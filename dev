@@ -1,0 +1,259 @@
+#!/usr/bin/env bash
+# =============================================================================
+#  ./dev — atalho para tudo no projeto (feito para WSL/Ubuntu + Docker)
+#
+#   ./dev build          compila (padrão se rodar só ./dev)
+#   ./dev run [exe|cue]  compila e abre no emulador do Windows (configure em dev.conf)
+#   ./dev models         exporta os .blend de assets/blender/ para models/ (Blender do Windows)
+#   ./dev watch          recompila sozinho sempre que você salvar um arquivo
+#   ./dev clean          apaga a pasta build/
+#   ./dev shell          abre um terminal dentro do ambiente de compilação
+#   ./dev image          (re)cria a imagem Docker do SDK
+#   ./dev vram           mostra onde cada textura ficou na VRAM
+#   ./dev doctor         confere se está tudo instalado
+#
+#  Por padrão usa Docker. Se você instalou o SDK direto no Ubuntu
+#  (scripts/setup-linux.sh), coloque USE_DOCKER=0 no dev.conf.
+# =============================================================================
+set -euo pipefail
+
+ROOT="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
+cd "$ROOT"
+
+IMAGE="psx-arena-sdk"
+USE_DOCKER=1
+EMULATOR=""
+EMULATOR_ARGS=""
+RUN_FILE="cue"
+BLENDER=""
+SDK_DIR="/opt/psn00bsdk"
+
+# Configuração pessoal (não vai para o git)
+if [[ ! -f dev.conf && -f dev.conf.example ]]; then
+	cp dev.conf.example dev.conf
+fi
+# shellcheck disable=SC1091
+[[ -f dev.conf ]] && source dev.conf
+
+c_ok()   { printf '\033[32m%s\033[0m\n' "$*"; }
+c_info() { printf '\033[36m%s\033[0m\n' "$*"; }
+c_err()  { printf '\033[31m%s\033[0m\n' "$*" >&2; }
+
+is_wsl() { grep -qi microsoft /proc/version 2>/dev/null; }
+
+# ---------------------------------------------------------------------------
+# Ambiente de compilação
+# ---------------------------------------------------------------------------
+need_docker() {
+	if ! command -v docker >/dev/null 2>&1; then
+		c_err "Docker não encontrado."
+		c_err "No Windows: instale o Docker Desktop e ative Settings > Resources > WSL Integration > Ubuntu."
+		c_err "Ou, dentro do Ubuntu:  sudo apt install docker.io && sudo usermod -aG docker \$USER  (e reabra o terminal)"
+		exit 1
+	fi
+	if ! docker info >/dev/null 2>&1; then
+		c_err "O Docker está instalado mas não está respondendo."
+		c_err "Abra o Docker Desktop no Windows (ou rode: sudo service docker start)."
+		exit 1
+	fi
+}
+
+ensure_image() {
+	need_docker
+	if ! docker image inspect "$IMAGE" >/dev/null 2>&1; then
+		c_info "Criando a imagem Docker do SDK (só na primeira vez, alguns minutos)..."
+		docker build -t "$IMAGE" "$ROOT"
+	fi
+}
+
+# Roda um comando no ambiente do SDK. No Docker, a pasta do projeto é montada
+# no MESMO caminho de dentro do WSL, assim mensagens de erro apontam para os
+# arquivos certos (e o VS Code consegue abrir com um clique).
+sdk() {
+	if [[ "$USE_DOCKER" == "1" ]]; then
+		ensure_image
+		local tty=()
+		if [[ "${SDK_INTERACTIVE:-0}" == "1" ]]; then tty=(-i); [[ -t 0 && -t 1 ]] && tty=(-it); fi
+		docker run --rm "${tty[@]}" \
+			--user "$(id -u):$(id -g)" \
+			-e HOME=/tmp \
+			-v "$ROOT":"$ROOT" -w "$ROOT" \
+			"$IMAGE" "$@"
+	else
+		export PSN00BSDK_LIBS="$SDK_DIR/lib/libpsn00b"
+		export PATH="$SDK_DIR/bin:$PATH"
+		"$@"
+	fi
+}
+
+target_triple() {
+	if [[ "$USE_DOCKER" != "1" ]] && command -v mipsel-none-elf-gcc >/dev/null 2>&1; then
+		echo mipsel-none-elf
+	else
+		echo mipsel-linux-gnu
+	fi
+}
+
+# Esconde mensagens repetitivas e inofensivas (use VERBOSE=1 ./dev build para ver tudo)
+quiet_filter() {
+	if [[ "${VERBOSE:-0}" == "1" ]]; then cat; return; fi
+	awk '
+		/^MKPSXISO/ { iso = 1 }
+		iso { if ($0 ~ /rror/) print; if ($0 ~ /^Total image size/) iso = 0; next }
+		/linking abicalls files with non-abicalls|uses -msoft-float|note\.gnu\.build-id/ { next }
+		{ print; fflush() }'
+}
+
+cmd_build() {
+	local t; t="$(target_triple)"
+	sdk sh -c "
+		if [ ! -f build/build.ninja ]; then
+			cmake --preset default -DPSN00BSDK_TARGET=$t > build-config.log 2>&1 || { cat build-config.log; exit 1; }
+			rm -f build-config.log
+		fi
+		cmake --build ./build
+	" 2>&1 | quiet_filter || { c_err "A compilação falhou (veja o erro acima)."; return 1; }
+
+	# Cabeçalhos do SDK para o autocompletar do VS Code (uma vez)
+	if [[ ! -d .sdk/include ]]; then
+		mkdir -p .sdk
+		if [[ "$USE_DOCKER" == "1" ]]; then
+			sdk cp -r /opt/psn00bsdk/include .sdk/ 2>/dev/null || true
+		else
+			cp -r "$SDK_DIR/include" .sdk/ 2>/dev/null || true
+		fi
+	fi
+	c_ok "OK: build/arena.exe  build/arena.cue  ($(stat -c %s build/arena.exe) bytes)"
+}
+
+cmd_clean() {
+	rm -rf build
+	c_ok "build/ apagada."
+}
+
+# ---------------------------------------------------------------------------
+# Emulador (programa do Windows chamado de dentro do WSL)
+# ---------------------------------------------------------------------------
+win_path() {
+	if is_wsl; then wslpath -w "$1"; else echo "$1"; fi
+}
+
+cmd_run() {
+	local what="${1:-$RUN_FILE}"
+	cmd_build
+	local file="$ROOT/build/arena.$what"
+	if [[ -z "$EMULATOR" ]]; then
+		c_err "Emulador não configurado. Edite o arquivo dev.conf e preencha EMULATOR."
+		c_info "Enquanto isso, abra no emulador:  $(win_path "$file")"
+		exit 1
+	fi
+	if [[ ! -e "$EMULATOR" ]]; then
+		c_err "Não achei o emulador em: $EMULATOR  (confira o dev.conf)"
+		exit 1
+	fi
+	c_info "Abrindo $(basename "$file") no emulador..."
+	# shellcheck disable=SC2086
+	( cd "$(dirname "$EMULATOR")" && "$EMULATOR" $EMULATOR_ARGS "$(win_path "$file")" >/dev/null 2>&1 & )
+}
+
+# ---------------------------------------------------------------------------
+# Blender
+# ---------------------------------------------------------------------------
+find_blender() {
+	if [[ -n "$BLENDER" ]]; then echo "$BLENDER"; return; fi
+	if is_wsl; then
+		local b
+		b=$(ls -d /mnt/c/Program\ Files/Blender\ Foundation/Blender*/blender.exe 2>/dev/null | sort -V | tail -1 || true)
+		[[ -n "$b" ]] && { echo "$b"; return; }
+	fi
+	command -v blender 2>/dev/null || true
+}
+
+cmd_models() {
+	local blender; blender="$(find_blender)"
+	if [[ -z "$blender" ]]; then
+		c_err "Blender não encontrado. Instale no Windows ou preencha BLENDER no dev.conf."
+		exit 1
+	fi
+	shopt -s nullglob
+	local files=(assets/blender/*.blend)
+	if (( ${#files[@]} == 0 )); then
+		c_err "Nenhum .blend em assets/blender/."
+		exit 1
+	fi
+	for f in "${files[@]}"; do
+		c_info "Exportando $f ..."
+		"$blender" --background "$(win_path "$ROOT/$f")" \
+			--python "$(win_path "$ROOT/tools/export_blend.py")" -- \
+			--models "$(win_path "$ROOT/models")" \
+			--textures "$(win_path "$ROOT/assets/textures")" 2>&1 \
+			| grep -E "^(PSX|ERRO|Erro|Error)" || true
+	done
+	c_ok "Modelos exportados. Agora: ./dev build"
+}
+
+# ---------------------------------------------------------------------------
+# Outros
+# ---------------------------------------------------------------------------
+cmd_watch() {
+	c_info "Observando src/ models/ assets/ — salve um arquivo para recompilar (Ctrl+C sai)."
+	local last=""
+	while true; do
+		local now
+		now=$(find src models assets CMakeLists.txt iso.xml -type f -printf '%T@ %p\n' 2>/dev/null | sort | md5sum)
+		if [[ "$now" != "$last" ]]; then
+			[[ -n "$last" ]] && { c_info "--- mudança detectada $(date +%T) ---"; cmd_build || true; }
+			last="$now"
+		fi
+		sleep 1
+	done
+}
+
+cmd_shell() {
+	c_info "Terminal do SDK (digite exit para sair)."
+	SDK_INTERACTIVE=1 sdk bash
+}
+
+cmd_image() {
+	need_docker
+	docker build -t "$IMAGE" "$ROOT"
+	c_ok "Imagem $IMAGE pronta."
+}
+
+cmd_vram() {
+	[[ -f build/textures/vram.txt ]] && cat build/textures/vram.txt || c_err "Compile primeiro (./dev build)."
+}
+
+cmd_doctor() {
+	echo "Projeto:   $ROOT"
+	if [[ "$ROOT" == /mnt/* ]]; then
+		c_err "  Aviso: o projeto está no disco do Windows (/mnt/...). Fica MUITO mais rápido em ~/ (disco do Linux)."
+	fi
+	is_wsl && c_ok "WSL:       sim" || echo "WSL:       não"
+	if [[ "$USE_DOCKER" == "1" ]]; then
+		if command -v docker >/dev/null && docker info >/dev/null 2>&1; then
+			c_ok "Docker:    ok"
+			docker image inspect "$IMAGE" >/dev/null 2>&1 && c_ok "Imagem:    $IMAGE ok" || echo "Imagem:    será criada no primeiro ./dev build"
+		else
+			c_err "Docker:    não disponível (veja ./dev build para instruções)"
+		fi
+	else
+		[[ -d "$SDK_DIR/lib/libpsn00b" ]] && c_ok "SDK local: $SDK_DIR" || c_err "SDK local: não encontrado em $SDK_DIR"
+	fi
+	[[ -n "$EMULATOR" && -e "$EMULATOR" ]] && c_ok "Emulador:  $EMULATOR" || echo "Emulador:  não configurado (dev.conf)"
+	local b; b="$(find_blender)"
+	[[ -n "$b" ]] && c_ok "Blender:   $b" || echo "Blender:   não encontrado (opcional)"
+}
+
+case "${1:-build}" in
+	build)  cmd_build ;;
+	run)    shift; cmd_run "$@" ;;
+	models) cmd_models ;;
+	watch)  cmd_watch ;;
+	clean)  cmd_clean ;;
+	shell)  cmd_shell ;;
+	image)  cmd_image ;;
+	vram)   cmd_vram ;;
+	doctor) cmd_doctor ;;
+	*)      sed -n '3,18p' "$0" | sed 's/^#//' ;;
+esac

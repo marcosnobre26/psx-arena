@@ -1,0 +1,39 @@
+<?xml version="1.0" encoding="utf-8"?>
+<!--
+	Configuração da imagem de CD (usada pelo mkpsxiso).
+	Caminhos são relativos à pasta build/. Para arquivos do projeto,
+	use ${PROJECT_SOURCE_DIR}/caminho.
+
+	Nomes de arquivo no CD seguem o formato 8.3 (ex: ARENA.EXE, FASE2.DAT).
+-->
+<iso_project>
+	<track type="data">
+		<identifiers
+			system			="PLAYSTATION"
+			volume			="PSX_ARENA"
+			volume_set		="PSX_ARENA"
+			publisher		="HOMEBREW"
+			data_preparer	="PSN00BSDK ${PSN00BSDK_VERSION}"
+			application		="PLAYSTATION"
+			copyright		="README.TXT;1"
+		/>
+
+		<!--
+			Alguns consoles (japoneses, PAL com modchip) exigem o arquivo de
+			licença da Sony. Ele não pode ser distribuído; se precisar, extraia
+			de um jogo original seu com o dumpsxiso e descomente a linha abaixo.
+		-->
+		<!--<license file="${PROJECT_SOURCE_DIR}/license.dat" />-->
+
+		<directory_tree>
+			<file name="SYSTEM.CNF"	type="data" source="${PROJECT_SOURCE_DIR}/system.cnf" />
+			<file name="ARENA.EXE"	type="data" source="arena.exe" />
+
+			<!-- Espaço reservado no fim do disco (recomendado) -->
+			<dummy sectors="1024"/>
+		</directory_tree>
+	</track>
+
+	<!-- Música em CD-DA: descomente e aponte para um .wav (44.1kHz estéreo) -->
+	<!--<track type="audio" source="${PROJECT_SOURCE_DIR}/assets/musica.wav" />-->
+</iso_project>

@@ -1,0 +1,11 @@
+{
+  "permissions": {
+    "allow": [
+      "Bash(./dev build)",
+      "Bash(./dev vram)",
+      "Bash(./dev doctor)",
+      "Bash(./dev clean)",
+      "Bash(VERBOSE=1 ./dev build)"
+    ]
+  }
+}

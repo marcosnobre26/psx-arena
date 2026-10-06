@@ -1,0 +1,10 @@
+build/
+.sdk/
+dev.conf
+build-config.log
+__pycache__/
+*.pyc
+*.blend1
+CLAUDE.local.md
+.claude/settings.local.json
+*:Zone.Identifier

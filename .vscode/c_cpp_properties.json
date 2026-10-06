@@ -1,0 +1,20 @@
+{
+	// Autocompletar do C para o PSn00bSDK. A pasta .sdk/ é criada pelo
+	// primeiro "./dev build" (cópia dos cabeçalhos do SDK que está no Docker).
+	"configurations": [
+		{
+			"name": "PS1 (PSn00bSDK)",
+			"includePath": [
+				"${workspaceFolder}/src",
+				"${workspaceFolder}/models",
+				"${workspaceFolder}/build/gen",
+				"${workspaceFolder}/.sdk/include/libpsn00b"
+			],
+			"defines": [ "PSN00BSDK=1", "NDEBUG=1" ],
+			"compilerPath": "",
+			"cStandard": "gnu11",
+			"intelliSenseMode": "linux-gcc-x86"
+		}
+	],
+	"version": 4
+}

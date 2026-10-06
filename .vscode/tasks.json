@@ -1,0 +1,44 @@
+{
+	// Ctrl+Shift+B = compilar.  Ctrl+Shift+P > "Tasks: Run Task" = outras tarefas.
+	"version": "2.0.0",
+	"tasks": [
+		{
+			"label": "PS1: compilar",
+			"type": "shell",
+			"command": "./dev build",
+			"group": { "kind": "build", "isDefault": true },
+			"problemMatcher": "$gcc",
+			"presentation": { "clear": true }
+		},
+		{
+			"label": "PS1: compilar e rodar no emulador",
+			"type": "shell",
+			"command": "./dev run",
+			"problemMatcher": "$gcc",
+			"presentation": { "clear": true }
+		},
+		{
+			"label": "PS1: exportar modelos do Blender",
+			"type": "shell",
+			"command": "./dev models && ./dev build",
+			"problemMatcher": "$gcc"
+		},
+		{
+			"label": "PS1: recompilar ao salvar (watch)",
+			"type": "shell",
+			"command": "./dev watch",
+			"isBackground": true,
+			"problemMatcher": "$gcc"
+		},
+		{
+			"label": "PS1: limpar build",
+			"type": "shell",
+			"command": "./dev clean"
+		},
+		{
+			"label": "PS1: mapa da VRAM",
+			"type": "shell",
+			"command": "./dev vram"
+		}
+	]
+}

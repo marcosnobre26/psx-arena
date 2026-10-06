@@ -1,0 +1,547 @@
+/*
+ * main.c - PS1 Arena: laço principal, câmera, HUD e telas
+ *
+ * Objetivo da fase: derrotar todos os inimigos da arena.
+ * Gemas dão pontos e energia; caixas podem esconder itens.
+ *
+ * Telas:  TÍTULO -> SELEÇÃO DE PERSONAGEM -> JOGO -> (PAUSA / FIM)
+ * Até 2 jogadores (controles 1 e 2). Online: veja "Jogar online" no README
+ * (netplay do RetroArch: o jogador remoto vira o controle 2).
+ */
+#include <stdio.h>
+#include <string.h>
+#include <stdlib.h>
+#include <psxapi.h>
+#include <psxpad.h>
+#include "game.h"
+#include "models.h"
+
+GAME    g;
+
+static int show_debug = 0;
+static int fps = 60, fps_frames = 0, fps_last = 0;
+
+void show_message(const char *text, int frames) {
+	strncpy(g.message, text, sizeof(g.message) - 1);
+	g.message[sizeof(g.message) - 1] = 0;
+	g.message_timer = frames;
+}
+
+/* ------------------------------------------------------------------ */
+/* Seleção de personagem (sobrevive entre partidas)                     */
+/* ------------------------------------------------------------------ */
+
+typedef struct {
+	int joined;      /* este controle está no jogo */
+	int character;   /* índice em character_defs */
+	int skin;
+	int ready;       /* confirmou a escolha */
+} SELECTION;
+
+static SELECTION sel[MAX_PLAYERS] = { { 1, 0, 0, 0 }, { 0, 1, 0, 0 } };
+
+/* Algum controle apertou um destes botões? Devolve qual (ou -1). */
+static int any_pressed(uint16_t mask) {
+	for (int i = 0; i < MAX_PLAYERS; i++)
+		if (g.in[i].pressed & mask)
+			return i;
+	return -1;
+}
+
+/* ------------------------------------------------------------------ */
+/* Partida                                                             */
+/* ------------------------------------------------------------------ */
+
+static void camera_update(int snap);
+static VECTOR cam_look;
+
+/* Lugar livre ao lado de (x,z) para o segundo jogador nascer */
+static void free_spot_near(int *x, int *z) {
+	static const int off[8][2] = { {1,0},{0,1},{-1,0},{0,-1},{1,1},{-1,1},{1,-1},{-1,-1} };
+	for (int k = 0; k < 8; k++) {
+		int tx = *x + off[k][0] * TILE_SIZE, tz = *z + off[k][1] * TILE_SIZE;
+		if (!level_blocked(tx, tz, PLAYER_RADIUS) && !collide_prop_at(tx, tz, PLAYER_RADIUS)) {
+			*x = tx; *z = tz;
+			return;
+		}
+	}
+}
+
+static void game_reset(void) {
+	INPUT in[MAX_PLAYERS];
+	memcpy(in, g.in, sizeof(in));
+	memset(&g, 0, sizeof(g));
+	memcpy(g.in, in, sizeof(in));
+
+	level_load(0);
+
+	/* cria os jogadores escolhidos na tela de seleção */
+	int x = g.spawn_x, z = g.spawn_z;
+	for (int i = 0; i < MAX_PLAYERS; i++) {
+		if (!sel[i].joined) continue;
+		PLAYER *p = &g.players[i];
+		p->index     = i;
+		p->active    = 1;
+		p->character = sel[i].character;
+		p->skin      = sel[i].skin;
+		if (g.num_players > 0)
+			free_spot_near(&x, &z);
+		player_spawn(p, x, z);
+		g.num_players++;
+	}
+
+	/* câmera começa olhando do início para o centro da fase */
+	g.cam_yaw = angle_of(level_width() * TILE_SIZE / 2 - g.spawn_x,
+	                     level_height() * TILE_SIZE / 2 - g.spawn_z);
+	for (int i = 0; i < MAX_PLAYERS; i++)
+		g.players[i].angle = g.cam_yaw;
+	camera_update(1);
+}
+
+/* ------------------------------------------------------------------ */
+/* Câmera em terceira pessoa (segue o grupo)                            */
+/* ------------------------------------------------------------------ */
+
+static void camera_update(int snap) {
+	if (g.state == STATE_PLAY) {
+		for (int i = 0; i < MAX_PLAYERS; i++) {   /* qualquer jogador gira */
+			if (!g.players[i].active) continue;
+			if (g.in[i].held & PAD_L1) g.cam_yaw -= CAM_TURN_SPEED;
+			if (g.in[i].held & PAD_R1) g.cam_yaw += CAM_TURN_SPEED;
+			g.cam_yaw += g.in[i].rx / 3;
+		}
+		g.cam_yaw &= 4095;
+	}
+
+	/* centro dos jogadores vivos (se ninguém vivo, de todos) e o quanto
+	 * estão afastados: a câmera recua para mostrar os dois */
+	int n = 0, cx = 0, cy = 0, cz = 0;
+	int minx = 0x7fffffff, maxx = -0x7fffffff, minz = 0x7fffffff, maxz = -0x7fffffff;
+	int only_alive = players_alive() > 0;
+	for (int i = 0; i < MAX_PLAYERS; i++) {
+		PLAYER *p = &g.players[i];
+		if (!p->active || (only_alive && !player_alive(p))) continue;
+		cx += p->pos.vx; cy += p->pos.vy; cz += p->pos.vz; n++;
+		if (p->pos.vx < minx) minx = p->pos.vx;
+		if (p->pos.vx > maxx) maxx = p->pos.vx;
+		if (p->pos.vz < minz) minz = p->pos.vz;
+		if (p->pos.vz > maxz) maxz = p->pos.vz;
+	}
+	if (n == 0) return;
+	cx /= n; cy /= n; cz /= n;
+	int extra = (n > 1) ? dist2d(maxx - minx, maxz - minz) * 2 / 3 : 0;
+	if (extra > 1400) extra = 1400;
+
+	/* Recua a câmera atrás do grupo. Se ela cair dentro de uma parede,
+	 * aproxima e SOBE (fica mais "de cima"), assim ninguém some atrás de
+	 * uma parede. */
+	int s = isin(g.cam_yaw), c = icos(g.cam_yaw);
+	int want_dist = CAM_DIST + extra;
+	VECTOR want;
+	int dist;
+	for (dist = want_dist; dist > CAM_MIN_DIST; dist -= 40) {
+		want.vx = cx - ((s * dist) >> 12);
+		want.vz = cz - ((c * dist) >> 12);
+		if (!level_blocked(want.vx, want.vz, 64))
+			break;
+	}
+	want.vy = (cy >> 1) - CAM_HEIGHT - extra * 3 / 4 - (want_dist - dist) * 3 / 4;
+
+	if (snap) {
+		g.cam_pos = want;
+	} else {   /* suaviza o movimento: anda 1/4 do caminho por quadro */
+		g.cam_pos.vx += (want.vx - g.cam_pos.vx) >> 2;
+		g.cam_pos.vy += (want.vy - g.cam_pos.vy) >> 2;
+		g.cam_pos.vz += (want.vz - g.cam_pos.vz) >> 2;
+	}
+
+	cam_look.vx = cx;
+	cam_look.vy = (cy >> 1) - CAM_LOOK_UP;
+	cam_look.vz = cz;
+}
+
+/* Envia a câmera calculada para o renderizador (uma vez por quadro) */
+static void camera_apply(void) {
+	render_set_camera(&g.cam_pos, &cam_look);
+}
+
+/* Na tela de título a câmera gira em volta da arena */
+static void camera_title(void) {
+	int cx = level_width() * TILE_SIZE / 2, cz = level_height() * TILE_SIZE / 2;
+	int a = (g.frame * 6) & 4095;
+	VECTOR eye  = { cx + ((isin(a) * 2600) >> 12), -1900, cz + ((icos(a) * 2600) >> 12) };
+	VECTOR look = { cx, 0, cz };
+	render_set_camera(&eye, &look);
+}
+
+/* ------------------------------------------------------------------ */
+/* HUD                                                                 */
+/* ------------------------------------------------------------------ */
+
+static void draw_bar(int x, int y, int w, int value, int max, int r, int gg, int b) {
+	if (value < 0) value = 0;
+	int fill = (w * value) / max;
+	render_rect(x, y, fill, 6, r, gg, b, 0);        /* frente (é desenhada depois) */
+	render_rect(x - 1, y - 1, w + 2, 8, 0, 0, 0, 1); /* fundo semitransparente */
+}
+
+static void draw_center(int y, const char *text) {
+	hud_print(160 - (int)strlen(text) * 4, y, "%s", text);
+}
+
+/* Bloco de vida/energia/arma de um jogador, a partir de (x, y) */
+static void draw_player_hud(const PLAYER *p, int x) {
+	if (g.num_players > 1)
+		hud_print(x, 2, "P%d %s", p->index + 1, character_defs[p->character].name);
+	if (!player_alive(p)) {
+		if (p->respawn_timer > 0)
+			hud_print(x, 18, "CAIDO - VOLTA EM %d", p->respawn_timer / 60 + 1);
+		else
+			hud_print(x, 18, "CAIDO");
+		return;
+	}
+	hud_print(x, 12, "HP");
+	draw_bar(x + 20, 13, 90, p->hp, p->max_hp, 230, 50, 60);
+	hud_print(x, 24, "EN");
+	draw_bar(x + 20, 25, 90, p->energy, PLAYER_MAX_ENERGY, 60, 150, 255);
+	hud_print(x, 36, "%s", weapon_defs[p->weapon].name);
+	if (g.num_players > 1)   /* com 2 jogadores falta espaço: sem o custo */
+		hud_print(x, 46, "%s", power_defs[p->power].name);
+	else
+		hud_print(x, 46, "%s (%d)", power_defs[p->power].name, power_defs[p->power].cost);
+}
+
+static void draw_hud(void) {
+	int col = 0;
+	for (int i = 0; i < MAX_PLAYERS; i++) {
+		if (!g.players[i].active) continue;
+		draw_player_hud(&g.players[i], col == 0 ? 12 : 196);
+		col++;
+	}
+
+	hud_print(12, 224, "PONTOS %05d  GEMAS %d/%d  INIMIGOS %d",
+	          g.score, g.gems, g.gems_total, g.enemies_left);
+
+	if (g.message_timer > 0)
+		draw_center(70, g.message);
+
+	if (show_debug) {
+		const PLAYER *p = &g.players[0];
+		hud_print(12, 196, "FPS %d  RAM GPU %d/%d", fps, render_stats_bytes(), PACKET_LEN);
+		hud_print(12, 206, "X %d Z %d ANG %d CAM %d", p->pos.vx, p->pos.vz, p->angle, g.cam_yaw);
+	}
+}
+
+/* ------------------------------------------------------------------ */
+/* Tela de seleção de personagem                                        */
+/* ------------------------------------------------------------------ */
+
+/* Os modelos são mostrados num "palco" longe da fase (fora da visão dela) */
+#define STAGE_X  (-9000)
+#define STAGE_Z  (-9000)
+
+static int joined_count(void) {
+	int n = 0;
+	for (int i = 0; i < MAX_PLAYERS; i++) n += sel[i].joined;
+	return n;
+}
+
+static void select_enter(void) {
+	for (int i = 0; i < MAX_PLAYERS; i++)
+		sel[i].ready = 0;
+	g.state = STATE_SELECT;
+}
+
+static void select_tick(void) {
+	for (int i = 0; i < MAX_PLAYERS; i++) {
+		SELECTION *s  = &sel[i];
+		INPUT     *in = &g.in[i];
+
+		if (!s->joined) {                 /* jogador 2 entra apertando START */
+			if (in->pressed & (PAD_START | PAD_CROSS)) {
+				s->joined = 1;
+				s->ready  = 0;
+			}
+			continue;
+		}
+
+		if (!s->ready) {
+			int n = num_characters;
+			if (in->pressed & PAD_LEFT)  s->character = (s->character + n - 1) % n;
+			if (in->pressed & PAD_RIGHT) s->character = (s->character + 1) % n;
+			if ((in->pressed & PAD_SELECT) && character_defs[s->character].use_skins)
+				s->skin = (s->skin + 1) % num_skins;
+			if (in->pressed & (PAD_CROSS | PAD_START))
+				s->ready = 1;
+			if (in->pressed & PAD_CIRCLE) {
+				if (i == 0) { g.state = STATE_TITLE; return; }   /* P1 volta */
+				s->joined = 0;                                     /* P2 sai */
+			}
+		} else if (in->pressed & PAD_CIRCLE) {
+			s->ready = 0;                     /* desfaz a confirmação */
+		}
+	}
+
+	/* todos que entraram confirmaram? começa! */
+	int all = 1;
+	for (int i = 0; i < MAX_PLAYERS; i++)
+		if (sel[i].joined && !sel[i].ready) all = 0;
+	if (all && sel[0].joined) {
+		srand(g.frame);
+		game_reset();
+		g.state = STATE_PLAY;
+		show_message("DERROTE TODOS OS INIMIGOS!", 120);
+	}
+}
+
+static void select_draw(void) {
+	static const CVECTOR ring_color[MAX_PLAYERS] = { { 80, 160, 255 }, { 255, 90, 90 } };
+	VECTOR eye  = { STAGE_X, -330, STAGE_Z - 1150 };
+	VECTOR look = { STAGE_X, -170, STAGE_Z };
+	render_set_camera(&eye, &look);
+
+	int nj = joined_count();
+	int slot = 0;
+
+	draw_center(12, "ESCOLHA SEU PERSONAGEM");
+
+	for (int i = 0; i < MAX_PLAYERS; i++) {
+		SELECTION *s = &sel[i];
+		if (!s->joined) continue;
+		const CHARACTER_DEF *c = &character_defs[s->character];
+
+		int sx = (nj == 1) ? 160 : (slot == 0 ? 80 : 240);   /* centro na tela */
+		int wx = (sx - 160) * 1150 / FOV_H;                    /* mesmo ponto no mundo */
+		slot++;
+
+		/* modelo girando sobre um anel colorido */
+		VECTOR  pos = { STAGE_X + wx, 0, STAGE_Z };
+		SVECTOR rot = { 0, (2048 + g.frame * 14) & 4095, 0 };
+		if (s->ready)
+			pos.vy = -((isin((g.frame * 200) & 4095) < 0 ? -isin((g.frame * 200) & 4095)
+			                                              :  isin((g.frame * 200) & 4095)) >> 7);
+		player_draw_model(&pos, &rot, s->character, s->skin);
+
+		DRAWOPT ro = { 0 };
+		ro.flags = DRAW_UNLIT | DRAW_SEMITRANS | DRAW_NOCULL;
+		ro.palette = &ring_color[i];
+		ro.npalette = 1;
+		VECTOR rp = { pos.vx, -4, pos.vz };
+		render_mesh(&ring_mesh, &rp, NULL, ONE * 3 / 4, &ro);
+
+		/* textos e atributos */
+		char line[40];
+		if (nj > 1) {
+			snprintf(line, sizeof(line), "JOGADOR %d", i + 1);
+			hud_print(sx - (int)strlen(line) * 4, 30, "%s", line);
+		}
+		snprintf(line, sizeof(line), s->ready ? "%s" : "< %s >", c->name);
+		hud_print(sx - (int)strlen(line) * 4, 150, "%s", line);
+
+		int bx = sx - 52;
+		hud_print(bx, 164, "VIDA");  draw_bar(bx + 44, 165, 60, c->max_hp, 200, 230, 50, 60);
+		hud_print(bx, 174, "VEL");   draw_bar(bx + 44, 175, 60, c->speed, 24, 80, 220, 120);
+		hud_print(bx, 184, "PULO");  draw_bar(bx + 44, 185, 60, c->jump, 50, 240, 200, 60);
+
+		snprintf(line, sizeof(line), "%s", weapon_defs[c->weapon].name);
+		hud_print(sx - (int)strlen(line) * 4, 196, "%s", line);
+
+		if (nj == 1)
+			draw_center(208, c->desc);
+		if (c->use_skins && !s->ready) {
+			snprintf(line, sizeof(line), "SELECT: %s", skin_defs[s->skin].name);
+			hud_print(sx - (int)strlen(line) * 4, nj == 1 ? 46 : 42, "%s", line);
+		}
+		if (s->ready && ((g.frame >> 4) & 1)) {
+			hud_print(sx - 28, 136, "PRONTO!");
+		}
+	}
+
+	if (!sel[1].joined)
+		draw_center(222, g.in[1].connected ? "CONTROLE 2: START PARA ENTRAR"
+		                                   : "LIGUE O CONTROLE 2 PARA 2 JOGADORES");
+	else
+		draw_center(222, "ESQ/DIR ESCOLHE  X CONFIRMA  O VOLTA");
+}
+
+/* ------------------------------------------------------------------ */
+/* Mundo                                                               */
+/* ------------------------------------------------------------------ */
+
+static void draw_world(int with_players) {
+	level_draw();
+	props_draw();
+	crates_draw();
+	pickups_draw();
+	enemies_draw();
+	bullets_draw();
+	effects_draw();
+	if (with_players)
+		for (int i = 0; i < MAX_PLAYERS; i++)
+			player_draw(&g.players[i]);
+}
+
+/* ------------------------------------------------------------------ */
+
+/* Lógica de UM passo (1/60 de segundo). Não desenha nada. */
+static void game_tick(void) {
+	int who;
+	switch (g.state) {
+	case STATE_TITLE:
+		effects_update();
+		who = any_pressed(PAD_START | PAD_CROSS);
+		if (who >= 0) {
+			sel[0].joined = 1;
+			if (who == 1) sel[1].joined = 1;   /* apertou no controle 2: entra também */
+			select_enter();
+		}
+		break;
+
+	case STATE_SELECT:
+		select_tick();
+		break;
+
+	case STATE_PLAY:
+		if (any_pressed(PAD_START) >= 0) {
+			g.state = STATE_PAUSE;
+			break;
+		}
+		for (int i = 0; i < MAX_PLAYERS; i++)
+			player_update(&g.players[i], &g.in[i]);
+		enemies_update();
+		bullets_update();
+		pickups_update();
+		effects_update();
+		camera_update(0);
+		g.play_frames++;
+		if (g.enemies_left == 0 && g.state == STATE_PLAY) {
+			g.state = STATE_WIN;
+			for (int i = 0; i < MAX_PLAYERS; i++)
+				if (player_alive(&g.players[i]))
+					g.score += g.players[i].hp * 10;
+			g.score += g.gems * 100;
+		}
+		break;
+
+	case STATE_PAUSE:
+		if (any_pressed(PAD_START) >= 0)
+			g.state = STATE_PLAY;
+		break;
+
+	case STATE_WIN:
+	case STATE_DEAD:
+		enemies_update();
+		effects_update();
+		camera_update(0);
+		if (any_pressed(PAD_START) >= 0) {        /* mesma escolha, de novo */
+			game_reset();
+			g.state = STATE_PLAY;
+		} else if (any_pressed(PAD_SELECT) >= 0) { /* trocar de personagem */
+			select_enter();
+		}
+		break;
+	}
+
+	if (g.message_timer > 0)
+		g.message_timer--;
+	g.frame++;
+}
+
+/* Desenha o quadro atual */
+static void game_draw(void) {
+	switch (g.state) {
+	case STATE_TITLE:
+		camera_title();
+		draw_world(0);
+		draw_center(60,  "P S 1   A R E N A");
+		draw_center(76,  "projeto base PSn00bSDK");
+		if ((g.frame >> 5) & 1)
+			draw_center(150, "APERTE START");
+		draw_center(200, "1 OU 2 JOGADORES");
+		break;
+
+	case STATE_SELECT:
+		select_draw();
+		break;
+
+	case STATE_PLAY:
+		camera_apply();
+		draw_world(1);
+		draw_hud();
+		break;
+
+	case STATE_PAUSE:
+		camera_apply();
+		draw_world(1);
+		draw_hud();
+		draw_center(70,  "PAUSA");
+		draw_center(96,  "X pular   QUADRADO atirar");
+		draw_center(108, "TRIANGULO arma  CIRCULO poder");
+		draw_center(120, "R2 troca poder  L1/R1 camera");
+		draw_center(132, "SELECT skin  L2 debug");
+		break;
+
+	case STATE_WIN:
+	case STATE_DEAD:
+		camera_apply();
+		draw_world(g.state == STATE_WIN);
+		draw_hud();
+		if (g.state == STATE_WIN) {
+			draw_center(90, "FASE COMPLETA!");
+			hud_print(104, 110, "TEMPO  %02d:%02d", g.play_frames / 3600, (g.play_frames / 60) % 60);
+			hud_print(104, 122, "PONTOS %05d", g.score);
+		} else {
+			draw_center(100, "GAME OVER");
+		}
+		if ((g.frame >> 5) & 1)
+			draw_center(150, "START jogar de novo");
+		draw_center(164, "SELECT trocar personagem");
+		break;
+	}
+}
+
+int main(void) {
+	render_init();
+	input_init();
+
+	assets_load_textures();     /* todas as texturas de assets/ (gerado) */
+
+	srand(12345);
+	game_reset();
+	g.state = STATE_TITLE;
+
+	int last_vsync = VSync(-1);
+
+	while (1) {
+		/* PASSO FIXO: a lógica sempre roda 60 vezes por segundo, mesmo que
+		 * o desenho caia para 30 ou 20 quadros. Assim o jogo não fica
+		 * "em câmera lenta" quando a cena é pesada. */
+		int now   = VSync(-1);
+		int ticks = now - last_vsync;
+		last_vsync = now;
+		if (ticks < 1) ticks = 1;
+		if (ticks > 4) ticks = 4;
+
+		input_update(g.in);
+		if (g.in[0].pressed & PAD_L2)   /* L2 liga/desliga a depuração */
+			show_debug ^= 1;
+
+		for (int t = 0; t < ticks; t++) {
+			game_tick();
+			for (int i = 0; i < MAX_PLAYERS; i++)
+				g.in[i].pressed = 0;    /* "apertou agora" vale só 1 passo */
+		}
+
+		game_draw();
+		render_end_frame();
+
+		/* medidor de FPS (VSync(-1) conta os retraços desde o boot) */
+		fps_frames++;
+		if (now - fps_last >= 60) {
+			fps = fps_frames * 60 / (now - fps_last);
+			fps_frames = 0;
+			fps_last = now;
+		}
+	}
+	return 0;
+}

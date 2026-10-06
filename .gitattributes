@@ -1,0 +1,19 @@
+# Finais de linha LF para tudo que roda no Linux/WSL/Docker
+* text=auto eol=lf
+dev                 text eol=lf
+*.sh                text eol=lf
+*.py                text eol=lf
+*.c                 text eol=lf
+*.h                 text eol=lf
+*.cmake             text eol=lf
+CMakeLists.txt      text eol=lf
+Dockerfile          text eol=lf
+system.cnf          text eol=lf
+
+# Binários
+*.blend             binary
+*.png               binary
+*.tim               binary
+*.bin               binary
+*.exe               binary
+*.cue               text eol=lf

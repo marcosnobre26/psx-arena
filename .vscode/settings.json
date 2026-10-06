@@ -1,0 +1,8 @@
+{
+	"files.associations": { "*.h": "c" },
+	"files.eol": "\n",
+	"files.exclude": { "build": false, ".sdk": true },
+	"editor.insertSpaces": false,
+	"editor.tabSize": 4,
+	"cmake.sourceDirectory": "/wsl.localhost/Ubuntu/tmp/psx-novo/psx-arena"
+}
