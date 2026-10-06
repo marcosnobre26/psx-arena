@@ -89,7 +89,7 @@ O mapa é texto, em [`src/level.c`](../src/level.c):
 | `P` | início dos jogadores | `C` | caixa destrutível |
 | `G` | gema | `H` | vida |
 | `N` | energia | `W` | arma nova |
-| `E` `B` `F` `A` | inimigos (`enemy_defs`; `A` = atirador) | espaço | vazio |
+| `E` `B` `F` | inimigos (`enemy_defs`) | espaço | vazio |
 | `1`…`9` | objetos de cenário (`prop_defs`) | | |
 
 Regras: todas as linhas com o mesmo tamanho, máximo 32×32. Chão, paredes
@@ -242,32 +242,11 @@ O parâmetro `p` é quem usou o poder — funciona igual para o jogador 1 e o 2.
 
 Em `enemy_defs` (`data.c`), uma linha com uma **letra nova**, e use a letra no mapa:
 ```c
-/* nome    letra vida vel dano tamanho pontos arma alcance modelo       paleta (corpo, chifres, olhos) */
-{ "CHEFE", 'K',  60,  3,  40,  ONE*3,  2000,  -1,    0,   &grunt_mesh, { {255,40,40}, {60,0,0}, {255,255,0} } },
+/* nome    letra vida vel dano tamanho pontos modelo       paleta (corpo, chifres, olhos) */
+{ "CHEFE", 'K',  60,  3,  40,  ONE*3,  2000, &grunt_mesh, { {255,40,40}, {60,0,0}, {255,255,0} } },
 ```
 Para um modelo seu, troque `&grunt_mesh`. A paleta troca as cores por slot
 de material (como as skins).
-
-### Inimigo que atira
-
-`arma` é um índice em `enemy_weapon_defs` (`data.c`); `-1` = só ataca
-encostando. `alcance` é a distância em que ele para e atira (256 = 1 bloco).
-O atirador incluído é o `ATIRADOR` (letra `A`):
-
-```c
-{ "ATIRADOR", 'A', 4, 6, 10, ONE*5/4, 250,  0, 1800, &grunt_mesh, { ... } },
-```
-
-Comportamento: persegue até o alcance, para (recua se você chegar a menos da
-metade do alcance), e quando **enxerga** você (sem parede/caixa/pilar no
-meio) pisca por 1/3 s e dispara. Os tiros saem na altura do peito: **pular
-no auge** faz o tiro passar por baixo.
-
-Para um chefe que atira em leque, use `arma = 1` ("LEQUE"). Arma nova de
-inimigo = linha nova em `enemy_weapon_defs` (mesmas colunas de
-`weapon_defs`; aqui "recarga" é a pausa entre um tiro e o próximo aviso).
-Ela fica numa tabela separada para não aparecer nos itens `W` do jogador.
-Prefira tiros **lentos e grandes** — o jogador precisa ver para desviar.
 
 ---
 
@@ -332,8 +311,7 @@ Do mais fácil ao mais difícil:
 3. Criar uma arma, uma skin e um poder.
 4. Modelar um personagem no Blender e colocá-lo na seleção.
 5. Fazer uma textura e aplicar num modelo com UV.
-6. ~~Um inimigo que atira~~ (feito: `ATIRADOR`). Próximo passo: fazê-lo andar
-   de lado (strafe) enquanto mira, ou um chefe com o "LEQUE".
+6. Um inimigo que **atira** (reaproveite `weapons.c` com um campo "dono").
 7. Uma **segunda fase** (novo mapa em `level_maps` + `level_load(1)` ao vencer).
 8. **Som**: biblioteca `psxspu` do PSn00bSDK (exemplos em `examples/sound`)
    ou música CD-DA no `iso.xml`.

@@ -38,19 +38,6 @@ const WEAPON_DEF weapon_defs[] = {
 const int num_weapons = sizeof(weapon_defs) / sizeof(weapon_defs[0]);
 
 /* ------------------------------------------------------------------ */
-/* ARMAS DOS INIMIGOS — tabela separada para o jogador nunca pegá-las */
-/* (os itens "W" percorrem weapon_defs inteira). Tiros lentos e      */
-/* grandes: o jogador precisa conseguir ver e desviar (ou pular).     */
-/* "recarga" aqui é a pausa entre um tiro e o próximo aviso.          */
-/* ------------------------------------------------------------------ */
-const WEAPON_DEF enemy_weapon_defs[] = {
-	/* nome            recarga vel  dano proj abert. impr. vida  tamanho    cor */
-	{ "BOLA DE FOGO",     90,   18,  10,   1,    0,   40,  130, ONE*3/2,   { 255, 120,  30 } },
-	{ "LEQUE",           120,   16,   8,   3,  200,    0,  110, ONE,       { 255,  60, 160 } },
-};
-const int num_enemy_weapons = sizeof(enemy_weapon_defs) / sizeof(enemy_weapon_defs[0]);
-
-/* ------------------------------------------------------------------ */
 /* PODERES — funções implementadas em powers.c                         */
 /* ------------------------------------------------------------------ */
 void power_shockwave(PLAYER *p);
@@ -69,15 +56,12 @@ const int num_powers = sizeof(power_defs) / sizeof(power_defs[0]);
 /* INIMIGOS — todos usam o modelo grunt com tamanho/cores diferentes. */
 /* Troque .mesh por um modelo seu exportado do Blender!                */
 /* Paleta: [0] corpo, [1] chifres, [2] olhos (materiais do modelo)    */
-/* arma: índice em enemy_weapon_defs (-1 = só ataca encostando)       */
-/* alcance: o atirador para a essa distância do jogador e atira       */
 /* ------------------------------------------------------------------ */
 const ENEMY_DEF enemy_defs[] = {
-	/* nome       letra  vida vel dano tamanho  pontos arma alcance modelo        paleta */
-	{ "GRUNT",    'E',   3,   7,  10, ONE,      100,   -1,     0, &grunt_mesh, { { 210,  50,  60 }, {  90,  20,  40 }, { 255, 230,  60 } } },
-	{ "BRUTO",    'B',  10,   4,  25, ONE*3/2,  300,   -1,     0, &grunt_mesh, { { 130,  60, 200 }, {  40,  20,  70 }, { 255,  80,  80 } } },
-	{ "VELOZ",    'F',   2,  12,   8, ONE*3/4,  150,   -1,     0, &grunt_mesh, { {  60, 200,  80 }, {  20,  70,  30 }, { 255, 255, 255 } } },
-	{ "ATIRADOR", 'A',   4,   6,  10, ONE*5/4,  250,    0,  1800, &grunt_mesh, { { 240, 140,  30 }, {  70,  40,  10 }, { 120, 255, 255 } } },
+	/* nome     letra  vida vel dano tamanho  pontos modelo        paleta */
+	{ "GRUNT",   'E',   3,   7,  10, ONE,      100, &grunt_mesh, { { 210,  50,  60 }, {  90,  20,  40 }, { 255, 230,  60 } } },
+	{ "BRUTO",   'B',  10,   4,  25, ONE*3/2,  300, &grunt_mesh, { { 130,  60, 200 }, {  40,  20,  70 }, { 255,  80,  80 } } },
+	{ "VELOZ",   'F',   2,  12,   8, ONE*3/4,  150, &grunt_mesh, { {  60, 200,  80 }, {  20,  70,  30 }, { 255, 255, 255 } } },
 };
 const int num_enemy_types = sizeof(enemy_defs) / sizeof(enemy_defs[0]);
 

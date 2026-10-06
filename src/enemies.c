@@ -1,12 +1,8 @@
 /*
  * enemies.c - Inimigos: perseguem o jogador mais próximo, causam dano ao encostar
  *
- * Atiradores (enemy_defs com arma >= 0): perseguem até o alcance, param
- * (ou recuam se o jogador chegar perto), e quando enxergam o alvo fazem
- * um "aviso" piscando antes de cada tiro — tempo para o jogador reagir.
- *
  * Ideias para praticar:
- *   - um atirador que anda de lado (strafe) em vez de ficar parado
+ *   - um inimigo que atira (reaproveite weapons.c com uma flag "do inimigo")
  *   - um inimigo que foge quando está com pouca vida
  *   - um chefe com mais vida e um ataque de onda de choque
  */
@@ -16,27 +12,9 @@
 
 #define CHASE_DIST   3600   /* distância em que o inimigo "vê" o jogador */
 #define ENEMY_RADIUS 90     /* raio de colisão com tamanho ONE */
-#define WINDUP_TIME  20     /* passos parado e piscando antes de atirar (1/3 s) */
-#define LOS_STEP     64     /* passo da checagem de linha de visão */
 
 int enemy_radius(const ENEMY *e) {
 	return (ENEMY_RADIUS * enemy_defs[e->type].scale) >> 12;
-}
-
-/* Linha de visão: anda pela reta de LOS_STEP em LOS_STEP unidades
- * procurando parede, caixa ou objeto sólido — os mesmos obstáculos que
- * param um tiro. Sem isso o atirador gastaria tiros na parede (e o pool
- * de projéteis, que é dividido com o jogador). */
-static int line_of_sight(int x0, int z0, int x1, int z1) {
-	int dx = x1 - x0, dz = z1 - z0;
-	int steps = dist2d(dx, dz) / LOS_STEP;
-	for (int s = 1; s < steps; s++) {
-		int x = x0 + dx * s / steps;
-		int z = z0 + dz * s / steps;
-		if (level_cell_solid(x / TILE_SIZE, z / TILE_SIZE) || collide_prop_at(x, z, 24))
-			return 0;
-	}
-	return 1;
 }
 
 void enemy_spawn(int type, int x, int z) {
@@ -51,8 +29,6 @@ void enemy_spawn(int type, int x, int z) {
 		e->flash = e->kx = e->kz = 0;
 		e->think = rand_range(30, 120);
 		e->hit_cooldown = 0;
-		e->shot_timer = rand_range(60, 150);  /* não atiram todos juntos */
-		e->windup = e->sees = 0;
 		g.enemies_left++;
 		return;
 	}
@@ -94,16 +70,6 @@ void enemies_update(void) {
 		PLAYER *p = player_nearest(e->pos.vx, e->pos.vz, &dist);
 		int chasing = p && dist < CHASE_DIST && g.state == STATE_PLAY;
 
-		/* --- atirador: enxerga o alvo? ---
-		 * A linha de visão custa ~30 testes, então cada inimigo só refaz a
-		 * conta a cada 8 passos, e cada um num passo diferente (+ i). */
-		int shooter = d->weapon >= 0;
-		if (!shooter || !chasing)
-			e->sees = 0;
-		else if (((g.frame + i) & 7) == 0)
-			e->sees = line_of_sight(e->pos.vx, e->pos.vz, p->pos.vx, p->pos.vz);
-		int aiming = shooter && chasing && e->sees && dist < d->range;
-
 		/* --- decidir direção --- */
 		if (chasing) {
 			e->angle = turn_towards(e->angle, angle_of(p->pos.vx - e->pos.vx, p->pos.vz - e->pos.vz), 96);
@@ -115,12 +81,6 @@ void enemies_update(void) {
 		/* --- mover com colisão contra paredes, cenário, jogadores e outros
 		 *     inimigos (ninguém atravessa ninguém) --- */
 		int sp = chasing ? d->speed : d->speed / 2;
-		if (aiming) {
-			if (e->windup == 0 && dist < d->range / 2)
-				sp = -d->speed / 2;   /* jogador perto demais: recua de frente para ele */
-			else
-				sp = 0;               /* na distância certa (ou mirando): fica parado */
-		}
 		int mx = ((isin(e->angle) * sp) >> 12) + e->kx;
 		int mz = ((icos(e->angle) * sp) >> 12) + e->kz;
 		e->kx = e->kx * 3 / 4;     /* empurrão vai diminuindo */
@@ -141,23 +101,6 @@ void enemies_update(void) {
 			e->hit_cooldown = 30;
 		}
 
-		/* --- atirar: espera a recarga, avisa (windup) e dispara ---
-		 * Atira na direção em que está olhando; como turn_towards continua
-		 * girando durante o aviso, o tiro sai mirado no jogador, mas quem
-		 * se mexe de lado depois do disparo escapa (o tiro é lento). */
-		if (aiming) {
-			if (e->windup > 0) {
-				if (--e->windup == 0) {
-					enemy_fire(e, e->angle);
-					e->shot_timer = enemy_weapon_defs[d->weapon].cooldown;
-				}
-			} else if (--e->shot_timer <= 0) {
-				e->windup = WINDUP_TIME;
-			}
-		} else {
-			e->windup = 0;   /* perdeu o alvo de vista: cancela o aviso */
-		}
-
 		if (e->flash > 0) e->flash--;
 	}
 }
@@ -172,7 +115,6 @@ void enemies_draw(void) {
 		opt.palette  = d->palette;
 		opt.npalette = 3;
 		if (e->flash & 2) opt.flags |= DRAW_FLASH;
-		if (e->windup & 4) opt.flags |= DRAW_FLASH;   /* aviso: vai atirar! */
 
 		/* pulinhos enquanto anda */
 		VECTOR pos = e->pos;

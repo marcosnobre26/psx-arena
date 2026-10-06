@@ -41,7 +41,6 @@ int collide_blocked(int x, int z, int y, int radius, const void *self, int mask,
 	if (level_blocked(x, z, radius))
 		return 1;
 
-	/* objetos de cenário sólidos */
 	for (int i = 0; i < MAX_PROPS; i++) {
 		const PROP *p = &g.props[i];
 		if (!p->active || !prop_defs[p->def].solid) continue;
@@ -50,7 +49,6 @@ int collide_blocked(int x, int z, int y, int radius, const void *self, int mask,
 			return 1;
 	}
 
-	/* jogadores */
 	if (mask & COL_PLAYERS) {
 		for (int i = 0; i < MAX_PLAYERS; i++) {
 			const PLAYER *o = &g.players[i];
@@ -61,7 +59,6 @@ int collide_blocked(int x, int z, int y, int radius, const void *self, int mask,
 		}
 	}
 
-	/* inimigos */
 	if (mask & COL_ENEMIES) {
 		for (int i = 0; i < MAX_ENEMIES; i++) {
 			const ENEMY *e = &g.enemies[i];
@@ -74,7 +71,6 @@ int collide_blocked(int x, int z, int y, int radius, const void *self, int mask,
 	return 0;
 }
 
-/* Move pos em (dx,dz). Devolve 1 se algum eixo foi bloqueado. */
 int collide_move(VECTOR *pos, int dx, int dz, int radius, const void *self, int mask) {
 	int hit = 0;
 	if (dx) {
@@ -92,7 +88,6 @@ int collide_move(VECTOR *pos, int dx, int dz, int radius, const void *self, int 
 	return hit;
 }
 
-/* Algum objeto de cenário sólido encosta no círculo (x,z,r)? (tiros) */
 int collide_prop_at(int x, int z, int radius) {
 	for (int i = 0; i < MAX_PROPS; i++) {
 		const PROP *p = &g.props[i];

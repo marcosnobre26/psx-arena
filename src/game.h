@@ -70,8 +70,6 @@ typedef struct {
 	int           damage;
 	int           scale;     /* ONE = tamanho do modelo exportado */
 	int           score;
-	int           weapon;    /* índice em enemy_weapon_defs; -1 = só corpo a corpo */
-	int           range;     /* atiradores param a esta distância e atiram */
 	const MESH   *mesh;
 	CVECTOR       palette[3];/* cores por material do modelo */
 } ENEMY_DEF;
@@ -106,8 +104,6 @@ typedef struct {
 
 extern const WEAPON_DEF weapon_defs[];
 extern const int        num_weapons;
-extern const WEAPON_DEF enemy_weapon_defs[];   /* armas que só inimigos usam */
-extern const int        num_enemy_weapons;
 extern const POWER_DEF  power_defs[];
 extern const int        num_powers;
 extern const ENEMY_DEF  enemy_defs[];
@@ -154,22 +150,15 @@ typedef struct {
 	int     kx, kz;         /* empurrão (knockback) */
 	int     think;          /* contador para mudar de direção ao vagar */
 	int     hit_cooldown;
-	int     shot_timer;     /* atiradores: quadros até o próximo tiro */
-	int     windup;         /* atiradores: >0 = parado, piscando, prestes a atirar */
-	int     sees;           /* atiradores: tem linha de visão até o alvo */
 } ENEMY;
-
-/* Quem disparou o tiro: decide em quem ele acerta e de qual tabela vem a arma */
-enum { OWNER_PLAYER, OWNER_ENEMY };
 
 typedef struct {
 	int     active;
-	int     owner;          /* OWNER_PLAYER ou OWNER_ENEMY */
 	VECTOR  pos;
 	int     vx, vz;
 	int     life;
 	int     damage;
-	int     weapon;         /* índice em weapon_defs ou enemy_weapon_defs (veja owner) */
+	int     weapon;
 } BULLET;
 
 enum { PICK_GEM, PICK_HEALTH, PICK_ENERGY, PICK_WEAPON, NUM_PICKUP_TYPES };
@@ -291,7 +280,6 @@ ENEMY *enemy_nearest_in_cone(int x, int z, int angle, int cone, int max_dist);
 
 /* weapons.c */
 void weapon_fire(PLAYER *p);
-void enemy_fire(ENEMY *e, int angle);
 void bullets_update(void);
 void bullets_draw(void);
 
