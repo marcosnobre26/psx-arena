@@ -48,6 +48,7 @@ Depois de qualquer mudança: `./dev run` (compila e abre no emulador) ou
 | **L2** (soltar) | depuração: névoa, memória do SPU, semente, polígonos, FPS, memória de primitivas, posição |
 | **L2 + Start** | (com o overlay aberto) pula para a próxima fase |
 | **L2 + direcional** | (com o overlay aberto) teleporta para os 4 pontos fixos da fase de teste |
+| **L2 + Select** | (com o overlay aberto) mostra a grade de colisão: quadrado em cada célula sólida perto do jogador 1 |
 
 **Tela de seleção:** esquerda/direita escolhe, **Select** troca a skin,
 **X** confirma, **Círculo** desfaz (ou volta ao título). O **controle 2**
@@ -192,6 +193,12 @@ tela só se aplica a névoa. Texturas da floresta: `tools/make_forest_textures.p
 
 **Mudou o mapa durante o jogo?** `level_set_cell()` e depois
 `level_invalidate(x, z)`: o bloco da célula é remontado.
+
+**Conferir a colisão:** com o overlay aberto, **L2 + Select** desenha um
+quadrado em cima de cada célula sólida em volta do jogador 1 (raio
+`COLMARK_RADIUS`), na altura do topo: vermelho = parede/mata, laranja =
+caixa, roxo = vazio. Desenho e colisão batem quando cada parede tem o seu
+quadrado vermelho exatamente no topo.
 
 **Medir sempre no mesmo lugar (fase 5):** com o overlay aberto, segure
 **L2** e aperte o direcional: ← início, → cruzamento das trilhas, ↑ canto

@@ -121,6 +121,12 @@ uma branch. As regras do ROADMAP (determinismo, orçamentos de desempenho,
   Parsec. Modo link (SIO1/lockstep) é proposta não implementada (README).
 - RAM do SPU: ~12,6 KB por segundo de som a 22 kHz (o manual, R8, diz 8 KB/s —
   está errado). Orçamento 450 KB; cada som também ocupa RAM principal (incbin).
+- **GTE + GCC:** as macros de *carga* (`gte_SetRotMatrix`, `gte_SetTransMatrix`,
+  `gte_SetColorMatrix`, `gte_ldv3`, `gte_ldrgb`...) leem memória sem avisar o
+  compilador. Se a função acabou de escrever a matriz/vértices/cor, chame
+  `GTE_BARRIER()` (em `render.c`) antes, senão o GCC pode apagar ou atrasar
+  as escritas (bug da 04a: blocos desenhados na origem). Dados que vêm de
+  uma chamada de função (ex.: `CompMatrixLV`) já estão na memória.
 - Mapa grande: coordenadas do mundo vão a 32 768 → **nunca** guarde posição
   de mundo em `SVECTOR` (16 bits); use `VECTOR` ou vértices relativos a uma
   origem (`load_translation` em `render.c`).

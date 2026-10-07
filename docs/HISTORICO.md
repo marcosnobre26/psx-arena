@@ -157,3 +157,14 @@ automatizar testes visuais.
   | ↑ canto denso | a medir | | | |
   | ↓ clareira | a medir | | | |
   | fase 2 CORREDORES (pior ponto da etapa 03) | a medir | | | |
+- 2026-10-07 — Correção da 04a: blocos desenhados na origem, desencontrados
+  da colisão. As macros de carga da GTE leem memória dentro de um `asm` sem
+  declarar isso; em `load_translation` o GCC apagou a soma da translação e
+  todos os blocos (e o cone da lanterna) iam para a origem do mundo.
+  Confirmado no assembly (`ctc2 $5..$7` carregando a translação da câmera
+  sem a origem do bloco). Correção: `GTE_BARRIER()` (asm com clobber
+  `"memory"`) antes das cargas de dados recém-escritos (`load_translation`,
+  cone, `render_set_light`, cor em `render_mesh`) e `R·p` em inteiros no
+  lugar do `ApplyMatrixLV`. Dados verificados compilando `level.c` no host:
+  nas 5 fases todo quad de chão cai em célula livre e todo topo em célula
+  sólida. Novo atalho L2 + Select: marcadores da grade de colisão.
