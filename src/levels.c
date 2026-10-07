@@ -138,8 +138,16 @@ static const char *const map_cerco[] = {
 #define TRAIL_Z      63      /* trilha leste-oeste (3 células: 62..64) */
 #define TRAIL_X      63      /* trilha norte-sul */
 
-static uint32_t fhash(int x, int z) {
-	uint32_t h = (uint32_t)x * 374761393u + (uint32_t)z * 668265263u;
+/* Hash de posição COM SEMENTE. A fase de teste usa uma semente fixa
+ * (FOREST_TEST_SEED: medições sempre no mesmo cenário). Na etapa 05 o
+ * gerador deve passar uma semente derivada de g.seed (já definida antes
+ * do level_load): mapas diferentes a cada partida, iguais nos dois
+ * consoles. Nunca use g.rng aqui (o mapa não deve consumir o gerador
+ * da lógica) nem nada local (tempo, VSync). */
+#define FOREST_TEST_SEED 0x5eed04b1u
+
+static uint32_t fhash(uint32_t seed, int x, int z) {
+	uint32_t h = seed ^ ((uint32_t)x * 374761393u + (uint32_t)z * 668265263u);
 	h = (h ^ (h >> 13)) * 1274126177u;
 	return h ^ (h >> 16);
 }
@@ -159,14 +167,26 @@ static int in_clearing(int x, int z) {
 	return 0;
 }
 
+/* Árvore com variação por hash: tipo (pinheiro 65%/seca 35%), deslocamento
+ * dentro da célula, rotação e tamanho. */
+static void forest_tree(uint32_t seed, int x, int z) {
+	uint32_t h = fhash(seed ^ 0x7a3u, x, z);
+	int type = (h % 100) < 65 ? TREE_PINE : TREE_DEAD;
+	const TREE_DEF *d = &tree_defs[type];
+	int wx = x * TILE_SIZE + TILE_SIZE / 2 + (int)((h >> 8) % 81) - 40;
+	int wz = z * TILE_SIZE + TILE_SIZE / 2 + (int)((h >> 16) % 81) - 40;
+	int scale = d->scale_min + (int)((h >> 4) % (uint32_t)(d->scale_max - d->scale_min + 1));
+	level_add_tree(type, wx, wz, (h >> 20) & 4095, scale);
+}
+
 static void build_test_forest(void) {
+	const uint32_t seed = FOREST_TEST_SEED;
 	level_begin(FOREST_W, FOREST_H);
 
 	for (int z = 0; z < FOREST_H; z++)
 	for (int x = 0; x < FOREST_W; x++) {
-		uint32_t h = fhash(x, z), patch = fhash(x >> 2, z >> 2);
+		uint32_t h = fhash(seed, x, z), patch = fhash(seed, x >> 2, z >> 2);
 		int trail = (z >= TRAIL_Z - 1 && z <= TRAIL_Z + 1) || (x >= TRAIL_X - 1 && x <= TRAIL_X + 1);
-		int near_trail = (z >= TRAIL_Z - 2 && z <= TRAIL_Z + 2) || (x >= TRAIL_X - 2 && x <= TRAIL_X + 2);
 		int border = x < FOREST_BORDER || z < FOREST_BORDER ||
 		             x >= FOREST_W - FOREST_BORDER || z >= FOREST_H - FOREST_BORDER;
 		int type;
@@ -181,15 +201,48 @@ static void build_test_forest(void) {
 			type = (h % 9 == 0) ? CELL_ROOTS : CELL_DIRT;   /* trilha com raízes soltas */
 		else if (in_clearing(x, z))
 			type = CELL_LEAVES;
-		else if (!near_trail) {
-			/* moitas de 2x2; o canto nordeste é bem mais fechado */
-			int dense = (x >= 96 && z < 32) ? 26 : 7;
-			if (fhash(x >> 1, z >> 1) % 100 < (uint32_t)dense)
-				type = CELL_THICKET;
-		}
 		if (border)
-			type = CELL_THICKET;
+			type = CELL_THICKET;                         /* borda: mata alta de 3 m */
 		level_set_cell(x, z, type);
+	}
+
+	/* ÁRVORES (depois das células: level_set_cell zeraria a solidez).
+	 * Interior: ~5% das células, ~16% no canto nordeste (o pior caso);
+	 * nunca nas trilhas, perto delas ou nas clareiras. */
+	for (int z = FOREST_BORDER; z < FOREST_H - FOREST_BORDER; z++)
+	for (int x = FOREST_BORDER; x < FOREST_W - FOREST_BORDER; x++) {
+		int near_trail = (z >= TRAIL_Z - 2 && z <= TRAIL_Z + 2) || (x >= TRAIL_X - 2 && x <= TRAIL_X + 2);
+		if (near_trail || in_clearing(x, z))
+			continue;
+		int edge = x == FOREST_BORDER || z == FOREST_BORDER ||
+		           x == FOREST_W - FOREST_BORDER - 1 || z == FOREST_H - FOREST_BORDER - 1;
+		int dense = (x >= 96 && z < 32) ? 160 : 50;     /* por mil */
+		if (edge ? ((x + z) & 1) == 0                   /* fileira na frente da borda */
+		         : fhash(seed, x, z) % 1000 < (uint32_t)dense)
+			forest_tree(seed, x, z);
+	}
+
+	/* TRONCOS CAÍDOS: ~15, deitados em X ou em Z (a colisão é por célula),
+	 * em 3 células livres longe das trilhas. */
+	for (int k = 0, placed = 0; k < 400 && placed < 15; k++) {
+		uint32_t h = fhash(seed ^ 0x1061u, k, 77);
+		int x = FOREST_BORDER + 2 + (int)(h % (FOREST_W - 2 * FOREST_BORDER - 4));
+		int z = FOREST_BORDER + 2 + (int)((h >> 12) % (FOREST_H - 2 * FOREST_BORDER - 4));
+		int along_z = (h >> 24) & 1;
+		int ok = 1;
+		for (int i = -2; i <= 2 && ok; i++) {              /* 3 células + folga de 1 */
+			int cx = x + (along_z ? 0 : i), cz = z + (along_z ? i : 0);
+			int near_trail = (cz >= TRAIL_Z - 2 && cz <= TRAIL_Z + 2) || (cx >= TRAIL_X - 2 && cx <= TRAIL_X + 2);
+			if (near_trail || in_clearing(cx, cz) || level_cell_solid(cx, cz))
+				ok = 0;
+		}
+		if (!ok)
+			continue;
+		int jitter = (int)((h >> 4) % 129) - 64;           /* +-5 graus */
+		level_add_tree(TREE_LOG, x * TILE_SIZE + TILE_SIZE / 2, z * TILE_SIZE + TILE_SIZE / 2,
+		               (along_z ? 1024 : 0) + jitter,
+		               tree_defs[TREE_LOG].scale_min + (int)((h >> 8) % 400));
+		placed++;
 	}
 
 	/* início a oeste, saída a leste, na trilha */
