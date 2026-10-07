@@ -108,3 +108,14 @@ automatizar testes visuais.
   orçamento dão ~35 s a 22 kHz ou ~70 s a 11 kHz. Música (CD-DA) fica para a
   etapa 01b. Obs.: o inimigo `ATIRADOR` registrado acima não está no código
   atual (`enemies.c` não atira), então só o tiro do jogador tem som.
+- 2026-10-06 — Etapa 02 (fases e objetivos): `LEVEL_DEF` em `src/levels.c`
+  (R3 ampliada: texturas, céu, faixa de música sem reprodução, objetivo,
+  parâmetro, `max_enemies`, texto); `src/objective.c` com `OBJ_KILL_ALL`,
+  `OBJ_REACH_EXIT`, `OBJ_COLLECT`, `OBJ_SURVIVE`; letras novas `X` (saída:
+  pilar + anel, abre ao cumprir o objetivo), `Q` (item de missão) e `S`
+  (reforço do SURVIVE: a cada 8 s, até `max_enemies` vivos, longe dos
+  jogadores e fora da câmera); `STATE_INTRO` (R12) e `STATE_END`;
+  progressão leva pontos, vida, energia, armas e poder (caído volta com
+  50%); game over recomeça a fase; `DEBUG_START_LEVEL`. 4 fases de teste
+  (ARENA, CORREDORES, RELIQUIAS, CERCO). Música CD-DA (01b) adiada para
+  depois da etapa 10. Medição L2 pendente (teste do Marcos).

@@ -42,7 +42,8 @@ jogo. Roda em emuladores e em console real (CD-R).
 ## Recursos
 
 **Jogo**
-- Fase única em arena 3D, câmera em terceira pessoa que segue o grupo.
+- **4 fases** com objetivos diferentes (derrotar todos, chegar à saída, coletar itens, sobreviver),
+  tela de introdução e progressão; câmera em terceira pessoa que segue o grupo.
 - **Seleção de personagem** com modelo 3D girando e atributos (vida, velocidade, pulo, arma).
   Três personagens incluídos: Robô (com 5 skins), Cavaleiro e Batedor.
 - **1 ou 2 jogadores** cooperativo (controles nas portas 1 e 2), com respawn ao lado do parceiro.
@@ -235,7 +236,9 @@ psx-arena/
 │   ├── config.h             constantes globais
 │   ├── game.h               tipos, estado global e protótipos
 │   ├── data.c               tabelas: personagens, armas, poderes, inimigos, skins, cenário
-│   ├── level.c              mapa em texto, geração de geometria, colisão com o mapa
+│   ├── levels.c             tabela de fases (mapas em texto, aparência, objetivo)
+│   ├── level.c              leitura do mapa, geração de geometria, colisão com o mapa
+│   ├── objective.c          objetivos, saída (X) e reforços (S)
 │   ├── player.c             jogadores (até 2), respawn
 │   ├── enemies.c            IA dos inimigos
 │   ├── weapons.c            projéteis e mira automática
@@ -432,6 +435,18 @@ dividem o pool `g.bullets` (`MAX_BULLETS`). Atiradores checam linha de visão (a
 Custo: O(jogadores + inimigos + objetos) por movimento — trivial para os limites atuais
 (2 + 24 + 64).
 
+### Fases, objetivos e progressão
+
+- `level_defs` (`levels.c`) descreve cada fase: mapa, texturas, céu, faixa de música (reservada
+  para a etapa 01b), objetivo, parâmetro, limite de inimigos e texto da introdução.
+- `objective.c`: `objective_start()` no fim do `game_reset`, `objective_update()` a cada passo
+  (devolve 1 na vitória), `objective_text()` para o HUD. Com `X` no mapa, o objetivo cumprido
+  abre a saída. Reforços do SURVIVE usam `g.rng` (determinístico).
+- Estados novos no fim do enum: `STATE_INTRO` (3 s, START/X pulam) e `STATE_END`.
+- Progressão: `progress` (fora de `g`, como `sel[]`, porque o `memset` apaga `g`) guarda pontos,
+  vida, energia, armas e poder ao vencer; `start_level()` aplica depois do `game_reset`. O game
+  over recomeça a fase com esse mesmo retrato. `DEBUG_START_LEVEL` (`config.h`) pula fases.
+
 ### Entidades e dados
 
 - Estado global único `GAME g` (em `main.c`), zerado a cada partida; a seleção de personagens fica
@@ -564,7 +579,7 @@ Só é necessário ao mudar os modelos padrão por código; o fluxo normal é ed
 - [ ] `./dev clean && ./dev build` sem erros nem avisos novos
 - [ ] Título → seleção → partida com 1 jogador
 - [ ] Seleção com 2 controles, personagens diferentes, partida cooperativa e respawn
-- [ ] Vitória (todos os inimigos) e game over; Start reinicia, Select volta à seleção
+- [ ] As 4 fases em sequência (cada objetivo vence); game over recomeça a fase; fim de jogo volta ao título
 - [ ] Overlay L2: FPS estável e memória de primitivas abaixo do limite
 - [ ] `arena.cue` inicia em DuckStation e PCSX-Redux
 - [ ] Atualizar `prebuilt/` ou anexar `arena.cue`/`arena.bin` à Release
@@ -576,7 +591,7 @@ Só é necessário ao mudar os modelos padrão por código; o fluxo normal é ed
 - Ordenação por profundidade média: sobreposições erradas ocasionais em polígonos grandes
   (comportamento típico do PS1).
 - Inimigos perseguem em linha reta (sem pathfinding) e contornam obstáculos de forma simples.
-- Fase única, embutida no executável (sem carregamento do CD).
+- Fases embutidas no executável (sem carregamento do CD); mapas de até 32×32.
 
 ---
 

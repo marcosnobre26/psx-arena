@@ -41,11 +41,13 @@ VERBOSE=1 ./dev build
 
 | Arquivo | Responsabilidade |
 |---|---|
-| `main.c` | laço com passo fixo de 60 Hz, estados (título, seleção, jogo, pausa, fim), câmera, HUD, tela de seleção |
+| `main.c` | laço com passo fixo de 60 Hz, estados (título, seleção, introdução, jogo, pausa, fim), progressão entre fases, câmera, HUD |
 | `data.c` | **tabelas**: `character_defs`, `weapon_defs`, `power_defs`, `enemy_defs`, `skin_defs`, `prop_defs` |
 | `config.h` | constantes globais |
 | `game.h` | tipos, `GAME g` (estado global), protótipos |
-| `level.c` | mapa em texto (`level_maps`), geração de chão/paredes em blocos 4×4, colisão com o mapa |
+| `levels.c` | **tabela de fases** `level_defs`: mapa em texto, texturas, céu, objetivo |
+| `level.c` | lê o mapa (`level_load`), geração de chão/paredes em blocos 4×4, colisão com o mapa |
+| `objective.c` | objetivo da fase (`objective_update/text`), saída `X`, reforços `S` |
 | `player.c` | até 2 jogadores (`g.players[2]`, `g.in[2]`), respawn |
 | `enemies.c` / `weapons.c` / `powers.c` / `items.c` | inimigos, tiros, poderes, itens/caixas/efeitos/cenário |
 | `collision.c` | colisão por círculos: `collide_move()`, `collide_blocked()` |

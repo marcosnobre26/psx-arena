@@ -15,7 +15,7 @@ Depois de qualquer mudança: `./dev run` (compila e abre no emulador) ou
 
 1. [Controles](#1-controles)
 2. [Ajustar números](#2-ajustar-números)
-3. [Editar o mapa](#3-editar-o-mapa)
+3. [Criar uma fase e escolher o objetivo](#3-criar-uma-fase-e-escolher-o-objetivo)
 4. [Modelar no Blender](#4-modelar-no-blender)
 5. [Novo personagem jogável](#5-novo-personagem-jogável)
 6. [Texturas](#6-texturas)
@@ -75,28 +75,75 @@ Exemplos:
 
 ---
 
-## 3. Editar o mapa
+## 3. Criar uma fase e escolher o objetivo
 
-O mapa é texto, em [`src/level.c`](../src/level.c):
+As fases ficam em [`src/levels.c`](../src/levels.c): um mapa em texto e uma
+linha na tabela `level_defs`. **A ordem da tabela é a ordem do jogo.**
+
+**1. Desenhe o mapa** (vetor de strings terminado em `NULL`):
 
 ```c
-"########################",
-"#P.......#......C......#",
-"#........#..E.......G..#",
+static const char *const map_ponte[] = {
+	"################",
+	"#P....E.....#..#",
+	"#..####..Q..#X.#",
+	"################",
+	NULL
+};
 ```
 
 | Caractere | Significado | Caractere | Significado |
 |---|---|---|---|
 | `#` | parede | `.` | chão |
 | `P` | início dos jogadores | `C` | caixa destrutível |
-| `G` | gema | `H` | vida |
+| `G` | gema (pontos) | `H` | vida |
 | `N` | energia | `W` | arma nova |
-| `E` `B` `F` | inimigos (`enemy_defs`) | espaço | vazio |
-| `1`…`9` | objetos de cenário (`prop_defs`) | | |
+| `X` | **saída** da fase | `Q` | **item de missão** |
+| `S` | **ponto de reforço** (objetivo SURVIVE) | espaço | vazio |
+| `E` `B` `F` | inimigos (`enemy_defs`) | `1`…`9` | objetos de cenário (`prop_defs`) |
 
 Regras: todas as linhas com o mesmo tamanho, máximo 32×32. Chão, paredes
 (com 2 "andares" de textura) e colisão são gerados a partir do texto. O
-segundo jogador nasce na primeira célula livre ao lado do `P`.
+segundo jogador nasce na primeira célula livre ao lado do `P`. Ao criar
+inimigo ou cenário novo, **não use letras reservadas**: `# . P C G H N W X
+Q S` e `A` (reservada para o ATIRADOR).
+
+**2. Acrescente a linha na tabela:**
+
+```c
+/* nome     mapa      chão          parede       céu (R,G,B)  música
+ *          objetivo      parâmetro  máx. inimigos  texto do objetivo */
+{ "PONTE",  map_ponte, &tex_floor_t, &tex_wall_t, 30, 30, 50,  0,
+            OBJ_COLLECT,  0,         0,             "PEGUE O ITEM E SAIA" },
+```
+
+| Objetivo | Vence quando | Parâmetro | HUD |
+|---|---|---|---|
+| `OBJ_KILL_ALL` | não sobra inimigo | — | `INIMIGOS 5` |
+| `OBJ_REACH_EXIT` | um jogador vivo chega ao `X` (**obrigatório** ter `X`) | — | `VA ATE A SAIDA` |
+| `OBJ_COLLECT` | o grupo junta N itens `Q` | N (0 = todos do mapa) | `ITENS 2/4` |
+| `OBJ_SURVIVE` | o tempo acaba com alguém vivo | segundos | `SOBREVIVA 0:45` |
+
+- **Saída:** se o mapa tem `X`, cumprir o objetivo **abre** a saída (o anel
+  acende e gira) e a fase termina quando alguém chega nela. Sem `X`, termina
+  na hora.
+- **Reforços (SURVIVE):** a cada 8 s (`REINFORCE_TIME`), se houver menos
+  inimigos vivos que o "máx. inimigos" da fase, nasce um inimigo num `S`
+  longe dos jogadores (`REINFORCE_MIN_DIST`) e fora da visão da câmera.
+- **Texto do objetivo:** aparece na introdução da fase. ASCII, sem acentos,
+  até ~38 caracteres.
+- **Música:** o campo existe, mas a reprodução (CD-DA) é da etapa 01b, adiada.
+- **Progressão:** vencer leva pontos, vida, energia, armas e poder para a
+  próxima fase (jogador caído volta com 50% da vida). Game over recomeça a
+  fase com o estado de quando ela começou. Depois da última: `FIM DE JOGO`.
+
+**3. Testar a fase sem jogar as anteriores:** em `config.h`, descomente
+`#define DEBUG_START_LEVEL 3` e troque o número pela fase (1 = primeira).
+O jogo novo, ao sair da seleção, começa direto nela. Comente de novo antes
+do commit.
+
+Mapas grandes com muitas paredes custam desempenho: confira o FPS com **L2**
+no ponto mais pesado.
 
 ---
 
@@ -393,7 +440,7 @@ Do mais fácil ao mais difícil:
 4. Modelar um personagem no Blender e colocá-lo na seleção.
 5. Fazer uma textura e aplicar num modelo com UV.
 6. Um inimigo que **atira** (reaproveite `weapons.c` com um campo "dono").
-7. Uma **segunda fase** (novo mapa em `level_maps` + `level_load(1)` ao vencer).
+7. Uma **fase nova** (mapa + linha em `level_defs`, `levels.c`) com outro objetivo.
 8. **Som**: biblioteca `psxspu` do PSn00bSDK (exemplos em `examples/sound`)
    ou música CD-DA no `iso.xml`.
 9. Carregar modelos e texturas **do CD** (`psxcd`) em vez de embutir no executável.
