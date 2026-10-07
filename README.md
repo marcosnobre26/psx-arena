@@ -499,10 +499,10 @@ Custo: O(jogadores + inimigos + objetos) por movimento — trivial para os limit
 
 | Seção | Tamanho | Conteúdo principal |
 |---|---|---|
-| `.text` | ~92 KB | código do jogo + bibliotecas do SDK usadas |
+| `.text` | ~93 KB | código do jogo + bibliotecas do SDK usadas |
 | `.data` | ~117 KB | modelos, texturas e sons embutidos, tabelas |
 | `.bss` | ~527 KB | 2 × 96 KB de primitivas, 2 × OT, cache de 36 blocos (~277 KB), grade 128×128 (16 KB), árvores (16 KB), pools |
-| **Total** | **~736 KB** de 2 MB | orçamento do roteiro: 1,2 MB |
+| **Total** | **~738 KB** de 2 MB | orçamento do roteiro: 1,2 MB |
 
 Medido com `mipsel-linux-gnu-size build/arena.elf` (dentro do `./dev shell`).
 

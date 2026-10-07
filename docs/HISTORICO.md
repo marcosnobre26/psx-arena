@@ -179,7 +179,7 @@ automatizar testes visuais.
   16% no canto nordeste), fileira na frente da borda, 15 troncos; hash com
   semente (`FOREST_TEST_SEED`; etapa 05 deriva de `g.seed`). Validado no
   host: 883 árvores, tudo alcançável, trilhas e pontos de teleporte livres.
-  RAM: 736 KB. Medições (L2, lanterna ligada, fase 5):
+  RAM: 738 KB (755 450 bytes). Medições (L2, lanterna ligada, fase 5):
 
   | Ponto | FPS | POLIS | RAM GPU | ARVORES modelo/plana |
   |---|---|---|---|---|
