@@ -60,6 +60,21 @@
 /* ---------- Som ---------- */
 #define SOUND_NEAR      300     /* até aqui (da câmera) o som fica no volume cheio */
 #define SOUND_FAR       3000    /* daqui em diante não se ouve nada */
+/* volume de cada evento (0..0x3fff); os sons em si ficam em assets/sounds/ */
+#define VOL_PASSO       0x1c00
+#define VOL_TIRO        0x3000
+#define VOL_ACERTO      0x2c00  /* tiro acertou um inimigo */
+#define VOL_PAREDE      0x1400  /* tiro bateu na parede */
+#define VOL_DOR         0x3800
+#define VOL_MORTE       0x3fff
+#define VOL_ITEM        0x3000
+#define VOL_ROSNADO     0x3800
+#define VOL_VENTO       0x1400  /* loops de ambiente durante a partida */
+#define VOL_GRILOS      0x0c00
+/* rosnado: inimigo perto e fora da tela "se denuncia" de vez em quando */
+#define GROWL_DIST      1800    /* distância máxima até a câmera */
+#define GROWL_CHANCE    240     /* 1 chance em N por passo, por inimigo (~4 s) */
+#define GROWL_GAP       90      /* passos mínimos entre dois rosnados */
 
 /* ---------- Depuração ---------- */
 /* Descomente para forçar a mesma semente em toda partida. Útil para

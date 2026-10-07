@@ -13,6 +13,25 @@
 #define CHASE_DIST   3600   /* distância em que o inimigo "vê" o jogador */
 #define ENEMY_RADIUS 90     /* raio de colisão com tamanho ONE */
 
+/* Intervalo entre rosnados. É estado SÓ DE ÁUDIO: fica fora de g de
+ * propósito (não muda a partida) e usa fx_range, não g.rng. */
+static int growl_wait = 0;
+
+/* Inimigo perto e fora do campo de visão da câmera rosna de vez em quando:
+ * o jogador ouve o que não vê (pilar "ver pouco, ouvir muito"). */
+static void enemy_growl(const ENEMY *e) {
+	int dx = e->pos.vx - g.cam_pos.vx, dz = e->pos.vz - g.cam_pos.vz;
+	if (dist2d(dx, dz) > GROWL_DIST)
+		return;
+	int rel = angle_diff(g.cam_yaw, angle_of(dx, dz));
+	if (rel > -640 && rel < 640)
+		return;                       /* dentro da tela (~56 graus para cada lado) */
+	if (fx_range(0, GROWL_CHANCE - 1) != 0)
+		return;
+	sound_play_at(&sfx_rosnado, e->pos.vx, e->pos.vz, VOL_ROSNADO);
+	growl_wait = GROWL_GAP;
+}
+
 int enemy_radius(const ENEMY *e) {
 	return (ENEMY_RADIUS * enemy_defs[e->type].scale) >> 12;
 }
@@ -40,8 +59,12 @@ void enemy_damage(ENEMY *e, int amount, int push_x, int push_z) {
 	e->kx += push_x;
 	e->kz += push_z;
 
+	if (e->hp > 0)
+		sound_play_at(&sfx_acerto, e->pos.vx, e->pos.vz, VOL_ACERTO);
+
 	if (e->hp <= 0) {
 		const ENEMY_DEF *d = &enemy_defs[e->type];
+		sound_play_at(&sfx_morte, e->pos.vx, e->pos.vz, VOL_MORTE);
 		e->active = 0;
 		g.enemies_left--;
 		g.score += d->score;
@@ -59,6 +82,7 @@ void enemy_damage(ENEMY *e, int amount, int push_x, int push_z) {
 }
 
 void enemies_update(void) {
+	if (growl_wait > 0) growl_wait--;
 	for (int i = 0; i < MAX_ENEMIES; i++) {
 		ENEMY *e = &g.enemies[i];
 		if (!e->active) continue;
@@ -102,6 +126,8 @@ void enemies_update(void) {
 		}
 
 		if (e->flash > 0) e->flash--;
+		if (growl_wait == 0 && g.state == STATE_PLAY)
+			enemy_growl(e);
 	}
 }
 

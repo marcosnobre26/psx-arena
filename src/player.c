@@ -138,7 +138,16 @@ void player_update(PLAYER *p, INPUT *in) {
 		int dir = angle_of(wx, wz);
 		p->angle = turn_towards(p->angle, dir, 256);
 		move(p, (isin(dir) * speed) >> 12, (icos(dir) * speed) >> 12);
+		int old_anim = p->walk_anim;
 		p->walk_anim += speed;
+
+		/* Som de passo quando o pé "toca o chão": o balanço do desenho é
+		 * |isin(walk_anim * 6)|, que passa por zero a cada 2048/6 ~ 341
+		 * unidades andadas. Alterna os dois sons de passo. Só lê o estado
+		 * (não cria campo novo em g). */
+		int step = (p->walk_anim * 6) >> 11;
+		if (p->on_ground && step != ((old_anim * 6) >> 11))
+			sound_play_at((step & 1) ? &sfx_passo2 : &sfx_passo1, p->pos.vx, p->pos.vz, VOL_PASSO);
 	} else {
 		p->walk_anim = 0;
 	}
@@ -210,6 +219,7 @@ void player_damage(PLAYER *p, int amount, int from_x, int from_z) {
 		return;
 	p->hp -= amount;
 	p->invuln = PLAYER_INVULN;
+	sound_play_at(&sfx_dor, p->pos.vx, p->pos.vz, VOL_DOR);
 
 	/* empurra o jogador para longe da origem do dano */
 	int dir = angle_of(p->pos.vx - from_x, p->pos.vz - from_z);

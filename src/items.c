@@ -63,6 +63,7 @@ static void collect(PICKUP *it, PLAYER *p) {
 	}
 	if (p->hp > p->max_hp) p->hp = p->max_hp;
 	if (p->energy > PLAYER_MAX_ENERGY) p->energy = PLAYER_MAX_ENERGY;
+	sound_play_at(&sfx_item, it->pos.vx, it->pos.vz, VOL_ITEM);
 	effect_spawn(FX_HEAL, it->pos.vx, it->pos.vz, 160, 14,
 	             pickup_colors[it->type].r, pickup_colors[it->type].g, pickup_colors[it->type].b);
 	it->active = 0;

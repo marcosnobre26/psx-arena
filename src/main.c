@@ -509,6 +509,23 @@ static void game_draw(void) {
 	}
 }
 
+/* Loops de ambiente (vozes 0 e 1): tocam enquanto há uma partida na tela
+ * (jogo, pausa, vitória, derrota) e param no título e na seleção. */
+static void ambience_update(void) {
+	static int playing = 0;
+	int want = g.state != STATE_TITLE && g.state != STATE_SELECT;
+	if (want == playing)
+		return;
+	playing = want;
+	if (want) {
+		sound_loop_start(0, &sfx_vento, VOL_VENTO);
+		sound_loop_start(1, &sfx_grilos, VOL_GRILOS);
+	} else {
+		sound_loop_stop(0);
+		sound_loop_stop(1);
+	}
+}
+
 int main(void) {
 	render_init();
 	input_init();
@@ -543,6 +560,7 @@ int main(void) {
 				g.in[i].pressed = 0;    /* "apertou agora" vale só 1 passo */
 		}
 
+		ambience_update();
 		game_draw();
 		render_end_frame();
 

@@ -50,6 +50,7 @@ void weapon_fire(PLAYER *p) {
 		spawn_bullet(sx, sy, sz, a & 4095, w, p->weapon);
 	}
 	p->cooldown = w->cooldown;
+	sound_play_at(&sfx_tiro, sx, sz, VOL_TIRO);
 }
 
 void bullets_update(void) {
@@ -68,6 +69,7 @@ void bullets_update(void) {
 		if (wall || collide_prop_at(b->pos.vx, b->pos.vz, 24)) {
 			if (wall)
 				crate_damage(cx, cz, b->damage);
+			sound_play_at(&sfx_acerto, b->pos.vx, b->pos.vz, VOL_PAREDE);
 			effect_spawn(FX_BURST, b->pos.vx - b->vx, b->pos.vz - b->vz, 90, 8,
 			             weapon_defs[b->weapon].color.r, weapon_defs[b->weapon].color.g,
 			             weapon_defs[b->weapon].color.b);
