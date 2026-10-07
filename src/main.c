@@ -66,9 +66,9 @@ static void free_spot_near(int *x, int *z) {
 	}
 }
 
-/* Começa uma partida nova. A semente vem como parâmetro porque o memset
+/* Começa a fase 'level'. A semente vem como parâmetro porque o memset
  * abaixo apaga g inteiro (inclusive g.frame, de onde ela costuma vir). */
-static void game_reset(uint32_t seed) {
+static void game_reset(int level, uint32_t seed) {
 	INPUT in[MAX_PLAYERS];
 	memcpy(in, g.in, sizeof(in));
 	memset(&g, 0, sizeof(g));
@@ -81,7 +81,8 @@ static void game_reset(uint32_t seed) {
 	g.seed = seed;
 	rng_seed(&g.rng, seed);
 
-	level_load(0);
+	g.level = level;
+	level_load(level);
 
 	/* cria os jogadores escolhidos na tela de seleção */
 	int x = g.spawn_x, z = g.spawn_z;
@@ -104,6 +105,7 @@ static void game_reset(uint32_t seed) {
 	for (int i = 0; i < MAX_PLAYERS; i++)
 		g.players[i].angle = g.cam_yaw;
 	camera_update(1);
+	objective_start();
 }
 
 /* ------------------------------------------------------------------ */
@@ -227,8 +229,8 @@ static void draw_hud(void) {
 		col++;
 	}
 
-	hud_print(12, 224, "PONTOS %05d  GEMAS %d/%d  INIMIGOS %d",
-	          g.score, g.gems, g.gems_total, g.enemies_left);
+	hud_print(12, 224, "PONTOS %05d  GEMAS %d/%d  %s",
+	          g.score, g.gems, g.gems_total, objective_text());
 
 	if (g.message_timer > 0)
 		draw_center(70, g.message);
@@ -297,7 +299,7 @@ static void select_tick(void) {
 	for (int i = 0; i < MAX_PLAYERS; i++)
 		if (sel[i].joined && !sel[i].ready) all = 0;
 	if (all && sel[0].joined) {
-		game_reset(g.frame);   /* tempo na seleção varia: partida diferente */
+		game_reset(0, g.frame);   /* tempo na seleção varia: partida diferente */
 		g.state = STATE_PLAY;
 		show_message("DERROTE TODOS OS INIMIGOS!", 120);
 	}
@@ -380,6 +382,7 @@ static void select_draw(void) {
 static void draw_world(int with_players) {
 	level_draw();
 	props_draw();
+	exit_draw();
 	crates_draw();
 	pickups_draw();
 	enemies_draw();
@@ -423,7 +426,7 @@ static void game_tick(void) {
 		effects_update();
 		camera_update(0);
 		g.play_frames++;
-		if (g.enemies_left == 0 && g.state == STATE_PLAY) {
+		if (objective_update() && g.state == STATE_PLAY) {
 			g.state = STATE_WIN;
 			for (int i = 0; i < MAX_PLAYERS; i++)
 				if (player_alive(&g.players[i]))
@@ -443,7 +446,7 @@ static void game_tick(void) {
 		effects_update();
 		camera_update(0);
 		if (any_pressed(PAD_START) >= 0) {        /* mesma escolha, de novo */
-			game_reset(g.frame);              /* semente nova */
+			game_reset(g.level, g.frame);     /* semente nova */
 			g.state = STATE_PLAY;
 		} else if (any_pressed(PAD_SELECT) >= 0) { /* trocar de personagem */
 			select_enter();
@@ -535,7 +538,7 @@ int main(void) {
 	assets_load_sounds();       /* todos os sons de assets/sounds/ para o SPU (gerado) */
 	sound_setup();              /* prioridades e variações (data.c) */
 
-	game_reset(12345);          /* fundo da tela de título: sempre igual */
+	game_reset(0, 12345);       /* fundo da tela de título: sempre igual */
 	g.state = STATE_TITLE;
 
 	int last_vsync = VSync(-1);

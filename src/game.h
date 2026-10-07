@@ -190,7 +190,7 @@ typedef struct {
 	int     weapon;
 } BULLET;
 
-enum { PICK_GEM, PICK_HEALTH, PICK_ENERGY, PICK_WEAPON, NUM_PICKUP_TYPES };
+enum { PICK_GEM, PICK_HEALTH, PICK_ENERGY, PICK_WEAPON, PICK_QUEST, NUM_PICKUP_TYPES };
 
 typedef struct {
 	int     active;
@@ -244,6 +244,17 @@ typedef struct {
 	int     gems, gems_total;
 	int     enemies_left;
 
+	/* fase e objetivo (objective.c) */
+	int     level;                /* índice em level_defs */
+	int     quest, quest_total;   /* itens de missão (Q) pegos / no mapa */
+	int     quest_need;           /* quantos o objetivo pede */
+	int     survive_left;         /* SURVIVE: passos que faltam */
+	int     reinforce_timer;      /* SURVIVE: passos até o próximo reforço */
+	int     has_exit, exit_open;  /* o mapa tem saída (X)? já abriu? */
+	int     exit_x, exit_z;
+	int     num_spawn_pts;        /* pontos de reforço (S) */
+	struct { int x, z; } spawn_pts[MAX_SPAWN_PTS];
+
 	INPUT   in[MAX_PLAYERS];      /* controle de cada porta */
 	PLAYER  players[MAX_PLAYERS];
 	int     num_players;          /* 1 ou 2 */
@@ -283,6 +294,12 @@ uint32_t rng_next(RNG *r);
 int      rng_range(RNG *r, int lo, int hi);   /* lo..hi, inclusive */
 int      rand_range(int lo, int hi);          /* lógica: usa g.rng */
 int      fx_range(int lo, int hi);            /* só efeitos visuais */
+
+/* objective.c */
+void objective_start(void);
+int  objective_update(void);            /* 1 = fase vencida */
+const char *objective_text(void);       /* linha do HUD */
+void exit_draw(void);
 
 /* level.c */
 void level_load(int index);

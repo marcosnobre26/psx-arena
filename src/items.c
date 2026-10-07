@@ -11,8 +11,9 @@ static const CVECTOR pickup_colors[NUM_PICKUP_TYPES] = {
 	{ 255,  60,  80 },   /* PICK_HEALTH */
 	{  60, 160, 255 },   /* PICK_ENERGY */
 	{ 255, 255, 255 },   /* PICK_WEAPON */
+	{ 190,  90, 255 },   /* PICK_QUEST  (item de missão, letra Q) */
 };
-static const int pickup_scale[NUM_PICKUP_TYPES] = { ONE, ONE * 3 / 4, ONE * 3 / 4, ONE * 3 / 2 };
+static const int pickup_scale[NUM_PICKUP_TYPES] = { ONE, ONE * 3 / 4, ONE * 3 / 4, ONE * 3 / 2, ONE * 5 / 4 };
 
 /* ------------------------------------------------------------------ */
 /* Itens                                                               */
@@ -26,6 +27,7 @@ void pickup_spawn(int type, int x, int z) {
 		p->type = type;
 		p->pos.vx = x; p->pos.vy = 0; p->pos.vz = z;
 		if (type == PICK_GEM) g.gems_total++;
+		if (type == PICK_QUEST) g.quest_total++;
 		return;
 	}
 }
@@ -45,6 +47,11 @@ static void collect(PICKUP *it, PLAYER *p) {
 	case PICK_ENERGY:
 		p->energy += 40;
 		show_message("+40 ENERGIA", 40);
+		break;
+	case PICK_QUEST:
+		g.quest++;
+		g.score += 200;
+		show_message("ITEM DE MISSAO!", 50);
 		break;
 	case PICK_WEAPON: {
 		/* libera a próxima arma que o jogador ainda não tem */

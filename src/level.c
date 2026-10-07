@@ -217,6 +217,15 @@ void level_load(int index) {
 		case 'H': pickup_spawn(PICK_HEALTH, wx, wz); break;
 		case 'N': pickup_spawn(PICK_ENERGY, wx, wz); break;
 		case 'W': pickup_spawn(PICK_WEAPON, wx, wz); break;
+		case 'Q': pickup_spawn(PICK_QUEST, wx, wz);  break;   /* item de missão */
+		case 'X': g.has_exit = 1; g.exit_x = wx; g.exit_z = wz; break;  /* saída */
+		case 'S':                                         /* ponto de reforço */
+			if (g.num_spawn_pts < MAX_SPAWN_PTS) {
+				g.spawn_pts[g.num_spawn_pts].x = wx;
+				g.spawn_pts[g.num_spawn_pts].z = wz;
+				g.num_spawn_pts++;
+			}
+			break;
 		default:
 			for (int t = 0; t < num_enemy_types; t++)
 				if (enemy_defs[t].map_char == ch)

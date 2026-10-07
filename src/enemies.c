@@ -76,8 +76,6 @@ void enemy_damage(ENEMY *e, int amount, int push_x, int push_z) {
 		if (r < 20)      pickup_spawn(PICK_HEALTH, e->pos.vx, e->pos.vz);
 		else if (r < 40) pickup_spawn(PICK_ENERGY, e->pos.vx, e->pos.vz);
 
-		if (g.enemies_left == 0)
-			show_message("ARENA LIMPA!", 90);
 	}
 }
 

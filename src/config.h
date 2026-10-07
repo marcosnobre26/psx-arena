@@ -57,6 +57,12 @@
 #define MAX_EFFECTS     16
 #define MAX_PROPS       64
 
+/* ---------- Fases e objetivos ---------- */
+#define EXIT_RADIUS         160  /* distância para "entrar" na saída (X) */
+#define MAX_SPAWN_PTS       8    /* pontos de reforço (S) por mapa */
+#define REINFORCE_TIME      480  /* SURVIVE: um reforço a cada 8 s */
+#define REINFORCE_MIN_DIST  1200 /* reforço só nasce longe dos jogadores */
+
 /* ---------- Som ---------- */
 #define SOUND_NEAR      300     /* até aqui (da câmera) o som fica no volume cheio */
 #define SOUND_FAR       3000    /* daqui em diante não se ouve nada */
