@@ -21,7 +21,8 @@
  * Com X no mapa, cumprir o objetivo abre a saída e vence-se ao chegar nela.
  *
  * Em cima do texto fica o "norte" (Z menor). Todas as linhas com o mesmo
- * tamanho; máximo 32x32.
+ * tamanho; máximo 128x128 (MAP_MAX_W/H). Mapas grandes podem ser feitos
+ * por código: map = NULL e uma função em LEVEL_DEF.build (ver fase 5).
  */
 #include "game.h"
 

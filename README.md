@@ -264,6 +264,7 @@ psx-arena/
 │   ├── blender_export_psx.py   exportador Blender → MESH (biblioteca + operador + CLI)
 │   ├── export_blend.py         exportação em lote de um .blend (usado por ./dev models)
 │   ├── build_textures.py       PNG → TIM com empacotamento de VRAM (usado pelo CMake)
+│   ├── make_forest_textures.py texturas provisórias da floresta (terra, folhas, raízes, mata)
 │   ├── wav2vag.py              WAV → VAG (encoder SPU-ADPCM em Python puro; usado pelo CMake)
 │   ├── make_placeholder_sounds.py  gera os sons provisórios sintetizados
 │   ├── png2tim.py              conversor manual com posição de VRAM explícita
@@ -360,8 +361,16 @@ Separação de responsabilidades: `*_update()` só altera estado; `*_draw()` só
    `POLY_F3/F4` (cor) e `POLY_FT3/FT4` (texturizadas), com semitransparência opcional.
 5. **Memória de primitivas:** 96 KB por buffer (`PACKET_LEN`); o desenho para com segurança se
    acabar. O HUD (L2) mostra o uso por quadro.
-6. **Fase em blocos:** o chão e as paredes geradas do mapa são agrupados em blocos de 4×4 células,
-   cada um com sua esfera de descarte — só o que está à vista é processado.
+6. **Mundo em blocos sob demanda (`level.c` + `render_chunk`):** grade de até 128×128 células
+   (1 byte: tipo + bit de sólido). A geometria é montada em blocos de 8×8 células num cache de 36:
+   o 3×3 em volta de cada jogador é montado no mesmo quadro; o resto do 5×5 do grupo entra numa
+   fila de 1 bloco por quadro; o mais distante é reaproveitado. Todo vértice de um bloco é um ponto
+   da grade (9×9 posições × 5 alturas), então **uma tabela única de 405 vértices** serve para todos
+   e cada quad guarda só índices, 4 cores e textura (30 bytes). Normais fixas: a luz é calculada na
+   montagem (mesma fórmula do `nccs`) e gravada na cor dos vértices; no desenho, por quad: `rtpt` +
+   `rtps`, `nclip`, `NEAR_Z`/névoa, `avsz4`, névoa nas cores com `dpct` (3 cores) + `dpcs` (a
+   quarta) → `POLY_GT4`. Vértices relativos à origem do bloco (`load_translation`): o mapa vai a
+   32 768 unidades e estouraria um `SVECTOR`.
 7. **HUD:** retângulos (`TILE`) e texto via `FntSort`, inseridos nas entradas 0/1 da OT.
 8. **Névoa (depth cueing):** a cada projeção a GTE calcula `IR0 = (H·65536/z·DQA + DQB)/4096`
    (0..4096). `render_set_fog()` escolhe DQA/DQB (registradores de controle 27/28, gravados por uma
@@ -483,10 +492,12 @@ Custo: O(jogadores + inimigos + objetos) por movimento — trivial para os limit
 
 | Seção | Tamanho | Conteúdo principal |
 |---|---|---|
-| `.text` | ~64 KB | código do jogo + bibliotecas do SDK usadas |
-| `.data` | ~27 KB | modelos, texturas embutidas, tabelas |
-| `.bss` | ~357 KB | 2 × 96 KB de primitivas, 2 × OT, geometria da fase, pools |
-| **Total** | **~450 KB** de 2 MB | sobra espaço para áudio, mais fases e assets |
+| `.text` | ~82 KB | código do jogo + bibliotecas do SDK usadas |
+| `.data` | ~115 KB | modelos, texturas e sons embutidos, tabelas |
+| `.bss` | ~510 KB | 2 × 96 KB de primitivas, 2 × OT, cache de 36 blocos (~277 KB), grade 128×128 (16 KB), pools |
+| **Total** | **~707 KB** de 2 MB | orçamento do roteiro: 1,2 MB |
+
+Medido com `mipsel-linux-gnu-size build/arena.elf` (dentro do `./dev shell`).
 
 ### Por que existe `fix_gnu_stack.py`
 
@@ -610,7 +621,7 @@ Só é necessário ao mudar os modelos padrão por código; o fluxo normal é ed
 - Ordenação por profundidade média: sobreposições erradas ocasionais em polígonos grandes
   (comportamento típico do PS1).
 - Inimigos perseguem em linha reta (sem pathfinding) e contornam obstáculos de forma simples.
-- Fases embutidas no executável (sem carregamento do CD); mapas de até 32×32.
+- Fases embutidas no executável (sem carregamento do CD); mapas de até 128×128, sem relevo.
 
 ---
 

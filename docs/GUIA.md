@@ -47,6 +47,7 @@ Depois de qualquer mudança: `./dev run` (compila e abre no emulador) ou
 | **Start** | pausar |
 | **L2** (soltar) | depuração: névoa, memória do SPU, semente, polígonos, FPS, memória de primitivas, posição |
 | **L2 + Start** | (com o overlay aberto) pula para a próxima fase |
+| **L2 + direcional** | (com o overlay aberto) teleporta para os 4 pontos fixos da fase de teste |
 
 **Tela de seleção:** esquerda/direita escolhe, **Select** troca a skin,
 **X** confirma, **Círculo** desfaz (ou volta ao título). O **controle 2**
@@ -104,7 +105,7 @@ static const char *const map_ponte[] = {
 | espaço | vazio | | |
 | `E` `B` `F` | inimigos (`enemy_defs`) | `1`…`9` | objetos de cenário (`prop_defs`) |
 
-Regras: todas as linhas com o mesmo tamanho, máximo 32×32. Chão, paredes
+Regras: todas as linhas com o mesmo tamanho, máximo 128×128. Chão, paredes
 (com 2 "andares" de textura) e colisão são gerados a partir do texto. O
 segundo jogador nasce na primeira célula livre ao lado do `P`. Ao criar
 inimigo ou cenário novo, **não use letras reservadas**: `# . P C G H N W X
@@ -149,6 +150,52 @@ do commit.
 Mapas grandes com muitas paredes custam desempenho: confira o FPS com **L2**
 no ponto mais pesado. **Atalho:** com o overlay L2 aberto, segure **L2** e
 aperte **Start** para pular para a próxima fase (levando o progresso).
+
+### Como o mundo é montado
+
+**Grade.** O mapa é uma grade de até **128×128 células** (`MAP_MAX_W/H`);
+1 célula = 1 metro = 256 unidades. Cada célula é **1 byte**: o tipo nos
+bits 0–5 e o bit 7 (`CELL_SOLID`) diz se bloqueia. Tipos (`game.h`):
+
+| Tipo | O que é | Sólido | Altura |
+|---|---|---|---|
+| `CELL_VOID` | nada (sem chão) | sim | — |
+| `CELL_FLOOR` | chão dos mapas de texto (`.`), textura da fase | não | — |
+| `CELL_WALL` | parede dos mapas de texto (`#`), textura da fase | sim | 1,5 m |
+| `CELL_DIRT` / `CELL_LEAVES` / `CELL_ROOTS` | chão de terra / folhas / raízes | não | — |
+| `CELL_THICKET` | mata densa | sim | 3 m |
+
+**Mapa por código.** Em vez do texto, a fase pode ter `map = NULL` e uma
+função em `LEVEL_DEF.build` que chama `level_begin(w, h)`,
+`level_set_cell(x, z, CELL_...)` (a solidez sai do tipo) e
+`level_place('E', x, z)` (a mesma legenda do texto: `P`, `X`, inimigos,
+itens...). Veja `build_test_forest()` em `levels.c` (fase 5).
+
+**Blocos sob demanda.** A geometria não existe para o mapa inteiro: o chão
+e as paredes são montados em **blocos de 8×8 células**, num cache de
+`CHUNK_SLOTS` (36) blocos:
+
+- o **3×3 em volta de cada jogador** é montado no mesmo quadro, sempre
+  (nunca falta chão perto de quem joga, nem girando a câmera nem correndo);
+- o resto do **5×5 em volta do grupo** entra numa fila de 1 bloco por
+  quadro (`CHUNK_BUILDS_PER_FRAME`), do mais perto ao mais longe — eles
+  ficam dentro da névoa, então a montagem aos poucos não aparece;
+- sem lugar livre, o bloco mais distante é reaproveitado.
+
+O overlay **L2** mostra `BLOCOS montados/36 +montados_neste_quadro`; se
+aparecer `CHEIO!`, algum bloco passou de 256 quads (`CHUNK_MAX_QUADS`).
+
+**Visual.** A luz de cada face já vem gravada na cor dos vértices (as
+normais são fixas), com uma variação sutil de cor por vértice e a textura
+do chão girada por célula (tudo por hash da posição: sempre igual). Na
+tela só se aplica a névoa. Texturas da floresta: `tools/make_forest_textures.py`.
+
+**Mudou o mapa durante o jogo?** `level_set_cell()` e depois
+`level_invalidate(x, z)`: o bloco da célula é remontado.
+
+**Medir sempre no mesmo lugar (fase 5):** com o overlay aberto, segure
+**L2** e aperte o direcional: ← início, → cruzamento das trilhas, ↑ canto
+denso (pior caso), ↓ maior clareira. A câmera fica sempre na mesma direção.
 
 ### Clima: névoa, luz e lanterna
 

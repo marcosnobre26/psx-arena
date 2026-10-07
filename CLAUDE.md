@@ -46,7 +46,7 @@ VERBOSE=1 ./dev build
 | `config.h` | constantes globais |
 | `game.h` | tipos, `GAME g` (estado global), protótipos |
 | `levels.c` | **tabela de fases** `level_defs`: mapa em texto, texturas, céu, objetivo |
-| `level.c` | lê o mapa (`level_load`), geração de chão/paredes em blocos 4×4, colisão com o mapa |
+| `level.c` | grade 128×128 (tipo + bit sólido), blocos 8×8 montados sob demanda num cache de 36, colisão com a grade |
 | `objective.c` | objetivo da fase (`objective_update/text`), saída `X`, reforços `S` |
 | `player.c` | até 2 jogadores (`g.players[2]`, `g.in[2]`), respawn |
 | `enemies.c` / `weapons.c` / `powers.c` / `items.c` | inimigos, tiros, poderes, itens/caixas/efeitos/cenário |
@@ -121,6 +121,12 @@ uma branch. As regras do ROADMAP (determinismo, orçamentos de desempenho,
   Parsec. Modo link (SIO1/lockstep) é proposta não implementada (README).
 - RAM do SPU: ~12,6 KB por segundo de som a 22 kHz (o manual, R8, diz 8 KB/s —
   está errado). Orçamento 450 KB; cada som também ocupa RAM principal (incbin).
+- Mapa grande: coordenadas do mundo vão a 32 768 → **nunca** guarde posição
+  de mundo em `SVECTOR` (16 bits); use `VECTOR` ou vértices relativos a uma
+  origem (`load_translation` em `render.c`).
+- Blocos: o 3×3 em volta de cada jogador é montado no mesmo quadro (sem
+  buracos); só o anel externo usa a fila de 1 bloco/quadro. `level_invalidate`
+  remonta um bloco depois de `level_set_cell`.
 - Névoa: só cores **escuras** (em faces texturizadas a cor só escurece).
   DQA/DQB são gravados por `gte_SetDepthCue` (macro própria em `render.c`).
   Primitiva aditiva sem textura (cone da lanterna) precisa de `DR_TPAGE`

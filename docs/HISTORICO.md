@@ -136,3 +136,24 @@ automatizar testes visuais.
   | 2 CORREDORES | 30 / 937 / 35 464 | a medir |
   | 3 RELIQUIAS | 30 / 518 / 20 796 | a medir |
   | 4 CERCO | 30 / 531 / 22 056 | a medir |
+- 2026-10-07 — Etapa 04a (grade grande e blocos sob demanda): grade de
+  até 128×128 (1 byte por célula: `CELL_*` + `CELL_SOLID`); geometria em
+  blocos de 8×8 num cache de 36 — o 3×3 em volta de cada jogador é montado
+  no mesmo quadro, o resto do 5×5 do grupo numa fila de 1 bloco/quadro,
+  cache centrado no jogador (girar a câmera não muda nada); `render_chunk`
+  com tabela única de 405 vértices, luz embutida nas cores e névoa com
+  `dpct`/`dpcs` (`POLY_GT4`); variação de cor por vértice e textura girada
+  por hash; texturas terra/folhas/raízes/mata (`make_forest_textures.py`);
+  mata densa com 3 m; fase 5 `FLORESTA (TESTE)` feita por código (validada
+  compilando o gerador no host: tudo alcançável, ≤ 208 quads por bloco);
+  L2 + direcional teleporta para 4 pontos fixos; cone da lanterna em
+  coordenadas relativas (o mapa passa de 32 767). RAM: 724 KB (text 84 KB,
+  data 118 KB, bss 523 KB), antes 545 KB. Medições (L2, lanterna ligada):
+
+  | Ponto (fase 5) | FPS | POLIS | RAM GPU | BLOCOS |
+  |---|---|---|---|---|
+  | ← início | a medir | | | |
+  | → cruzamento | a medir | | | |
+  | ↑ canto denso | a medir | | | |
+  | ↓ clareira | a medir | | | |
+  | fase 2 CORREDORES (pior ponto da etapa 03) | a medir | | | |
