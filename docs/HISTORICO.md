@@ -96,3 +96,15 @@ automatizar testes visuais.
   `game_reset(seed)` semeia antes do `level_load` (o `memset` apagava
   `g.frame`); `DEBUG_FIXED_SEED` em `config.h`; overlay L2 com `SEED` e
   `POLIS`; `CREDITS.md`; seção "Roteiro" e regras de determinismo no `CLAUDE.md`.
+- 2026-10-06 — Etapa 01a (efeitos sonoros): `tools/wav2vag.py` (encoder
+  SPU-ADPCM em Python puro, `--selftest` com SNR), pipeline
+  `assets/sounds/*.wav` → `sfx_<nome>` no CMake, `src/sound.c` (vozes 0–1
+  para loops, 2–23 com prioridade de `sound_defs`, som posicional pela
+  câmera), sons provisórios por `tools/make_placeholder_sounds.py`, passos
+  sincronizados com o balanço do modelo (~341 unidades, não 256), rosnado de
+  inimigo fora da tela, vento e grilos em loop, `SPU xxxK/512K` no L2.
+  **Correção do manual (R8):** a RAM do SPU gasta **~12,6 KB por segundo a
+  22 050 Hz** (16 bytes a cada 28 amostras), não 8 KB/s; os 450 KB do
+  orçamento dão ~35 s a 22 kHz ou ~70 s a 11 kHz. Música (CD-DA) fica para a
+  etapa 01b. Obs.: o inimigo `ATIRADOR` registrado acima não está no código
+  atual (`enemies.c` não atira), então só o tiro do jogador tem som.

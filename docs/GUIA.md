@@ -25,9 +25,10 @@ Depois de qualquer mudança: `./dev run` (compila e abre no emulador) ou
 10. [Novo inimigo](#10-novo-inimigo)
 11. [Nova skin](#11-nova-skin)
 12. [Números aleatórios](#12-números-aleatórios)
-13. [Emuladores](#13-emuladores)
-14. [Gravar em CD e jogar no console](#14-gravar-em-cd-e-jogar-no-console)
-15. [Roteiro de estudo](#15-roteiro-de-estudo)
+13. [Sons e música](#13-sons-e-música)
+14. [Emuladores](#14-emuladores)
+15. [Gravar em CD e jogar no console](#15-gravar-em-cd-e-jogar-no-console)
+16. [Roteiro de estudo](#16-roteiro-de-estudo)
 
 ---
 
@@ -44,7 +45,7 @@ Depois de qualquer mudança: `./dev run` (compila e abre no emulador) ou
 | **L1 / R1** ou analógico direito | girar a câmera |
 | **Select** | trocar a skin (personagens com skins) |
 | **Start** | pausar |
-| **L2** | depuração: semente, polígonos, FPS, memória de primitivas, posição |
+| **L2** | depuração: memória do SPU, semente, polígonos, FPS, memória de primitivas, posição |
 
 **Tela de seleção:** esquerda/direita escolhe, **Select** troca a skin,
 **X** confirma, **Círculo** desfaz (ou volta ao título). O **controle 2**
@@ -277,7 +278,67 @@ do futuro modo link: os dois consoles precisam sortear os mesmos números.
 
 ---
 
-## 13. Emuladores
+## 13. Sons e música
+
+### Efeitos sonoros
+
+**Solte o WAV em `assets/sounds/` e compile.** A conversão para VAG
+(formato do chip de som, o SPU) é automática (`tools/wav2vag.py`).
+
+| Arquivo | Resultado | Símbolo no código |
+|---|---|---|
+| `porta.wav` | 22 050 Hz, toca uma vez | `sfx_porta` |
+| `porta-11k.wav` | 11 025 Hz (metade da memória; bom para graves e ruídos) | `sfx_porta` |
+| `chuva-loop.wav` | repete sem parar (para ambiente) | `sfx_chuva` |
+| `chuva-loop-11k.wav` | os dois | `sfx_chuva` |
+
+- WAV **PCM 16 bits** (ou 8), qualquer taxa; estéreo vira mono sozinho.
+  No Audacity: *Arquivo → Exportar → WAV, PCM 16 bits com sinal*.
+- Memória: o SPU tem 512 KB (orçamento do jogo: 450 KB). Conta rápida:
+  **~12,6 KB por segundo a 22 kHz**, ~6,3 KB/s a 11 kHz. O overlay **L2**
+  mostra o uso (`SPU xxxK/512K`). Cada som também ocupa o mesmo tanto na RAM
+  principal (vai embutido no EXE).
+- Loops: corte o WAV num ponto em que o fim emende no começo sem estalo.
+  Ideal: número de amostras múltiplo de 28.
+- Confira a qualidade sem abrir o jogo:
+  `python3 tools/wav2vag.py --selftest assets/sounds/porta.wav` (SNR acima de
+  ~20 dB é aceitável para efeito).
+
+Tocando no código (som é só efeito colateral: nunca mude `g` por causa dele):
+```c
+sound_play(&sfx_porta, 0x3000);                     /* sem posição (menus) */
+sound_play_at(&sfx_porta, x, z, 0x3000);            /* no mundo: volume e lado */
+sound_loop_start(0, &sfx_chuva, 0x1400);            /* vozes 0 e 1: ambiente */
+sound_loop_stop(0);
+```
+Volume: 0..`0x3fff`. Os volumes dos eventos atuais ficam em `config.h`
+(`VOL_PASSO`, `VOL_TIRO`...). Distância audível: `SOUND_NEAR`/`SOUND_FAR`.
+
+**Prioridade e variação de tom:** uma linha em `sound_defs` (`data.c`).
+São 22 vozes para efeitos; quando todas estão ocupadas, um som novo só
+corta uma voz de prioridade menor ou igual à dele. A variação de tom (em %)
+evita que sons repetidos (passos) soem "metralhados".
+
+**Trocar um som provisório por um real:** os sons atuais foram gerados por
+`tools/make_placeholder_sounds.py`. Para trocar, apague o provisório e
+coloque o seu com o **mesmo nome-base** (ex.: apague `tiro-11k.wav`, coloque
+`tiro.wav`). O símbolo `sfx_tiro` continua o mesmo, então o código não muda.
+Não rode o script de provisórios de novo depois disso (ele recria os arquivos).
+
+**Onde achar sons livres:** [freesound.org](https://freesound.org) (filtre
+por licença CC0 ou CC-BY), [opengameart.org](https://opengameart.org),
+[sonniss.com/gameaudiogdc](https://sonniss.com/gameaudiogdc) (pacotes
+liberados para jogos), [kenney.nl](https://kenney.nl/assets) (CC0). **Todo
+som de terceiros vai para o `CREDITS.md`** (autor, link, licença); CC-BY
+exige o crédito. Nada tirado de jogos comerciais.
+
+### Música
+
+Faixas de CD-DA (`assets/music/`): chegam na etapa 01b.
+
+---
+
+## 14. Emuladores
 
 | Emulador | Arquivo | BIOS | Observações |
 |---|---|---|---|
@@ -306,7 +367,7 @@ RUN_FILE="cue"
 
 ---
 
-## 14. Gravar em CD e jogar no console
+## 15. Gravar em CD e jogar no console
 
 1. Grave o **`arena.cue`** (não o `.bin` sozinho) num **CD-R** (o PS1 não lê
    CD-RW). No Windows: ImgBurn → *Write image file to disc*, em 4x a 8x.
@@ -322,7 +383,7 @@ do PC para o console em segundos (ferramenta `nops`).
 
 ---
 
-## 15. Roteiro de estudo
+## 16. Roteiro de estudo
 
 Do mais fácil ao mais difícil:
 

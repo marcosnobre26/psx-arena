@@ -51,6 +51,7 @@ VERBOSE=1 ./dev build
 | `collision.c` | colisão por círculos: `collide_move()`, `collide_blocked()` |
 | `render.c` | motor 3D: GTE, Ordering Table, `render_mesh()`, HUD |
 | `input.c` | controles das portas 1 e 2 |
+| `sound.c` | efeitos no SPU: `sound_play`, `sound_play_at` (posicional), loops de ambiente nas vozes 0–1 |
 | `rng.c` | gerador aleatório determinístico: `g.rng` (lógica) e `fx_range` (visual) |
 
 Gerados no build (não edite): `build/gen/assets_gen.{h,c}` (declara
@@ -78,7 +79,10 @@ Gerados no build (não edite): `build/gen/assets_gen.{h,c}` (declara
 - Modelos: `models/*.h` são gerados pelo exportador — não edite à mão;
   regenere com `./dev models` (fonte: `assets/blender/exemplos.blend`, coleção
   `PSX`). O nome do arquivo define o símbolo.
-- Novos `.c` em `src/`, PNGs em `assets/textures/` e `.h` em `models/` entram
+- Sons: WAV em `assets/sounds/<nome>[-loop][-11k].wav` vira `sfx_<nome>`;
+  prioridade/variação de tom em `sound_defs` (`data.c`), volumes em `config.h`.
+  Som nunca muda `g` nem usa `g.rng`.
+- Novos `.c` em `src/`, PNGs em `assets/textures/`, WAVs em `assets/sounds/` e `.h` em `models/` entram
   sozinhos no build (globs `CONFIGURE_DEPENDS`); não precisa editar o CMake.
 - **Não use `__builtin_bswap32`** nem outros builtins que puxem a libgcc
   (o projeto não liga com ela; o link falha ou traz código inesperado).
@@ -113,6 +117,8 @@ uma branch. As regras do ROADMAP (determinismo, orçamentos de desempenho,
   y = 256 nem u0+largura > 256.
 - PSX não tem rede; netplay do RetroArch não funciona com PS1. Online hoje =
   Parsec. Modo link (SIO1/lockstep) é proposta não implementada (README).
+- RAM do SPU: ~12,6 KB por segundo de som a 22 kHz (o manual, R8, diz 8 KB/s —
+  está errado). Orçamento 450 KB; cada som também ocupa RAM principal (incbin).
 - Desempenho: ~30 FPS na fase com os limites atuais; confira com **L2** no
   jogo (`SEED`, `POLIS` = polígonos enviados à GPU, FPS e bytes de primitivas;
   `PACKET_LEN` = 96 KB por buffer).

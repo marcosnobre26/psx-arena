@@ -49,13 +49,14 @@ jogo. Roda em emuladores e em console real (CD-R).
 - 4 armas (com mira automática), 3 poderes, 4 tipos de inimigo (um deles atira), gemas, itens, caixas destrutíveis
   e objetos de cenário.
 - **Colisão entre tudo**: paredes, caixas, cenário, jogadores e inimigos. Pular passa por cima dos inimigos.
+- **Som posicional** no SPU: passos, tiros, acertos, inimigos que rosnam fora da tela, vento e grilos em loop.
 
 **Motor e ferramentas**
 - Renderização 3D na GTE com iluminação, texturas (4/8/16 bits), ordenação por Ordering Table,
   descarte por frustum e por face, geometria da fase agrupada em blocos.
 - Lógica em **passo fixo de 60 Hz**, independente da taxa de quadros.
 - Jogo **orientado a dados**: personagens, armas, poderes, inimigos, skins e cenário são linhas de tabela.
-- **Pipeline de assets automático**: PNG → TIM com alocação de VRAM; Blender → modelos C; tudo
+- **Pipeline de assets automático**: PNG → TIM com alocação de VRAM; WAV → VAG; Blender → modelos C; tudo
   descoberto pelo CMake sem editar arquivos de build.
 - Exportador do Blender (menu *File → Export* e linha de comando), `.blend` de exemplo com todos os modelos.
 - Ambiente reproduzível em **Docker**, script único `./dev`, integração com **VS Code**.
@@ -214,7 +215,7 @@ convertido para `\\wsl.localhost\...`. **2 jogadores:** configure um controle na
 emulador e aperte Start nele na tela de seleção.
 
 **Console real:** grave `arena.cue` num CD-R; o console precisa de modchip ou softmod
-(Tonyhax International, FreePSXBoot, Unirom). Detalhes no [Guia](docs/GUIA.md#14-gravar-em-cd-e-jogar-no-console).
+(Tonyhax International, FreePSXBoot, Unirom). Detalhes no [Guia](docs/GUIA.md#15-gravar-em-cd-e-jogar-no-console).
 
 ---
 
@@ -246,16 +247,20 @@ psx-arena/
 │   ├── input.c              controles (portas 1 e 2)
 │   ├── mathutil.c           atan2, distâncias e utilidades em inteiros
 │   ├── rng.c                gerador aleatório determinístico (xorshift32)
+│   ├── sound.c / sound.h    efeitos sonoros no SPU (vozes, prioridade, som posicional)
 │   └── models.h             inclui as declarações geradas
 ├── models/                  modelos exportados (.h) — gerados, mas versionados
 ├── assets/
 │   ├── blender/             fontes .blend (exemplos.blend tem todos os modelos)
 │   ├── textures/            PNGs (convertidos no build)
+│   ├── sounds/              WAVs (convertidos para VAG no build)
 │   └── tim/                 TIMs prontos (opcional)
 ├── tools/
 │   ├── blender_export_psx.py   exportador Blender → MESH (biblioteca + operador + CLI)
 │   ├── export_blend.py         exportação em lote de um .blend (usado por ./dev models)
 │   ├── build_textures.py       PNG → TIM com empacotamento de VRAM (usado pelo CMake)
+│   ├── wav2vag.py              WAV → VAG (encoder SPU-ADPCM em Python puro; usado pelo CMake)
+│   ├── make_placeholder_sounds.py  gera os sons provisórios sintetizados
 │   ├── png2tim.py              conversor manual com posição de VRAM explícita
 │   ├── fix_gnu_stack.py        corrige o ELF do GCC mipsel-linux-gnu antes do elf2x
 │   ├── make_default_assets.py  gera os modelos e texturas padrão por código
@@ -391,6 +396,24 @@ em "prateleiras" garantindo que nenhuma textura cruze o limite de página (y = 2
 `u0 + largura ≤ 256` dentro da página, e grava `vram.txt`. Em tempo de execução,
 `render_load_texture` lê a posição do próprio TIM e calcula `tpage`, `clut` e os deslocamentos
 de UV — por isso a posição pode mudar a cada build sem quebrar nada.
+
+### Som (`sound.c`)
+
+- **Formato:** VAG = cabeçalho de 48 bytes (big-endian) + SPU-ADPCM: blocos de 16 bytes com 28
+  amostras de 4 bits, um de 5 filtros de previsão e um *shift* por bloco. Flags nos blocos marcam
+  fim (1), repetição (2) e início de loop (4). `tools/wav2vag.py` escolhe, por bloco, a combinação
+  filtro/shift de menor erro, reproduzindo o decodificador do SPU.
+- **Memória:** 16 bytes a cada 28 amostras → **~12,6 KB/s a 22 050 Hz**. As amostras vão
+  embutidas no EXE (`incbin`) e são copiadas por DMA para a RAM do SPU no boot, a partir de
+  `0x1010` (os primeiros 4 KB são reservados). Ou seja: ocupam RAM principal *e* do SPU.
+- **Vozes:** 0–1 para loops de ambiente; 2–23 em rodízio. Como o SDK não expõe o registrador ENDX,
+  o fim de cada som é estimado pela duração (calculada no carregamento) contra `VSync(-1)`. Sem voz
+  livre, rouba a de menor prioridade (tabela `sound_defs`), ou descarta o som novo.
+- **Posicional:** volume linear de `SOUND_NEAR` a `SOUND_FAR` pela distância até `g.cam_pos`; pan
+  pelo seno do ângulo relativo a `g.cam_yaw` (o lado oposto cai até 25%).
+- **Determinismo:** o módulo só lê `g`. Variações (tom, rosnados) usam `fx_range`.
+- **Cabeçalho big-endian:** convertido com `be32()` byte a byte. `__builtin_bswap32` chamaria uma
+  rotina da libgcc compilada com outro ABI e o jogo trava no boot.
 
 ### Colisão (`collision.c`)
 
@@ -548,7 +571,7 @@ Só é necessário ao mudar os modelos padrão por código; o fluxo normal é ed
 
 ### Limitações conhecidas
 
-- Sem áudio.
+- Sem música ainda (CD-DA chega na etapa 01b do `docs/ROADMAP.md`).
 - Sem recorte de polígonos no plano próximo: faces muito perto da câmera somem.
 - Ordenação por profundidade média: sobreposições erradas ocasionais em polígonos grandes
   (comportamento típico do PS1).
