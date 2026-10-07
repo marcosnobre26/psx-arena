@@ -463,7 +463,25 @@ static void select_draw(void) {
 /* Mundo                                                               */
 /* ------------------------------------------------------------------ */
 
+/* Lanternas acesas neste quadro: avisa o motor (objetos no cone são vistos
+ * mais longe) e desenha o cone de luz no chão de cada uma. */
+static void lanterns_draw(int with_players) {
+	VECTOR pos[MAX_PLAYERS] = { { 0 } };
+	int    ang[MAX_PLAYERS] = { 0 }, n = 0;
+	for (int i = 0; with_players && i < MAX_PLAYERS; i++) {
+		const PLAYER *p = &g.players[i];
+		if (!lantern_lit(p)) continue;
+		pos[n] = p->pos;
+		ang[n] = p->angle;
+		n++;
+	}
+	render_set_lanterns(n, pos, ang);
+	for (int i = 0; i < n; i++)
+		render_light_cone(pos[i].vx, pos[i].vz, ang[i], LANTERN_R, LANTERN_G, LANTERN_B);
+}
+
 static void draw_world(int with_players) {
+	lanterns_draw(with_players);   /* antes dos modelos: eles consultam as lanternas */
 	level_draw();
 	props_draw();
 	exit_draw();

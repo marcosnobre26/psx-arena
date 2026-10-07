@@ -65,6 +65,8 @@ int  render_fog_far(void);
 void render_set_light(int amb_r, int amb_g, int amb_b, int sun_r, int sun_g, int sun_b);
 /* Lanternas acesas neste quadro: objetos no cone são vistos mais longe */
 void render_set_lanterns(int n, const VECTOR *pos, const int *angle);
+/* Cone de luz aditivo no chão (cor da ponta; a borda vai a preto) */
+void render_light_cone(int x, int z, int angle, int r, int g, int b);
 
 /* Cor de fundo (céu): muda por fase */
 void render_set_clear_color(int r, int g, int b);

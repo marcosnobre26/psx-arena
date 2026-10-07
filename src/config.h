@@ -41,6 +41,11 @@
 #define LANTERN_MAX       MAX_PLAYERS
 #define LANTERN_RANGE     1600  /* alcance do cone (e do "ver mais longe") */
 #define LANTERN_FOG_MUL   26    /* no cone a névoa vai 26/16 = 1,6x mais longe */
+#define LANTERN_HALF      340   /* meio-ângulo do cone (340/4096*360 ~ 30 graus) */
+#define LANTERN_SEGS      4     /* triângulos do leque no chão */
+#define LANTERN_R         110   /* cor da ponta do cone (somada ao chão) */
+#define LANTERN_G         100
+#define LANTERN_B         70
 #define BATTERY_MAX       1000
 #define BATTERY_DRAIN     6     /* ligada: -1 de bateria a cada N passos (~100 s) */
 #define BATTERY_PICKUP    400   /* uma pilha (letra L no mapa) recarrega isto */

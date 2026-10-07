@@ -439,6 +439,87 @@ void render_mesh(const MESH *m, const VECTOR *pos, const SVECTOR *rot,
 
 /* ------------------------------------------------------------------ */
 
+/* Cone de luz da lanterna no chão: um leque de triângulos POLY_G3 em modo
+ * ADITIVO, com a ponta clara e a borda preta (somar preto não muda nada,
+ * então o degradê some suavemente sem precisar de textura).
+ *
+ * Cuidado com o modo de mistura: polígonos sem textura usam o modo da
+ * última "texture page" ativa. Por isso cada triângulo vai na OT entre
+ * dois DR_TPAGE: um liga o modo aditivo antes dele e outro volta ao modo
+ * normal (50%) depois, senão as sombras (pretas, 50%) passariam a ser
+ * somadas e sumiriam. Dentro de uma entrada da OT, o último addPrim é o
+ * primeiro desenhado; daí a ordem invertida abaixo. */
+void render_light_cone(int x, int z, int angle, int r, int g, int b) {
+	SVECTOR v[LANTERN_SEGS + 2];
+	v[0].vx = x + ((isin(angle) * 40) >> 12);   /* ponta logo à frente do pé */
+	v[0].vy = -4;
+	v[0].vz = z + ((icos(angle) * 40) >> 12);
+	for (int k = 0; k <= LANTERN_SEGS; k++) {
+		int a = (angle - LANTERN_HALF + (2 * LANTERN_HALF * k) / LANTERN_SEGS) & 4095;
+		v[k + 1].vx = x + ((isin(a) * LANTERN_RANGE) >> 12);
+		v[k + 1].vy = -4;
+		v[k + 1].vz = z + ((icos(a) * LANTERN_RANGE) >> 12);
+	}
+
+	/* vértices já estão no mundo: a matriz é só a da câmera */
+	gte_SetRotMatrix(&view);
+	gte_SetTransMatrix(&view);
+
+	uint32_t *ot  = fb[cur].ot;
+	uint8_t  *end = fb[cur].pkt + PACKET_LEN - 64;
+	uint16_t add  = getTPage(0, 1, 0, 0) | (fb[cur].draw.dtd << 9);   /* abr 1 = somar */
+	uint16_t half = getTPage(0, 0, 0, 0) | (fb[cur].draw.dtd << 9);   /* abr 0 = 50% */
+
+	for (int k = 1; k <= LANTERN_SEGS; k++) {
+		int32_t z0, z1, z2;
+		int otz;
+		DVECTOR xy[3];
+		if (nextpri + sizeof(POLY_G3) + 2 * sizeof(DR_TPAGE) >= end)
+			return;
+		gte_ldv3(&v[0], &v[k], &v[k + 1]);
+		gte_rtpt();
+		gte_stsz3(&z0, &z1, &z2);
+		if (z0 < NEAR_Z || z1 < NEAR_Z || z2 < NEAR_Z)
+			continue;
+		/* Posição na OT: o triângulo é comprido, e pela profundidade média
+		 * as células do chão perto da ponta seriam desenhadas por cima dele.
+		 * Usamos o vértice mais próximo menos meia célula (a GTE converte
+		 * para a escala da OT, igual às outras faces). */
+		int zn = z0 < z1 ? z0 : z1;
+		if (z2 < zn) zn = z2;
+		zn -= TILE_SIZE / 2;
+		if (zn < NEAR_Z) zn = NEAR_Z;
+		gte_ldsz3(zn, zn, zn);
+		gte_avsz3();
+		gte_stotz(&otz);
+		if (otz < 2 || otz >= OT_LEN) continue;
+		gte_stsxy3(&xy[0], &xy[1], &xy[2]);
+		if (bad_xy(xy[0].vx, xy[0].vy) || bad_xy(xy[1].vx, xy[1].vy) || bad_xy(xy[2].vx, xy[2].vy))
+			continue;
+
+		DR_TPAGE *after = (DR_TPAGE *)nextpri;     /* desenhado por último */
+		setDrawTPage(after, 0, 1, half);
+		addPrim(ot + otz, after);
+		nextpri += sizeof(DR_TPAGE);
+
+		POLY_G3 *p = (POLY_G3 *)nextpri;
+		setXY3(p, xy[0].vx, xy[0].vy, xy[1].vx, xy[1].vy, xy[2].vx, xy[2].vy);
+		setPolyG3(p);
+		setSemiTrans(p, 1);
+		setRGB0(p, r, g, b);                       /* ponta: clara */
+		setRGB1(p, 0, 0, 0);                       /* borda: preta (some) */
+		setRGB2(p, 0, 0, 0);
+		addPrim(ot + otz, p);
+		nextpri += sizeof(POLY_G3);
+
+		DR_TPAGE *before = (DR_TPAGE *)nextpri;    /* desenhado primeiro */
+		setDrawTPage(before, 0, 1, add);
+		addPrim(ot + otz, before);
+		nextpri += sizeof(DR_TPAGE);
+		polys++;
+	}
+}
+
 void render_rect(int x, int y, int w, int h, int r, int g, int b, int semitrans) {
 	if (nextpri + sizeof(TILE) >= fb[cur].pkt + PACKET_LEN)
 		return;
