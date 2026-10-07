@@ -53,8 +53,15 @@
 #define LANTERN_DYING     60    /* bateria zerou: pisca por 1 s e apaga */
 
 /* ---------- Mundo ---------- */
-#define TILE_SIZE       256     /* tamanho de um bloco do mapa */
-#define WALL_HEIGHT     384     /* altura das paredes */
+#define TILE_SIZE       256     /* tamanho de uma célula do mapa (1 metro) */
+#define MAP_MAX_W       128     /* maior mapa: 128 x 128 células */
+#define MAP_MAX_H       128
+#define CHUNK_SLOTS     36      /* blocos montados ao mesmo tempo (cache) */
+#define CHUNK_LOAD_RADIUS 2     /* monta o 5x5 de blocos em volta do grupo */
+#define CHUNK_BUILDS_PER_FRAME 1 /* fila: blocos distantes montados por quadro */
+#define WALL_SLICE      192     /* paredes são montadas em fatias desta altura */
+#define WALL_HEIGHT     384     /* parede dos mapas de texto (2 fatias) */
+#define THICKET_HEIGHT  768     /* mata densa: 3 m (4 fatias) */
 #define GRAVITY         3       /* aceleração para baixo por quadro */
 
 /* ---------- Câmera ---------- */

@@ -127,13 +127,35 @@ void render_set_fog(int near, int far, int r, int g, int b) {
 int render_fog_near(void) { return fog_base.near; }
 int render_fog_far(void)  { return fog_base.far; }
 
+static int amb[3], sun[3];      /* cópia da luz atual, para render_bake_light */
+
 /* Luz ambiente (0..255) e cor da luz direcional (ONE = 1.0 por canal) */
 void render_set_light(int amb_r, int amb_g, int amb_b, int sun_r, int sun_g, int sun_b) {
+	amb[0] = amb_r; amb[1] = amb_g; amb[2] = amb_b;
+	sun[0] = sun_r; sun[1] = sun_g; sun[2] = sun_b;
 	gte_SetBackColor(amb_r, amb_g, amb_b);
 	light_color.m[0][0] = sun_r;
 	light_color.m[1][0] = sun_g;
 	light_color.m[2][0] = sun_b;
 	gte_SetColorMatrix(&light_color);
+}
+
+/* A mesma conta que a GTE faz em nccs, feita uma vez na montagem do bloco:
+ *   luz = ambiente*16 + cor_da_lua * max(0, direção_da_luz . normal)
+ *   cor = cor_base * luz / 4096   (4096 = 1.0) */
+void render_bake_light(const SVECTOR *n, int r, int g, int b, CVECTOR *out) {
+	int d = (light_dir.m[0][0] * n->vx + light_dir.m[0][1] * n->vy +
+	         light_dir.m[0][2] * n->vz) >> 12;
+	if (d < 0) d = 0;
+	int base[3] = { r, g, b }, res[3];
+	for (int k = 0; k < 3; k++) {
+		int l = amb[k] * 16 + ((sun[k] * d) >> 12);
+		if (l > 4095 * 2) l = 4095 * 2;
+		int c = (base[k] * l) >> 12;
+		res[k] = c > 255 ? 255 : c;
+	}
+	out->r = res[0]; out->g = res[1]; out->b = res[2];
+	out->cd = 0x3c;                 /* código do POLY_GT4 (a GTE copia este byte) */
 }
 
 /* ------------------------------------------------------------------ */
@@ -439,6 +461,132 @@ void render_mesh(const MESH *m, const VECTOR *pos, const SVECTOR *rot,
 
 /* ------------------------------------------------------------------ */
 
+/* ------------------------------------------------------------------ */
+/* Blocos do mapa                                                      */
+/* ------------------------------------------------------------------ */
+
+static const SVECTOR       *chunk_verts;
+static const TEXTURE *const *chunk_texs;
+static int                  chunk_ntex;
+
+void render_chunk_setup(const SVECTOR *verts, const TEXTURE *const *texs, int ntex) {
+	chunk_verts = verts;
+	chunk_texs  = texs;
+	chunk_ntex  = ntex;
+}
+
+/* Carrega na GTE a matriz mundo->câmera de algo só transladado para (x,y,z).
+ * Assim os vértices podem ser pequenos (relativos a esse ponto) mesmo num
+ * mapa de 32 768 unidades, que estouraria um SVECTOR (16 bits). */
+static void load_translation(int x, int y, int z) {
+	MATRIX m = view;
+	VECTOR p = { x, y, z }, t;
+	ApplyMatrixLV(&view, &p, &t);
+	m.t[0] = view.t[0] + t.vx;
+	m.t[1] = view.t[1] + t.vy;
+	m.t[2] = view.t[2] + t.vz;
+	gte_SetRotMatrix(&m);
+	gte_SetTransMatrix(&m);
+}
+
+/* Cantos da textura (u, v): chão 64x64 e fatia de parede 64x48 */
+static const uint8_t chunk_uv[2][4][2] = {
+	{ { 0, 0 }, { 0, 63 }, { 63, 63 }, { 63, 0 } },
+	{ { 0, 47 }, { 63, 47 }, { 63, 0 }, { 0, 0 } },
+};
+
+#define CHUNK_HALF    (CHUNK_CELLS * TILE_SIZE / 2)
+#define CHUNK_RADIUS  (CHUNK_HALF * 3 / 2 + THICKET_HEIGHT / 2)   /* esfera que cobre o bloco */
+
+void render_chunk(const CHUNK_GEOM *c) {
+	if (!c->nquads || !chunk_verts)
+		return;
+
+	/* descarte do bloco inteiro: distância, névoa e campo de visão */
+	int r  = CHUNK_RADIUS;
+	int dx = c->origin.vx + CHUNK_HALF - cam_pos.vx;
+	int dy = -THICKET_HEIGHT / 2 - cam_pos.vy;
+	int dz = c->origin.vz + CHUNK_HALF - cam_pos.vz;
+	if (dx > draw_dist + r || dx < -draw_dist - r || dz > draw_dist + r || dz < -draw_dist - r)
+		return;
+	int vz = (view.m[2][0] * dx + view.m[2][1] * dy + view.m[2][2] * dz) >> 12;
+	if (vz < NEAR_Z - r || vz - r > fog_base.far)
+		return;
+	int vx = (view.m[0][0] * dx + view.m[0][1] * dy + view.m[0][2] * dz) >> 12;
+	int lim = (vz * (SCREEN_W / 2)) / FOV_H + ((r * 3) >> 1);
+	if (vx > lim || vx < -lim)
+		return;
+
+	fog_use(&fog_base);              /* blocos não usam a névoa da lanterna */
+	load_translation(c->origin.vx, 0, c->origin.vz);
+
+	uint32_t *ot  = fb[cur].ot;
+	uint8_t  *end = fb[cur].pkt + PACKET_LEN - 64;
+	const int far = fog_base.far;
+
+	for (int i = 0; i < c->nquads; i++) {
+		const CHUNK_QUAD *q = &c->quads[i];
+		int p, otz;
+		int32_t z0, z1, z2, z3;
+
+		if (nextpri >= end)
+			break;
+
+		gte_ldv3(&chunk_verts[q->v[0]], &chunk_verts[q->v[1]], &chunk_verts[q->v[2]]);
+		gte_rtpt();
+		gte_nclip();
+		gte_stopz(&p);
+		if (p <= 0)
+			continue;                    /* de costas */
+		gte_stsz3(&z0, &z1, &z2);
+		if (z0 < NEAR_Z || z1 < NEAR_Z || z2 < NEAR_Z)
+			continue;
+		if (z0 > far && z1 > far && z2 > far)
+			continue;                    /* sumiu na névoa */
+
+		POLY_GT4 *pr = (POLY_GT4 *)nextpri;
+		gte_stsxy3(&pr->x0, &pr->x1, &pr->x2);
+		gte_ldv0(&chunk_verts[q->v[3]]);
+		gte_rtps();
+		gte_stsxy(&pr->x3);
+		gte_stsz(&z3);
+		if (z3 < NEAR_Z)
+			continue;
+		gte_avsz4();
+		gte_stotz(&otz);
+		otz += q->zbias;
+		if (otz < 2) otz = 2;
+		if (otz >= OT_LEN) continue;
+		if (bad_xy(pr->x0, pr->y0) || bad_xy(pr->x1, pr->y1) ||
+		    bad_xy(pr->x2, pr->y2) || bad_xy(pr->x3, pr->y3))
+			continue;
+
+		/* névoa nas 4 cores (o fator IR0 é o do último vértice projetado):
+		 * dpct faz 3 cores de uma vez, dpcs a quarta */
+		gte_ldrgb3(&q->c[0], &q->c[1], &q->c[2]);
+		gte_dpct();
+		gte_strgb3(&pr->r0, &pr->r1, &pr->r2);
+		gte_ldrgb(&q->c[3]);
+		gte_dpcs();
+		gte_strgb(&pr->r3);
+		setPolyGT4(pr);
+
+		const TEXTURE *t = chunk_texs[q->tex < chunk_ntex ? q->tex : 0];
+		const uint8_t (*uv)[2] = chunk_uv[q->uv];
+		int cm = q->corners, rot = q->rot;
+		pr->tpage = t->tpage;
+		pr->clut  = t->clut;
+		pr->u0 = t->u0 + uv[((cm     ) + rot) & 3][0]; pr->v0 = t->v0 + uv[((cm     ) + rot) & 3][1];
+		pr->u1 = t->u0 + uv[((cm >> 2) + rot) & 3][0]; pr->v1 = t->v0 + uv[((cm >> 2) + rot) & 3][1];
+		pr->u2 = t->u0 + uv[((cm >> 4) + rot) & 3][0]; pr->v2 = t->v0 + uv[((cm >> 4) + rot) & 3][1];
+		pr->u3 = t->u0 + uv[((cm >> 6) + rot) & 3][0]; pr->v3 = t->v0 + uv[((cm >> 6) + rot) & 3][1];
+
+		addPrim(ot + otz, pr);
+		nextpri += sizeof(POLY_GT4);
+		polys++;
+	}
+}
+
 /* Cone de luz da lanterna no chão: um leque de triângulos POLY_G3 em modo
  * ADITIVO, com a ponta clara e a borda preta (somar preto não muda nada,
  * então o degradê some suavemente sem precisar de textura).
@@ -450,20 +598,18 @@ void render_mesh(const MESH *m, const VECTOR *pos, const SVECTOR *rot,
  * somadas e sumiriam. Dentro de uma entrada da OT, o último addPrim é o
  * primeiro desenhado; daí a ordem invertida abaixo. */
 void render_light_cone(int x, int z, int angle, int r, int g, int b) {
+	/* vértices relativos ao jogador (o mapa grande estouraria 16 bits) */
 	SVECTOR v[LANTERN_SEGS + 2];
-	v[0].vx = x + ((isin(angle) * 40) >> 12);   /* ponta logo à frente do pé */
+	v[0].vx = (isin(angle) * 40) >> 12;          /* ponta logo à frente do pé */
 	v[0].vy = -4;
-	v[0].vz = z + ((icos(angle) * 40) >> 12);
+	v[0].vz = (icos(angle) * 40) >> 12;
 	for (int k = 0; k <= LANTERN_SEGS; k++) {
 		int a = (angle - LANTERN_HALF + (2 * LANTERN_HALF * k) / LANTERN_SEGS) & 4095;
-		v[k + 1].vx = x + ((isin(a) * LANTERN_RANGE) >> 12);
+		v[k + 1].vx = (isin(a) * LANTERN_RANGE) >> 12;
 		v[k + 1].vy = -4;
-		v[k + 1].vz = z + ((icos(a) * LANTERN_RANGE) >> 12);
+		v[k + 1].vz = (icos(a) * LANTERN_RANGE) >> 12;
 	}
-
-	/* vértices já estão no mundo: a matriz é só a da câmera */
-	gte_SetRotMatrix(&view);
-	gte_SetTransMatrix(&view);
+	load_translation(x, 0, z);
 
 	uint32_t *ot  = fb[cur].ot;
 	uint8_t  *end = fb[cur].pkt + PACKET_LEN - 64;

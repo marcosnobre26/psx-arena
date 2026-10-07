@@ -38,6 +38,34 @@ typedef struct {
 	int            zbias;    /* negativo = desenha "mais à frente" */
 } DRAWOPT;
 
+/* ---- Blocos do mapa (geometria montada em level.c) ----
+ * Todo vértice de um bloco de CHUNK_CELLS x CHUNK_CELLS células é um ponto
+ * da grade, em CHUNK_LAYERS alturas: por isso uma única tabela de vértices
+ * (relativos à origem do bloco) serve para todos, e cada quad guarda só
+ * índices. A luz já vem embutida na cor de cada vértice (as normais do
+ * chão e das paredes são fixas); no desenho só se aplica a névoa. */
+#define CHUNK_CELLS      8
+#define CHUNK_LAYERS     5                      /* alturas: 0, 1, 2, 3, 4 x WALL_SLICE */
+#define CHUNK_GRID       (CHUNK_CELLS + 1)
+#define CHUNK_VERTS      (CHUNK_GRID * CHUNK_GRID * CHUNK_LAYERS)
+#define CHUNK_MAX_QUADS  256
+
+typedef struct {
+	uint16_t v[4];        /* índices na tabela de vértices, em ordem "Z" */
+	CVECTOR  c[4];        /* cor de cada vértice (luz embutida) */
+	uint8_t  tex;         /* índice na tabela de texturas do mundo */
+	uint8_t  uv;          /* 0 = chão (64x64), 1 = fatia de parede (64x48) */
+	uint8_t  rot;         /* chão: rotação da textura 0..3 (variedade) */
+	uint8_t  corners;     /* canto da textura de cada vértice (2 bits cada) */
+	int8_t   zbias;
+} CHUNK_QUAD;
+
+typedef struct {
+	VECTOR      origin;   /* canto (x0, 0, z0) do bloco no mundo */
+	int         nquads;
+	CHUNK_QUAD  quads[CHUNK_MAX_QUADS];
+} CHUNK_GEOM;
+
 void render_init(void);
 void render_load_texture(const uint32_t *tim, TEXTURE *out);
 
@@ -65,6 +93,12 @@ int  render_fog_far(void);
 void render_set_light(int amb_r, int amb_g, int amb_b, int sun_r, int sun_g, int sun_b);
 /* Lanternas acesas neste quadro: objetos no cone são vistos mais longe */
 void render_set_lanterns(int n, const VECTOR *pos, const int *angle);
+/* Blocos do mapa: tabela de vértices, texturas e desenho */
+void render_chunk_setup(const SVECTOR *verts, const TEXTURE *const *texs, int ntex);
+void render_chunk(const CHUNK_GEOM *c);
+/* Cor de uma face com normal fixa, com a luz atual (ambiente + lua) */
+void render_bake_light(const SVECTOR *normal, int r, int g, int b, CVECTOR *out);
+
 /* Cone de luz aditivo no chão (cor da ponta; a borda vai a preto) */
 void render_light_cone(int x, int z, int angle, int r, int g, int b);
 

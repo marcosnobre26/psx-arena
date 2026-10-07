@@ -125,6 +125,25 @@ typedef struct {
 } SOUND_DEF;
 extern const SOUND_DEF  sound_defs[];
 
+/* Tipo de cada célula da grade (level.c). Bit 7 = sólido. */
+enum {
+	CELL_VOID,      /* nada (sem chão), sólido */
+	CELL_FLOOR,     /* chão dos mapas de texto (textura da fase) */
+	CELL_WALL,      /* parede dos mapas de texto (1,5 m) */
+	CELL_DIRT,      /* trilha de terra */
+	CELL_LEAVES,    /* chão de folhas */
+	CELL_ROOTS,     /* terra com raízes */
+	CELL_THICKET,   /* mata densa (3 m), sólida */
+};
+#define CELL_TYPE_MASK  0x3f
+#define CELL_SOLID      0x80
+
+/* Ponto fixo para o teleporte de depuração (célula + direção da câmera) */
+typedef struct {
+	int cx, cz;
+	int yaw;
+} DEBUG_POINT;
+
 /* Objetivo de uma fase (ver objective.c) */
 enum { OBJ_KILL_ALL, OBJ_REACH_EXIT, OBJ_COLLECT, OBJ_SURVIVE };
 
@@ -142,6 +161,8 @@ typedef struct {
 	int                obj_param;    /* COLLECT: itens (0 = todos os Q); SURVIVE: segundos */
 	int                max_enemies;  /* SURVIVE: inimigos vivos no máximo (reforços) */
 	const char        *obj_text;     /* frase da introdução (ASCII, sem acentos) */
+	void             (*build)(void); /* mapa por código (quando map == NULL) */
+	const DEBUG_POINT *debug_pts;    /* 4 pontos de teleporte (L2 + direcional) */
 } LEVEL_DEF;
 extern const LEVEL_DEF  level_defs[];
 extern const int        num_levels;
@@ -314,6 +335,12 @@ void exit_draw(void);
 
 /* level.c */
 void level_load(int index);
+void level_begin(int w, int h);         /* mapa por código: tamanho (tudo vazio) */
+void level_set_cell(int cx, int cz, int type);   /* CELL_* (solidez automática) */
+int  level_cell_type(int cx, int cz);
+void level_place(char ch, int cx, int cz);       /* cria o que a letra representa */
+void level_invalidate(int cx, int cz);  /* célula mudou: remonta o bloco */
+void level_stats(int *loaded, int *slots, int *built, int *overflow);
 void level_apply_look(void);            /* névoa e luz da fase atual */
 void level_draw(void);
 int  level_cell_solid(int cx, int cz);

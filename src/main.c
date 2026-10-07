@@ -320,6 +320,9 @@ static void draw_hud(void) {
 #else
 		hud_print(12, 166, "FOG %d/%d", render_fog_near(), render_fog_far());
 #endif
+		int bl, bs, bb, bo;
+		level_stats(&bl, &bs, &bb, &bo);
+		hud_print(12, 156, "BLOCOS %d/%d +%d%s", bl, bs, bb, bo ? " CHEIO!" : "");
 		hud_print(12, 176, "SPU %dK/512K", sound_spu_used() / 1024);
 		hud_print(12, 186, "SEED %08X  POLIS %d", (unsigned)g.seed, render_stats_polys());
 		hud_print(12, 196, "FPS %d  RAM GPU %d/%d", fps, render_stats_bytes(), PACKET_LEN);
