@@ -23,7 +23,7 @@ outra.
 | Mapas | **gerados a cada partida** (semente) **e** mudam durante o jogo (eventos) |
 | Armas | espada, machado (corpo a corpo), arco e flecha (munição), magias (energia), armas de fogo raras |
 | Online | **Parsec** agora; **modo link** (lockstep pela serial, receita R11 do manual) por último |
-| Som | efeitos em VAG no SPU; música por faixa de CD-DA; som posicional |
+| Som | efeitos em VAG no SPU; som posicional; música por faixa de CD-DA **adiada** (etapa 01b, depois da 10) |
 
 ### Pilares (use para decidir quando houver dúvida)
 
@@ -37,7 +37,7 @@ outra.
 | # | Etapa | Prompt | Depende de | Risco |
 |---|---|---|---|---|
 | 00 | Preparação (regras, créditos, ferramentas) | `00-preparacao.md` | — | baixo |
-| 01 | Som: efeitos, passos, música, som posicional | `01-som.md` | 00 | baixo |
+| 01a | Som: efeitos, passos, ambiente, som posicional | `01-som.md` | 00 | baixo |
 | 02 | Fases e objetivos | `02-fases-objetivos.md` | 00 | baixo |
 | 03 | Clima: escuridão, névoa, lanterna | `03-clima-lanterna.md` | 02 | médio |
 | 04 | Mundo grande: floresta em blocos | `04-mundo-grande.md` | 03 | **alto** |
@@ -47,6 +47,7 @@ outra.
 | 08 | Inventário e menu do START | `08-menu-inventario.md` | 06, 07 | médio |
 | 09 | Floresta viva: céu, pássaros, animais | `09-ambiente-vivo.md` | 04, 01 | médio |
 | 10 | Desempenho, polimento, release | `10-polimento.md` | todas | médio |
+| 01b | Música CD-DA (adiada) | `01-som.md` (tarefa 4) | 01a, 10 | médio |
 | 11 | Modo link (2 jogadores pela serial) | `11-modo-link.md` | todas | médio |
 
 ## Regras que valem para TODAS as etapas
