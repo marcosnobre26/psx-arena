@@ -119,3 +119,20 @@ automatizar testes visuais.
   50%); game over recomeça a fase; `DEBUG_START_LEVEL`. 4 fases de teste
   (ARENA, CORREDORES, RELIQUIAS, CERCO). Música CD-DA (01b) adiada para
   depois da etapa 10. Medição L2 pendente (teste do Marcos).
+- 2026-10-06 — Etapa 03 (clima e lanterna): névoa por profundidade da GTE
+  (DQA/DQB por macro própria, `ncds`/`dpcs`, faces além do `fog_far`
+  descartadas, cor da névoa = céu), escuridão por fase (`fog_near/far` e luz
+  ambiente em `LEVEL_DEF`, lua azulada em `config.h`), lanterna no Select
+  (bateria 0–1000, pisca e apaga, pilha `L` +400 e 10% de drop dos
+  inimigos; cone `POLY_G3` aditivo entre `DR_TPAGE`; objetos no cone com
+  névoa 1,6× mais longe), overlay `FOG near/far`, `DEBUG_FOG_TUNING`,
+  L2 + START pula de fase (o overlay passou a alternar ao soltar o L2).
+  Clarear vértices do chão (opcional) não foi feito: o chão é um quad de cor
+  única por célula. Desempenho no pior ponto de cada fase (L2):
+
+  | Fase | Antes: FPS / POLIS / RAM GPU | Depois: FPS / POLIS / RAM GPU |
+  |---|---|---|
+  | 1 ARENA | 60 / 354 / 14 584 | a medir |
+  | 2 CORREDORES | 30 / 937 / 35 464 | a medir |
+  | 3 RELIQUIAS | 30 / 518 / 20 796 | a medir |
+  | 4 CERCO | 30 / 531 / 22 056 | a medir |

@@ -121,6 +121,12 @@ uma branch. As regras do ROADMAP (determinismo, orçamentos de desempenho,
   Parsec. Modo link (SIO1/lockstep) é proposta não implementada (README).
 - RAM do SPU: ~12,6 KB por segundo de som a 22 kHz (o manual, R8, diz 8 KB/s —
   está errado). Orçamento 450 KB; cada som também ocupa RAM principal (incbin).
+- Névoa: só cores **escuras** (em faces texturizadas a cor só escurece).
+  DQA/DQB são gravados por `gte_SetDepthCue` (macro própria em `render.c`).
+  Primitiva aditiva sem textura (cone da lanterna) precisa de `DR_TPAGE`
+  antes **e** depois, senão muda o modo de mistura das sombras.
+- Controles: **Select = lanterna** (skin só na seleção); L2 alterna o overlay
+  ao **soltar**; overlay aberto + L2 + START pula de fase.
 - Desempenho: ~30 FPS na fase com os limites atuais; confira com **L2** no
   jogo (`SEED`, `POLIS` = polígonos enviados à GPU, FPS e bytes de primitivas;
   `PACKET_LEN` = 96 KB por buffer).

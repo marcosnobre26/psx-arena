@@ -43,9 +43,10 @@ Depois de qualquer mudança: `./dev run` (compila e abre no emulador) ou
 | **Círculo** | usar poder (gasta energia) |
 | **R2** | trocar de poder |
 | **L1 / R1** ou analógico direito | girar a câmera |
-| **Select** | trocar a skin (personagens com skins) |
+| **Select** | liga/desliga a **lanterna** (a skin muda só na tela de seleção) |
 | **Start** | pausar |
-| **L2** | depuração: memória do SPU, semente, polígonos, FPS, memória de primitivas, posição |
+| **L2** (soltar) | depuração: névoa, memória do SPU, semente, polígonos, FPS, memória de primitivas, posição |
+| **L2 + Start** | (com o overlay aberto) pula para a próxima fase |
 
 **Tela de seleção:** esquerda/direita escolhe, **Select** troca a skin,
 **X** confirma, **Círculo** desfaz (ou volta ao título). O **controle 2**
@@ -99,22 +100,25 @@ static const char *const map_ponte[] = {
 | `G` | gema (pontos) | `H` | vida |
 | `N` | energia | `W` | arma nova |
 | `X` | **saída** da fase | `Q` | **item de missão** |
-| `S` | **ponto de reforço** (objetivo SURVIVE) | espaço | vazio |
+| `S` | **ponto de reforço** (objetivo SURVIVE) | `L` | **pilha** da lanterna |
+| espaço | vazio | | |
 | `E` `B` `F` | inimigos (`enemy_defs`) | `1`…`9` | objetos de cenário (`prop_defs`) |
 
 Regras: todas as linhas com o mesmo tamanho, máximo 32×32. Chão, paredes
 (com 2 "andares" de textura) e colisão são gerados a partir do texto. O
 segundo jogador nasce na primeira célula livre ao lado do `P`. Ao criar
 inimigo ou cenário novo, **não use letras reservadas**: `# . P C G H N W X
-Q S` e `A` (reservada para o ATIRADOR).
+Q S L` e `A` (reservada para o ATIRADOR).
 
 **2. Acrescente a linha na tabela:**
 
 ```c
-/* nome     mapa      chão          parede       céu (R,G,B)  música
- *          objetivo      parâmetro  máx. inimigos  texto do objetivo */
-{ "PONTE",  map_ponte, &tex_floor_t, &tex_wall_t, 30, 30, 50,  0,
-            OBJ_COLLECT,  0,         0,             "PEGUE O ITEM E SAIA" },
+/* nome      mapa
+ *   chão          parede       céu=névoa   névoa near/far  luz ambiente  música
+ *   objetivo      parâmetro  máx. inimigos  texto do objetivo */
+{ "PONTE",   map_ponte,
+  &tex_floor_t, &tex_wall_t, 10, 12, 24,  1300, 3200,     40, 40, 56,   0,
+  OBJ_COLLECT,  0,         0,             "PEGUE O ITEM E SAIA" },
 ```
 
 | Objetivo | Vence quando | Parâmetro | HUD |
@@ -143,7 +147,35 @@ O jogo novo, ao sair da seleção, começa direto nela. Comente de novo antes
 do commit.
 
 Mapas grandes com muitas paredes custam desempenho: confira o FPS com **L2**
-no ponto mais pesado.
+no ponto mais pesado. **Atalho:** com o overlay L2 aberto, segure **L2** e
+aperte **Start** para pular para a próxima fase (levando o progresso).
+
+### Clima: névoa, luz e lanterna
+
+**Névoa** (por fase, colunas `névoa near/far` em `level_defs`): até `near`
+tudo aparece normal; entre `near` e `far` a cor vai para a cor do céu; além
+de `far` nada é desenhado (economiza polígonos). Os valores são de
+profundidade a partir da câmera, que fica a ~1000 do jogador: **near abaixo
+de ~1100 enevoa o próprio jogador**. A névoa da GTE cresce em 1/z: logo
+depois do `near` ela já engrossa rápido.
+
+- Use **céu escuro**: em faces com textura a cor só *escurece* a textura,
+  então uma névoa clara (cinza, branca) não funciona nelas.
+- **Luz ambiente** (0–255 por canal) também é por fase. A luz direcional
+  ("lua", fraca e azulada) fica em `config.h` (`MOON_R/G/B`).
+- **Ajuste ao vivo:** descomente `#define DEBUG_FOG_TUNING` em `config.h`.
+  No jogo, abra o overlay (**L2**), segure **R2** e use o direcional:
+  cima/baixo = `far` ±100, direita/esquerda = `near` ±50. A linha `FOG` do
+  overlay mostra os valores; anote os bons e passe para `levels.c`.
+
+**Lanterna** (Select liga/desliga, cada jogador a sua):
+- Cone de luz no chão à frente do jogador; inimigos, itens e cenário **dentro
+  do cone** são vistos 1,6× mais longe (`LANTERN_FOG_MUL`, `LANTERN_RANGE`).
+- Bateria 0–1000 (barra `LT`): ligada gasta ~1 a cada 6 passos (~100 s).
+  Abaixo de 15% a luz falha às vezes; zerada, pisca 1 s e apaga.
+- **Pilha** (`L` no mapa, ou 10% de chance ao matar um inimigo) recarrega 400.
+- A bateria passa de fase e não recarrega quando o jogador cai.
+- Ajustes em `config.h`, bloco "Lanterna" (alcance, ângulo, cor, consumo).
 
 ---
 

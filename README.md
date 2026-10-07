@@ -50,6 +50,8 @@ jogo. Roda em emuladores e em console real (CD-R).
 - 4 armas (com mira automática), 3 poderes, 4 tipos de inimigo (um deles atira), gemas, itens, caixas destrutíveis
   e objetos de cenário.
 - **Colisão entre tudo**: paredes, caixas, cenário, jogadores e inimigos. Pular passa por cima dos inimigos.
+- **Clima de terror:** névoa por profundidade da GTE, escuridão por fase e **lanterna** com bateria
+  (cone de luz aditivo; vê-se mais longe no cone).
 - **Som posicional** no SPU: passos, tiros, acertos, inimigos que rosnam fora da tela, vento e grilos em loop.
 
 **Motor e ferramentas**
@@ -316,13 +318,16 @@ stateDiagram-v2
     [*] --> Titulo
     Titulo --> Selecao: START (controle 1 ou 2)
     Selecao --> Titulo: CÍRCULO (jogador 1)
-    Selecao --> Jogo: todos confirmaram
+    Selecao --> Intro: todos confirmaram
+    Intro --> Jogo: 3 s ou START/X
     Jogo --> Pausa: START
     Pausa --> Jogo: START
-    Jogo --> Vitoria: sem inimigos
+    Jogo --> Vitoria: objetivo cumprido
     Jogo --> GameOver: todos caídos
-    Vitoria --> Jogo: START
-    GameOver --> Jogo: START
+    Vitoria --> Intro: START (próxima fase)
+    Vitoria --> Fim: START (última fase)
+    Fim --> Titulo: START
+    GameOver --> Intro: START (mesma fase)
     Vitoria --> Selecao: SELECT
     GameOver --> Selecao: SELECT
 ```
@@ -349,13 +354,27 @@ Separação de responsabilidades: `*_update()` só altera estado; `*_draw()` só
    - matriz modelo→câmera com `RotMatrix` + `ScaleMatrix` + `CompMatrixLV`; matriz de luz no espaço do modelo.
 4. **Por face:** `gte_rtpt` projeta 3 vértices; `gte_nclip` descarta faces de costas; faces com
    vértice antes do plano próximo (`NEAR_Z`) ou com coordenadas fora do limite da GPU são
-   descartadas; `gte_nccs` calcula a cor iluminada (ambiente + 1 luz direcional). Primitivas:
+   descartadas, assim como as que estão inteiras além do `fog_far`; `gte_ncds` calcula a cor
+   iluminada (ambiente + 1 luz direcional) já misturada com a névoa, e `gte_dpcs` faz só a névoa
+   nas faces sem luz. Primitivas:
    `POLY_F3/F4` (cor) e `POLY_FT3/FT4` (texturizadas), com semitransparência opcional.
 5. **Memória de primitivas:** 96 KB por buffer (`PACKET_LEN`); o desenho para com segurança se
    acabar. O HUD (L2) mostra o uso por quadro.
 6. **Fase em blocos:** o chão e as paredes geradas do mapa são agrupados em blocos de 4×4 células,
    cada um com sua esfera de descarte — só o que está à vista é processado.
 7. **HUD:** retângulos (`TILE`) e texto via `FntSort`, inseridos nas entradas 0/1 da OT.
+8. **Névoa (depth cueing):** a cada projeção a GTE calcula `IR0 = (H·65536/z·DQA + DQB)/4096`
+   (0..4096). `render_set_fog()` escolhe DQA/DQB (registradores de controle 27/28, gravados por uma
+   macro própria `gte_SetDepthCue`, porque o SDK não tem) para `IR0` = 0 no `near` e 4096 no
+   `far`; `gte_SetFarColor` = cor do céu, que também é a cor de fundo. A conta é em 1/z: a névoa
+   engrossa logo depois do `near`. É por face (o `IR0` do último vértice projetado). As contas
+   evitam 64 bits (que puxariam a libgcc) limitando `near ≥ 256` e `far − near ≥ far/8`.
+9. **Lanterna:** objetos cujo centro está no cone de uma lanterna acesa usam um segundo par
+   DQA/DQB (névoa 1,6× mais longe); os blocos do mapa (`DRAW_FIXEDFOG`) ficam de fora. O cone no
+   chão é um leque de `POLY_G3` em modo **aditivo** (ponta clara, borda preta). Polígonos sem
+   textura usam o modo de mistura da última *texture page*, então cada triângulo vai na OT entre
+   dois `DR_TPAGE` (aditivo antes, 50% depois — senão as sombras seriam somadas e sumiriam). O
+   índice na OT usa o vértice mais próximo menos meia célula, para o chão não cobrir a ponta.
 
 ### Coordenadas, unidades e ponto fixo
 
