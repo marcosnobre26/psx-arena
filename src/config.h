@@ -58,6 +58,7 @@
 #define MAX_PROPS       64
 
 /* ---------- Fases e objetivos ---------- */
+#define INTRO_TIME          180  /* introdução da fase: 3 s (START/X pulam) */
 #define EXIT_RADIUS         160  /* distância para "entrar" na saída (X) */
 #define MAX_SPAWN_PTS       8    /* pontos de reforço (S) por mapa */
 #define REINFORCE_TIME      480  /* SURVIVE: um reforço a cada 8 s */
@@ -87,5 +88,9 @@
  * conferir o determinismo: duas partidas com as mesmas entradas devem
  * se comportar igual (mesmos inimigos, mesmos sorteios). */
 /* #define DEBUG_FIXED_SEED 1234 */
+
+/* Descomente para o jogo novo começar direto na fase N (1 = primeira).
+ * Para testar uma fase sem jogar as anteriores. */
+/* #define DEBUG_START_LEVEL 3 */
 
 #endif

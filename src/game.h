@@ -232,10 +232,12 @@ typedef struct {
 	uint32_t s;
 } RNG;
 
-enum { STATE_TITLE, STATE_SELECT, STATE_PLAY, STATE_PAUSE, STATE_WIN, STATE_DEAD };
+enum { STATE_TITLE, STATE_SELECT, STATE_PLAY, STATE_PAUSE, STATE_WIN, STATE_DEAD,
+       STATE_INTRO, STATE_END };   /* novos no fim: não mudam os números antigos */
 
 typedef struct {
 	int     state;
+	int     state_timer;    /* contador do estado atual (ex.: duração da introdução) */
 	int     frame;
 	uint32_t seed;          /* semente da partida (no modo link virá do handshake) */
 	RNG     rng;            /* único gerador que a LÓGICA pode usar */

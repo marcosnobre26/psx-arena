@@ -109,6 +109,71 @@ static void game_reset(int level, uint32_t seed) {
 }
 
 /* ------------------------------------------------------------------ */
+/* Progressão entre fases                                              */
+/* ------------------------------------------------------------------ */
+
+/* O que passa de uma fase para a outra. Fica fora de g (como sel[]),
+ * porque o memset do game_reset apaga g. É o "retrato" de quando a fase
+ * começou: vencer atualiza o retrato; o game over recomeça a fase com ele.
+ * Calculado só a partir de g, então é igual nos dois consoles (modo link). */
+typedef struct {
+	int      valid;
+	int      hp, energy, weapon, power;
+	uint32_t weapons_owned;
+} CARRY;
+
+static struct {
+	int   score;
+	CARRY p[MAX_PLAYERS];
+} progress;
+
+/* Guarda o estado atual (chamado ao vencer uma fase) */
+static void progress_save(void) {
+	progress.score = g.score;
+	for (int i = 0; i < MAX_PLAYERS; i++) {
+		const PLAYER *p = &g.players[i];
+		CARRY *c = &progress.p[i];
+		c->valid = p->active;
+		if (!p->active) continue;
+		c->hp            = p->hp > 0 ? p->hp : p->max_hp / 2;  /* caído volta com 50% */
+		c->energy        = p->energy;
+		c->weapon        = p->weapon;
+		c->power         = p->power;
+		c->weapons_owned = p->weapons_owned;
+	}
+}
+
+/* Começa a fase pela tela de introdução, com o progresso guardado */
+static void start_level(int level, uint32_t seed) {
+	game_reset(level, seed);
+	g.score = progress.score;
+	for (int i = 0; i < MAX_PLAYERS; i++) {
+		PLAYER *p = &g.players[i];
+		const CARRY *c = &progress.p[i];
+		if (!p->active || !c->valid) continue;
+		p->hp            = c->hp < p->max_hp ? c->hp : p->max_hp;
+		p->energy        = c->energy;
+		p->weapon        = c->weapon;
+		p->power         = c->power;
+		p->weapons_owned = c->weapons_owned;
+	}
+	g.state = STATE_INTRO;
+	g.state_timer = INTRO_TIME;
+}
+
+/* Jogo novo (saindo da seleção): zera o progresso */
+static void start_new_game(void) {
+	int first = 0;
+#ifdef DEBUG_START_LEVEL
+	first = DEBUG_START_LEVEL - 1;            /* 1 = primeira fase */
+	if (first < 0) first = 0;
+	if (first >= num_levels) first = num_levels - 1;
+#endif
+	memset(&progress, 0, sizeof(progress));
+	start_level(first, g.frame);              /* tempo na seleção varia: partida diferente */
+}
+
+/* ------------------------------------------------------------------ */
 /* Câmera em terceira pessoa (segue o grupo)                            */
 /* ------------------------------------------------------------------ */
 
@@ -299,9 +364,7 @@ static void select_tick(void) {
 	for (int i = 0; i < MAX_PLAYERS; i++)
 		if (sel[i].joined && !sel[i].ready) all = 0;
 	if (all && sel[0].joined) {
-		game_reset(0, g.frame);   /* tempo na seleção varia: partida diferente */
-		g.state = STATE_PLAY;
-		show_message("DERROTE TODOS OS INIMIGOS!", 120);
+		start_new_game();
 	}
 }
 
@@ -440,16 +503,39 @@ static void game_tick(void) {
 			g.state = STATE_PLAY;
 		break;
 
+	case STATE_INTRO:                             /* nome da fase e objetivo */
+		effects_update();
+		camera_update(0);
+		if (--g.state_timer <= 0 || any_pressed(PAD_START | PAD_CROSS) >= 0)
+			g.state = STATE_PLAY;
+		break;
+
 	case STATE_WIN:
 	case STATE_DEAD:
 		enemies_update();
 		effects_update();
 		camera_update(0);
-		if (any_pressed(PAD_START) >= 0) {        /* mesma escolha, de novo */
-			game_reset(g.level, g.frame);     /* semente nova */
-			g.state = STATE_PLAY;
+		if (any_pressed(PAD_START) >= 0) {
+			if (g.state == STATE_DEAD) {              /* recomeça a fase (semente nova) */
+				start_level(g.level, g.frame);
+			} else if (g.level + 1 < num_levels) {    /* próxima fase, levando tudo */
+				progress_save();
+				start_level(g.level + 1, g.frame);
+			} else {                                  /* era a última */
+				progress_save();
+				g.state = STATE_END;
+			}
 		} else if (any_pressed(PAD_SELECT) >= 0) { /* trocar de personagem */
 			select_enter();
+		}
+		break;
+
+	case STATE_END:
+		effects_update();
+		camera_update(0);
+		if (any_pressed(PAD_START | PAD_CROSS) >= 0) {
+			game_reset(0, 12345);                 /* fundo do título, como no boot */
+			g.state = STATE_TITLE;
 		}
 		break;
 	}
@@ -493,6 +579,17 @@ static void game_draw(void) {
 		draw_center(132, "SELECT skin  L2 debug");
 		break;
 
+	case STATE_INTRO: {
+		const LEVEL_DEF *ld = &level_defs[g.level];
+		camera_apply();
+		draw_world(1);
+		render_rect(0, 64, SCREEN_W, 64, 0, 0, 0, 1);   /* faixa escura atrás do texto */
+		hud_print(124, 72, "FASE %d/%d", g.level + 1, num_levels);
+		draw_center(88, ld->name);
+		draw_center(108, ld->obj_text);
+		break;
+	}
+
 	case STATE_WIN:
 	case STATE_DEAD:
 		camera_apply();
@@ -505,9 +602,26 @@ static void game_draw(void) {
 		} else {
 			draw_center(100, "GAME OVER");
 		}
-		if ((g.frame >> 5) & 1)
-			draw_center(150, "START jogar de novo");
+		if ((g.frame >> 5) & 1) {
+			if (g.state == STATE_DEAD)
+				draw_center(150, "START tentar de novo");
+			else if (g.level + 1 < num_levels)
+				draw_center(150, "START proxima fase");
+			else
+				draw_center(150, "START continuar");
+		}
 		draw_center(164, "SELECT trocar personagem");
+		break;
+
+	case STATE_END:
+		camera_apply();
+		draw_world(1);
+		render_rect(0, 70, SCREEN_W, 80, 0, 0, 0, 1);
+		draw_center(80, "FIM DE JOGO");
+		draw_center(96, "TODAS AS FASES VENCIDAS!");
+		hud_print(84, 116, "PONTOS TOTAIS %05d", g.score);   /* 19 letras x 8 px, centrado */
+		if ((g.frame >> 5) & 1)
+			draw_center(136, "START voltar ao titulo");
 		break;
 	}
 }
