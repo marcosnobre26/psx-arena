@@ -59,6 +59,8 @@
 #define CHUNK_SLOTS     36      /* blocos montados ao mesmo tempo (cache) */
 #define CHUNK_LOAD_RADIUS 2     /* monta o 5x5 de blocos em volta do grupo */
 #define CHUNK_BUILDS_PER_FRAME 1 /* fila: blocos distantes montados por quadro */
+#define MAX_TREES       1024    /* árvores e troncos no mapa (8 bytes cada) */
+#define TREE_LOD_DIST   1800    /* profundidade em que a árvore vira imagem plana */
 #define WALL_SLICE      192     /* paredes são montadas em fatias desta altura */
 #define WALL_HEIGHT     384     /* parede dos mapas de texto (2 fatias) */
 #define THICKET_HEIGHT  768     /* mata densa: 3 m (4 fatias) */

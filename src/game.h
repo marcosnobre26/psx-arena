@@ -138,6 +138,18 @@ enum {
 #define CELL_TYPE_MASK  0x3f
 #define CELL_SOLID      0x80
 
+/* Árvores e troncos caídos (data.c: tree_defs). Ficam guardados por bloco
+ * em level.c (fora de g: vêm do mapa, como as células). */
+enum { TREE_PINE, TREE_DEAD, TREE_LOG, NUM_TREE_TYPES };
+typedef struct {
+	const MESH    *mesh;
+	const TEXTURE *bb;          /* imagem plana de longe (NULL = some de longe) */
+	int            bb_w, bb_h;  /* tamanho da imagem no mundo, em escala ONE */
+	int            scale_min, scale_max;   /* variação de tamanho (ONE = 1.0) */
+	int            cells;       /* células sólidas: 1 (em pé) ou 3 (deitado) */
+} TREE_DEF;
+extern const TREE_DEF tree_defs[];
+
 /* Ponto fixo para o teleporte de depuração (célula + direção da câmera) */
 typedef struct {
 	int cx, cz;
@@ -342,6 +354,11 @@ void level_place(char ch, int cx, int cz);       /* cria o que a letra represent
 void level_invalidate(int cx, int cz);  /* célula mudou: remonta o bloco */
 void level_stats(int *loaded, int *slots, int *built, int *overflow);
 int  level_cell_top(int cx, int cz);    /* altura do topo da célula (0, 384, 768) */
+/* Árvore na posição do mundo (x, z). angle 0..4095; scale ONE = 1.0.
+ * Marca a(s) célula(s) do tronco como sólida(s). Troncos caídos: use
+ * ângulo perto de 0/1024/2048/3072 (a colisão é por célula). */
+void level_add_tree(int type, int x, int z, int angle, int scale);
+void level_tree_stats(int *total, int *models, int *billboards);
 void level_apply_look(void);            /* névoa e luz da fase atual */
 void level_draw(void);
 int  level_cell_solid(int cx, int cz);

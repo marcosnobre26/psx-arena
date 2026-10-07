@@ -323,6 +323,101 @@ void level_stats(int *loaded, int *slots, int *built, int *overflow) {
 }
 
 /* ------------------------------------------------------------------ */
+/* Árvores: guardadas por bloco                                         */
+/* ------------------------------------------------------------------ */
+/* Centenas de árvores não cabem (nem precisam) no pool de props, que a
+ * colisão percorre inteiro. Aqui elas são só desenho, 8 bytes cada,
+ * ordenadas por bloco: o desenho percorre só os blocos perto do grupo.
+ * A colisão é pela grade: o tronco marca a célula como sólida (provisório
+ * até a grade espacial da 04c). */
+typedef struct {
+	uint16_t x, z;          /* posição no mundo (0..32767) */
+	uint8_t  type;          /* TREE_* */
+	uint8_t  rot;           /* ângulo / 16 */
+	uint8_t  scale;         /* escala / 64 (64 = 1.0) */
+	uint8_t  pad;
+} TREE;
+
+static TREE     trees[MAX_TREES], tree_tmp[MAX_TREES];
+static int      num_trees;
+static uint16_t tree_start[MAX_CCZ][MAX_CCX], tree_count[MAX_CCZ][MAX_CCX];
+static int      trees_drawn_mesh, trees_drawn_bb;
+static CVECTOR  bb_tint;        /* cor das imagens planas (luz da fase) */
+
+void level_add_tree(int type, int x, int z, int angle, int scale) {
+	if (num_trees >= MAX_TREES || type < 0 || type >= NUM_TREE_TYPES)
+		return;
+	if (x < 0 || z < 0 || x >= lw * TILE_SIZE || z >= lh * TILE_SIZE)
+		return;
+	TREE *t = &trees[num_trees++];
+	t->x = x;
+	t->z = z;
+	t->type = type;
+	t->rot = (angle & 4095) >> 4;
+	t->scale = scale >> 6;
+
+	/* colisão provisória: a célula do tronco fica sólida; deitado, também
+	 * as vizinhas ao longo do comprimento (eixo pelo ângulo arredondado) */
+	int cx = x / TILE_SIZE, cz = z / TILE_SIZE;
+	level_set_solid(cx, cz, 1);
+	if (tree_defs[type].cells == 3) {
+		int along_z = ((angle + 512) >> 10) & 1;   /* 1024/3072: comprido em Z */
+		level_set_solid(cx - !along_z, cz - along_z, 1);
+		level_set_solid(cx + !along_z, cz + along_z, 1);
+	}
+}
+
+/* Ordena por bloco (contagem + preenchimento, estável) */
+static void trees_finish(void) {
+	memset(tree_count, 0, sizeof(tree_count));
+	for (int i = 0; i < num_trees; i++)
+		tree_count[trees[i].z / CHUNK_SIZE][trees[i].x / CHUNK_SIZE]++;
+	int pos = 0;
+	for (int bz = 0; bz < MAX_CCZ; bz++)
+		for (int bx = 0; bx < MAX_CCX; bx++) {
+			tree_start[bz][bx] = pos;
+			pos += tree_count[bz][bx];
+		}
+	uint16_t fill[MAX_CCZ][MAX_CCX];
+	memcpy(fill, tree_start, sizeof(fill));
+	for (int i = 0; i < num_trees; i++)
+		tree_tmp[fill[trees[i].z / CHUNK_SIZE][trees[i].x / CHUNK_SIZE]++] = trees[i];
+	memcpy(trees, tree_tmp, num_trees * sizeof(TREE));
+}
+
+/* Só os blocos do 5x5 em volta do grupo; perto = modelo, longe = imagem */
+static void trees_draw(void) {
+	DRAWOPT opt = { 0 };
+	trees_drawn_mesh = trees_drawn_bb = 0;
+	for (int bz = fcz - CHUNK_LOAD_RADIUS; bz <= fcz + CHUNK_LOAD_RADIUS; bz++)
+		for (int bx = fcx - CHUNK_LOAD_RADIUS; bx <= fcx + CHUNK_LOAD_RADIUS; bx++) {
+			if (bx < 0 || bz < 0 || bx >= ncx || bz >= ncz)
+				continue;
+			const TREE *t = &trees[tree_start[bz][bx]];
+			for (int n = tree_count[bz][bx]; n > 0; n--, t++) {
+				const TREE_DEF *d = &tree_defs[t->type];
+				int scale = t->scale << 6;
+				int depth = render_view_depth(t->x, -256, t->z);
+				if (depth > TREE_LOD_DIST) {
+					if (d->bb)
+						trees_drawn_bb += render_billboard(t->x, t->z, (d->bb_w * scale) >> 12,
+						                                   (d->bb_h * scale) >> 12, d->bb, &bb_tint);
+					continue;       /* sem imagem plana (tronco): some de longe */
+				}
+				VECTOR  pos = { t->x, 0, t->z };
+				SVECTOR rot = { 0, t->rot << 4, 0 };
+				trees_drawn_mesh += render_mesh(d->mesh, &pos, &rot, scale, &opt);
+			}
+		}
+}
+
+void level_tree_stats(int *total, int *models, int *billboards) {
+	*total = num_trees;
+	*models = trees_drawn_mesh;
+	*billboards = trees_drawn_bb;
+}
+
+/* ------------------------------------------------------------------ */
 /* Carregar a fase                                                      */
 /* ------------------------------------------------------------------ */
 
@@ -404,10 +499,12 @@ void level_load(int index) {
 	cur_level = index;
 	level_apply_look();               /* a luz entra na cor dos blocos */
 
+	num_trees = 0;
 	if (ld->map)
 		load_text_map(ld->map);
 	else if (ld->build)
 		ld->build();                  /* mapa feito por código (levels.c) */
+	trees_finish();
 
 	/* texturas do mundo: as da fase para chão/parede de texto, e as da
 	 * floresta para os tipos de terreno */
@@ -446,6 +543,10 @@ void level_apply_look(void) {
 	const LEVEL_DEF *ld = &level_defs[cur_level];
 	render_set_fog(ld->fog_near, ld->fog_far, ld->sky_r, ld->sky_g, ld->sky_b);
 	render_set_light(ld->amb_r, ld->amb_g, ld->amb_b, MOON_R, MOON_G, MOON_B);
+	/* imagens planas: a luz média de uma face de lado (sem normal própria) */
+	static const SVECTOR side = { ONE * 7 / 10, 0, -ONE * 7 / 10, 0 };
+	render_bake_light(&side, 128, 128, 128, &bb_tint);
+	bb_tint.cd = 0;
 }
 
 void level_draw(void) {
@@ -453,6 +554,7 @@ void level_draw(void) {
 	for (int i = 0; i < CHUNK_SLOTS; i++)
 		if (slot_cx[i] >= 0)
 			render_chunk(&slot_geom[i]);
+	trees_draw();
 }
 
 /* ------------------------------------------------------------------ */

@@ -107,3 +107,16 @@ const SOUND_DEF sound_defs[] = {
 	{ &sfx_morte,     3,    8  },
 	{ NULL }
 };
+
+/* ------------------------------------------------------------------ */
+/* ÁRVORES — modelos de tools/make_tree_models.py (ou do Blender, com  */
+/* os mesmos nomes). De perto: modelo; além de TREE_LOD_DIST: imagem   */
+/* plana (bb); depois da névoa: nada. bb_w/bb_h = quadro da imagem no  */
+/* mundo (2 x 4 m no script).                                          */
+/* ------------------------------------------------------------------ */
+const TREE_DEF tree_defs[NUM_TREE_TYPES] = {
+	/* modelo            imagem plana          bb_w  bb_h   escala mín/máx          células */
+	{ &pinheiro_mesh,    &tex_pinheiro_bb_t,   512, 1024,  ONE * 85 / 100, ONE * 130 / 100, 1 },
+	{ &arvore_seca_mesh, &tex_seca_bb_t,       512, 1024,  ONE * 85 / 100, ONE * 120 / 100, 1 },
+	{ &tronco_mesh,      NULL,                 0,   0,     ONE * 90 / 100, ONE * 110 / 100, 3 },
+};

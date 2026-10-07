@@ -300,7 +300,7 @@ static inline int bad_xy(int x, int y) {
 	return (x < -600 || x > SCREEN_W + 600 || y < -400 || y > SCREEN_H + 400);
 }
 
-void render_mesh(const MESH *m, const VECTOR *pos, const SVECTOR *rot,
+int render_mesh(const MESH *m, const VECTOR *pos, const SVECTOR *rot,
                  int scale, const DRAWOPT *opt) {
 	static const DRAWOPT defopt = { 0 };
 	if (!opt) opt = &defopt;
@@ -310,12 +310,12 @@ void render_mesh(const MESH *m, const VECTOR *pos, const SVECTOR *rot,
 	int r  = (m->radius * scale) >> 12;
 	if (dx > draw_dist + r || dx < -draw_dist - r ||
 	    dz > draw_dist + r || dz < -draw_dist - r)
-		return;
+		return 0;
 	/* Frustum culling: posição do centro no espaço da câmera.
 	 * Se a esfera do modelo está toda fora do campo de visão, nem processa. */
 	int vz = (view.m[2][0] * dx + view.m[2][1] * dy + view.m[2][2] * dz) >> 12;
 	if (vz < NEAR_Z - r)
-		return;                                  /* atrás da câmera */
+		return 0;                                  /* atrás da câmera */
 
 	/* névoa deste modelo: a da fase, ou a "empurrada" se estiver no cone
 	 * de uma lanterna (os blocos do mapa ficam de fora: são grandes demais
@@ -323,16 +323,16 @@ void render_mesh(const MESH *m, const VECTOR *pos, const SVECTOR *rot,
 	const FOG *fog = (!(opt->flags & DRAW_FIXEDFOG) && num_lamps &&
 	                  in_lantern(pos->vx, pos->vz)) ? &fog_lamp : &fog_base;
 	if (vz - r > fog->far)
-		return;                                  /* inteiro dentro da névoa */
+		return 0;                                  /* inteiro dentro da névoa */
 	fog_use(fog);
 	int vx = (view.m[0][0] * dx + view.m[0][1] * dy + view.m[0][2] * dz) >> 12;
 	int lim = (vz * (SCREEN_W / 2)) / FOV_H + ((r * 3) >> 1);
 	if (vx > lim || vx < -lim)
-		return;                                  /* fora pelos lados */
+		return 0;                                  /* fora pelos lados */
 	int vy = (view.m[1][0] * dx + view.m[1][1] * dy + view.m[1][2] * dz) >> 12;
 	lim = (vz * (SCREEN_H / 2)) / FOV_H + ((r * 3) >> 1);
 	if (vy > lim || vy < -lim)
-		return;                                  /* fora por cima/baixo */
+		return 0;                                  /* fora por cima/baixo */
 
 	/* Matriz do modelo = rotação + escala + posição */
 	MATRIX model, mv, lmtx;
@@ -475,6 +475,7 @@ void render_mesh(const MESH *m, const VECTOR *pos, const SVECTOR *rot,
 		}
 		polys++;   /* só chega aqui quem passou por todos os descartes */
 	}
+	return 1;
 }
 
 /* ------------------------------------------------------------------ */
@@ -603,6 +604,81 @@ void render_chunk(const CHUNK_GEOM *c) {
 		nextpri += sizeof(POLY_GT4);
 		polys++;
 	}
+}
+
+int render_view_depth(int x, int y, int z) {
+	int dx = x - cam_pos.vx, dy = y - cam_pos.vy, dz = z - cam_pos.vz;
+	return (view.m[2][0] * dx + view.m[2][1] * dy + view.m[2][2] * dz) >> 12;
+}
+
+/* Imagem plana (LOD das árvores): um POLY_FT4 em pé, virado para a câmera
+ * só em Y (a direção "direita" da câmera, que é sempre horizontal), para
+ * não deitar quando a câmera olha de cima. Névoa como os modelos (inclusive
+ * a da lanterna). Devolve 1 se foi desenhada. */
+int render_billboard(int x, int z, int w, int h, const TEXTURE *t, const CVECTOR *tint) {
+	int r  = h / 2;
+	int dx = x - cam_pos.vx, dy = -r - cam_pos.vy, dz = z - cam_pos.vz;
+	if (dx > draw_dist + r || dx < -draw_dist - r || dz > draw_dist + r || dz < -draw_dist - r)
+		return 0;
+	int vz = (view.m[2][0] * dx + view.m[2][1] * dy + view.m[2][2] * dz) >> 12;
+	if (vz < NEAR_Z + r)
+		return 0;
+	const FOG *fog = (num_lamps && in_lantern(x, z)) ? &fog_lamp : &fog_base;
+	if (vz - r > fog->far)
+		return 0;
+	int vx = (view.m[0][0] * dx + view.m[0][1] * dy + view.m[0][2] * dz) >> 12;
+	int lim = (vz * (SCREEN_W / 2)) / FOV_H + r;
+	if (vx > lim || vx < -lim)
+		return 0;
+	if (nextpri + sizeof(POLY_FT4) >= fb[cur].pkt + PACKET_LEN - 64)
+		return 0;
+	fog_use(fog);
+
+	int hw = w / 2;
+	int ox = (view.m[0][0] * hw) >> 12, oz = (view.m[0][2] * hw) >> 12;
+	SVECTOR v[4] = {
+		{ -ox, -h, -oz, 0 }, { ox, -h, oz, 0 },     /* cima: esquerda, direita */
+		{ -ox,  0, -oz, 0 }, { ox,  0, oz, 0 },     /* base  (ordem "Z") */
+	};
+	load_translation(x, 0, z);
+	GTE_BARRIER();                       /* v[] acabou de ser escrito */
+
+	POLY_FT4 *p = (POLY_FT4 *)nextpri;
+	int32_t z0, z1, z2, z3;
+	int otz;
+	gte_ldv3(&v[0], &v[1], &v[2]);
+	gte_rtpt();
+	gte_stsz3(&z0, &z1, &z2);
+	if (z0 < NEAR_Z || z1 < NEAR_Z || z2 < NEAR_Z)
+		return 0;
+	gte_stsxy3(&p->x0, &p->x1, &p->x2);
+	gte_ldv0(&v[3]);
+	gte_rtps();
+	gte_stsxy(&p->x3);
+	gte_stsz(&z3);
+	if (z3 < NEAR_Z)
+		return 0;
+	gte_avsz4();
+	gte_stotz(&otz);
+	if (otz < 2 || otz >= OT_LEN)
+		return 0;
+	if (bad_xy(p->x0, p->y0) || bad_xy(p->x1, p->y1) || bad_xy(p->x2, p->y2) || bad_xy(p->x3, p->y3))
+		return 0;
+
+	setRGB0(p, tint->r, tint->g, tint->b);
+	GTE_BARRIER();                       /* setRGB0 escreveu o que gte_ldrgb lê */
+	gte_ldrgb(&p->r0);
+	gte_dpcs();                          /* névoa (IR0 do último vértice) */
+	gte_strgb(&p->r0);
+	setPolyFT4(p);
+	p->tpage = t->tpage;
+	p->clut  = t->clut;
+	setUV4(p, t->u0, t->v0, t->u0 + t->w - 1, t->v0,
+	          t->u0, t->v0 + t->h - 1, t->u0 + t->w - 1, t->v0 + t->h - 1);
+	addPrim(fb[cur].ot + otz, p);
+	nextpri += sizeof(POLY_FT4);
+	polys++;
+	return 1;
 }
 
 /* Marcador de depuração: quadrado plano (horizontal) de lado 2*half em

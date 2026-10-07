@@ -324,6 +324,10 @@ static void draw_hud(void) {
 		int bl, bs, bb, bo;
 		level_stats(&bl, &bs, &bb, &bo);
 		hud_print(12, 156, "BLOCOS %d/%d +%d%s", bl, bs, bb, bo ? " CHEIO!" : "");
+		int tt, tm, tb;
+		level_tree_stats(&tt, &tm, &tb);
+		if (tt)
+			hud_print(12, 146, "ARVORES %d  MODELO %d  PLANA %d", tt, tm, tb);
 		hud_print(12, 176, "SPU %dK/512K", sound_spu_used() / 1024);
 		hud_print(12, 186, "SEED %08X  POLIS %d", (unsigned)g.seed, render_stats_polys());
 		hud_print(12, 196, "FPS %d  RAM GPU %d/%d", fps, render_stats_bytes(), PACKET_LEN);

@@ -73,8 +73,14 @@ void render_set_camera(const VECTOR *eye, const VECTOR *target);
 const VECTOR *render_camera_pos(void);
 
 /* pos: posição no mundo; rot: rotação (4096 = 360°); scale: ONE = 1.0 */
-void render_mesh(const MESH *m, const VECTOR *pos, const SVECTOR *rot,
+/* Devolve 1 se o modelo passou pelos descartes (foi para a tela) */
+int  render_mesh(const MESH *m, const VECTOR *pos, const SVECTOR *rot,
                  int scale, const DRAWOPT *opt);
+/* Profundidade de um ponto do mundo vista pela câmera (z da câmera) */
+int  render_view_depth(int x, int y, int z);
+/* Imagem plana em pé (largura w, altura h) com a base em (x, 0, z), virada
+ * para a câmera girando só em Y. Texel 0 da paleta = transparente. */
+int  render_billboard(int x, int z, int w, int h, const TEXTURE *t, const CVECTOR *tint);
 
 /* Retângulo 2D na tela (barras de vida, etc) */
 void render_rect(int x, int y, int w, int h, int r, int g, int b, int semitrans);
