@@ -97,5 +97,13 @@ const int num_props = sizeof(prop_defs) / sizeof(prop_defs[0]);
 /* ------------------------------------------------------------------ */
 const SOUND_DEF sound_defs[] = {
 	/* som            prio  variação de tom (%) */
+	{ &sfx_passo1,    1,    8  },
+	{ &sfx_passo2,    1,    8  },
+	{ &sfx_rosnado,   1,    10 },
+	{ &sfx_tiro,      2,    5  },
+	{ &sfx_acerto,    2,    10 },
+	{ &sfx_item,      2,    0  },
+	{ &sfx_dor,       3,    6  },
+	{ &sfx_morte,     3,    8  },
 	{ NULL }
 };
