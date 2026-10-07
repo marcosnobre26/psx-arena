@@ -214,7 +214,7 @@ convertido para `\\wsl.localhost\...`. **2 jogadores:** configure um controle na
 emulador e aperte Start nele na tela de seleção.
 
 **Console real:** grave `arena.cue` num CD-R; o console precisa de modchip ou softmod
-(Tonyhax International, FreePSXBoot, Unirom). Detalhes no [Guia](docs/GUIA.md#13-gravar-em-cd-e-jogar-no-console).
+(Tonyhax International, FreePSXBoot, Unirom). Detalhes no [Guia](docs/GUIA.md#14-gravar-em-cd-e-jogar-no-console).
 
 ---
 
@@ -245,6 +245,7 @@ psx-arena/
 │   ├── mesh.h               formato de modelo
 │   ├── input.c              controles (portas 1 e 2)
 │   ├── mathutil.c           atan2, distâncias e utilidades em inteiros
+│   ├── rng.c                gerador aleatório determinístico (xorshift32)
 │   └── models.h             inclui as declarações geradas
 ├── models/                  modelos exportados (.h) — gerados, mas versionados
 ├── assets/
@@ -415,6 +416,11 @@ Custo: O(jogadores + inimigos + objetos) por movimento — trivial para os limit
 - Entidades em **pools estáticos** com flag `active` (`MAX_ENEMIES`, `MAX_BULLETS`, …).
 - **Orientação a dados:** comportamento definido por tabelas em `data.c`. Poderes são ponteiros
   de função `void (*)(PLAYER *)`; inimigos e objetos de cenário são associados a caracteres do mapa.
+- **Aleatoriedade determinística** (`rng.c`): xorshift32 com estado explícito. A lógica sorteia só
+  com `g.rng` (via `rand_range`), semeado por `game_reset(seed)` com `g.seed`; efeitos puramente
+  visuais usam `fx_range`, um gerador separado fora de `g`. Assim a mesma semente + as mesmas
+  entradas reproduzem a partida — requisito do modo link. `DEBUG_FIXED_SEED` (`config.h`) força
+  uma semente para testes. O overlay **L2** mostra `SEED` e `POLIS` (polígonos enviados à GPU).
 
 ### Memória (build atual)
 
@@ -457,7 +463,7 @@ O projeto já tem a maior parte do que isso exige:
 - entrada isolada em `INPUT in[2]` — o controle remoto entraria como a porta 2.
 
 O que faltaria:
-1. handshake e troca da **semente** do `srand` (hoje vem de `g.frame` ao iniciar a partida);
+1. handshake e troca da **semente** `g.seed` (hoje vem de `g.frame` ao iniciar a partida);
 2. atraso de entrada fixo (ex.: 2–4 passos) para absorver a latência;
 3. pacote por passo `{número do passo, botões, analógicos}` e espera pelo pacote remoto;
 4. *checksum* periódico do estado para detectar dessincronia;
@@ -584,6 +590,8 @@ adicionado, todos os direitos são reservados ao autor.
   inclui `mkpsxiso` e `elf2x`.
 - [PCSX-Redux](https://github.com/grumpycoders/pcsx-redux) — emulador e OpenBIOS usados nos testes.
 - [Blender](https://www.blender.org/) — modelagem.
+
+Assets de terceiros (sons, texturas, modelos) ficam listados em [`CREDITS.md`](CREDITS.md).
 
 **Avisos**
 - *PlayStation* é marca registrada da Sony Interactive Entertainment. Este é um projeto

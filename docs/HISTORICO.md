@@ -91,3 +91,8 @@ automatizar testes visuais.
   tabela `enemy_weapon_defs` separada (para não cair nos itens `W`), colunas
   `arma`/`alcance` em `enemy_defs`, IA com alcance, recuo, linha de visão e
   aviso piscando de 20 passos antes do tiro. Dois `A` no mapa da fase 1.
+- 2026-10-06 — Etapa 00 (preparação): `src/rng.c` (xorshift32) com `g.seed`/
+  `g.rng` para a lógica e `fx_range` para efeitos; `rand()` da libc removido;
+  `game_reset(seed)` semeia antes do `level_load` (o `memset` apagava
+  `g.frame`); `DEBUG_FIXED_SEED` em `config.h`; overlay L2 com `SEED` e
+  `POLIS`; `CREDITS.md`; seção "Roteiro" e regras de determinismo no `CLAUDE.md`.

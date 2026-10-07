@@ -51,6 +51,7 @@ VERBOSE=1 ./dev build
 | `collision.c` | colisão por círculos: `collide_move()`, `collide_blocked()` |
 | `render.c` | motor 3D: GTE, Ordering Table, `render_mesh()`, HUD |
 | `input.c` | controles das portas 1 e 2 |
+| `rng.c` | gerador aleatório determinístico: `g.rng` (lógica) e `fx_range` (visual) |
 
 Gerados no build (não edite): `build/gen/assets_gen.{h,c}` (declara
 `<nome>_mesh` para cada `models/<nome>.h` e `tex_<nome>_t` para cada
@@ -113,7 +114,8 @@ uma branch. As regras do ROADMAP (determinismo, orçamentos de desempenho,
 - PSX não tem rede; netplay do RetroArch não funciona com PS1. Online hoje =
   Parsec. Modo link (SIO1/lockstep) é proposta não implementada (README).
 - Desempenho: ~30 FPS na fase com os limites atuais; confira com **L2** no
-  jogo (FPS e bytes de primitivas; `PACKET_LEN` = 96 KB por buffer).
+  jogo (`SEED`, `POLIS` = polígonos enviados à GPU, FPS e bytes de primitivas;
+  `PACKET_LEN` = 96 KB por buffer).
 
 ## Ao terminar uma tarefa
 

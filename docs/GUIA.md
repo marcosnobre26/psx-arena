@@ -24,9 +24,10 @@ Depois de qualquer mudança: `./dev run` (compila e abre no emulador) ou
 9. [Novo poder](#9-novo-poder)
 10. [Novo inimigo](#10-novo-inimigo)
 11. [Nova skin](#11-nova-skin)
-12. [Emuladores](#12-emuladores)
-13. [Gravar em CD e jogar no console](#13-gravar-em-cd-e-jogar-no-console)
-14. [Roteiro de estudo](#14-roteiro-de-estudo)
+12. [Números aleatórios](#12-números-aleatórios)
+13. [Emuladores](#13-emuladores)
+14. [Gravar em CD e jogar no console](#14-gravar-em-cd-e-jogar-no-console)
+15. [Roteiro de estudo](#15-roteiro-de-estudo)
 
 ---
 
@@ -43,7 +44,7 @@ Depois de qualquer mudança: `./dev run` (compila e abre no emulador) ou
 | **L1 / R1** ou analógico direito | girar a câmera |
 | **Select** | trocar a skin (personagens com skins) |
 | **Start** | pausar |
-| **L2** | depuração: FPS, memória de primitivas, posição |
+| **L2** | depuração: semente, polígonos, FPS, memória de primitivas, posição |
 
 **Tela de seleção:** esquerda/direita escolhe, **Select** troca a skin,
 **X** confirma, **Círculo** desfaz (ou volta ao título). O **controle 2**
@@ -257,7 +258,26 @@ braços/pernas, visor, arma. Vale para personagens com `skins = 1`.
 
 ---
 
-## 12. Emuladores
+## 12. Números aleatórios
+
+Existem **dois** geradores (ver `src/rng.c`), e a escolha importa por causa
+do futuro modo link: os dois consoles precisam sortear os mesmos números.
+
+| Para quê | Use | Exemplo |
+|---|---|---|
+| **Lógica** (algo que muda `g`: IA, drops, spawns, dano) | `rand_range(lo, hi)` ou `rng_next(&g.rng)` | `e->think = rand_range(40, 140);` |
+| **Só visual** (partículas, pássaros, piscadas) | `fx_range(lo, hi)` | `jitter = fx_range(-4, 4);` |
+
+- **Nunca** use `rand()`/`srand()` da libc.
+- A semente da partida fica em `g.seed` e aparece no overlay **L2**
+  (`SEED`). `game_reset(seed)` semeia `g.rng` antes de carregar a fase.
+- Para repetir sempre a mesma partida (testes, caça a bugs), descomente
+  `#define DEBUG_FIXED_SEED 1234` em `config.h`. Com as mesmas entradas,
+  os inimigos devem se mover igual em toda partida. Comente de novo depois.
+
+---
+
+## 13. Emuladores
 
 | Emulador | Arquivo | BIOS | Observações |
 |---|---|---|---|
@@ -286,7 +306,7 @@ RUN_FILE="cue"
 
 ---
 
-## 13. Gravar em CD e jogar no console
+## 14. Gravar em CD e jogar no console
 
 1. Grave o **`arena.cue`** (não o `.bin` sozinho) num **CD-R** (o PS1 não lê
    CD-RW). No Windows: ImgBurn → *Write image file to disc*, em 4x a 8x.
@@ -302,7 +322,7 @@ do PC para o console em segundos (ferramenta `nops`).
 
 ---
 
-## 14. Roteiro de estudo
+## 15. Roteiro de estudo
 
 Do mais fácil ao mais difícil:
 
