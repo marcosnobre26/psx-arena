@@ -122,6 +122,102 @@ static const char *const map_cerco[] = {
 	NULL
 };
 
+/* ------------------------------------------------------------------ */
+/* Fase 5: floresta de TESTE (128 x 128), feita por código              */
+/* ------------------------------------------------------------------ */
+/* Enquanto a geração procedural (etapa 05) não existe, este mapa fixo
+ * serve para testar o mundo grande: borda de mata densa, duas trilhas que
+ * se cruzam no meio, quatro clareiras, moitas espalhadas e um canto
+ * nordeste mais fechado (o pior caso de desempenho). Nada aleatório: a
+ * "variedade" vem de um hash da posição, então o mapa é sempre igual. */
+
+#define FOREST_W     128
+#define FOREST_H     128
+#define FOREST_BORDER  4
+#define TRAIL_Z      63      /* trilha leste-oeste (3 células: 62..64) */
+#define TRAIL_X      63      /* trilha norte-sul */
+
+static uint32_t fhash(int x, int z) {
+	uint32_t h = (uint32_t)x * 374761393u + (uint32_t)z * 668265263u;
+	h = (h ^ (h >> 13)) * 1274126177u;
+	return h ^ (h >> 16);
+}
+
+static const struct { int x, z, r; } clearings[] = {
+	{ 32, 32, 7 }, { 96, 96, 9 }, { 96, 30, 6 }, { 30, 96, 7 },
+	{ 108, 16, 2 },          /* respiro no canto denso (ponto de medição) */
+};
+#define NUM_CLEARINGS ((int)(sizeof(clearings) / sizeof(clearings[0])))
+
+static int in_clearing(int x, int z) {
+	for (int i = 0; i < NUM_CLEARINGS; i++) {
+		int dx = x - clearings[i].x, dz = z - clearings[i].z;
+		if (dx * dx + dz * dz <= clearings[i].r * clearings[i].r)
+			return 1;
+	}
+	return 0;
+}
+
+static void build_test_forest(void) {
+	level_begin(FOREST_W, FOREST_H);
+
+	for (int z = 0; z < FOREST_H; z++)
+	for (int x = 0; x < FOREST_W; x++) {
+		uint32_t h = fhash(x, z), patch = fhash(x >> 2, z >> 2);
+		int trail = (z >= TRAIL_Z - 1 && z <= TRAIL_Z + 1) || (x >= TRAIL_X - 1 && x <= TRAIL_X + 1);
+		int near_trail = (z >= TRAIL_Z - 2 && z <= TRAIL_Z + 2) || (x >= TRAIL_X - 2 && x <= TRAIL_X + 2);
+		int border = x < FOREST_BORDER || z < FOREST_BORDER ||
+		             x >= FOREST_W - FOREST_BORDER || z >= FOREST_H - FOREST_BORDER;
+		int type;
+
+		/* chão: manchas de 4x4 células de folhas/raízes/terra */
+		switch (patch % 10) {
+		case 0: case 1:  type = CELL_ROOTS;  break;
+		case 2:          type = CELL_DIRT;   break;
+		default:         type = CELL_LEAVES; break;
+		}
+		if (trail)
+			type = (h % 9 == 0) ? CELL_ROOTS : CELL_DIRT;   /* trilha com raízes soltas */
+		else if (in_clearing(x, z))
+			type = CELL_LEAVES;
+		else if (!near_trail) {
+			/* moitas de 2x2; o canto nordeste é bem mais fechado */
+			int dense = (x >= 96 && z < 32) ? 26 : 7;
+			if (fhash(x >> 1, z >> 1) % 100 < (uint32_t)dense)
+				type = CELL_THICKET;
+		}
+		if (border)
+			type = CELL_THICKET;
+		level_set_cell(x, z, type);
+	}
+
+	/* início a oeste, saída a leste, na trilha */
+	level_place('P', 8, TRAIL_Z);
+	level_place('X', FOREST_W - 9, TRAIL_Z);
+
+	/* inimigos nas clareiras e ao longo das trilhas */
+	static const struct { char ch; int x, z; } things[] = {
+		{ 'E', 30, 30 }, { 'E', 34, 33 }, { 'F', 28, 97 }, { 'E', 32, 95 },
+		{ 'B', 96, 96 }, { 'E', 93, 99 }, { 'F', 96, 29 }, { 'E', 63, 40 },
+		{ 'E', 63, 90 }, { 'F', 85, 63 }, { 'E', 45, 63 },
+		{ 'L', 33, 31 }, { 'L', 97, 95 }, { 'L', 63, 20 },
+		{ 'H', 31, 97 }, { 'H', 75, 63 }, { 'N', 95, 31 }, { 'W', 63, 63 },
+		{ 'G', 108, 16 }, { 'G', 20, 63 }, { 'G', 63, 110 },
+	};
+	for (int i = 0; i < (int)(sizeof(things) / sizeof(things[0])); i++)
+		level_place(things[i].ch, things[i].x, things[i].z);
+}
+
+/* Teleporte de depuração (L2 + direcional com o overlay aberto): sempre
+ * os mesmos lugares e a mesma direção de câmera, para medir FPS/POLIS.
+ * Ordem: esquerda, direita, cima, baixo. Ângulo: 0 = sul (+Z), 1024 = leste. */
+static const DEBUG_POINT forest_debug_pts[4] = {
+	{   8, TRAIL_Z, 1024 },   /* <- início, olhando a trilha para leste */
+	{ TRAIL_X, TRAIL_Z, 512 },/* -> cruzamento das trilhas, olhando para sudeste */
+	{ 108,  16, 2048 },       /* ^  canto denso (nordeste), olhando a borda norte */
+	{  96,  96, 3072 },       /* v  maior clareira, olhando para oeste */
+};
+
 const LEVEL_DEF level_defs[] = {
 	/* nome        mapa
 	 *   chão          parede        céu=névoa (R,G,B)  névoa near/far  luz ambiente  música
@@ -142,5 +238,10 @@ const LEVEL_DEF level_defs[] = {
 	{ "CERCO",      map_cerco,
 	  &tex_wall_t,  &tex_wall_t,   20,  8,  8,        1400, 3400,     48, 32, 32,   0,
 	  OBJ_SURVIVE,    60,        8,             "SOBREVIVA 60 SEGUNDOS" },
+	/* teste do mundo grande (04a): mapa por código, sem texto */
+	{ "FLORESTA (TESTE)", NULL,
+	  &tex_terra_t, &tex_mata_t,    8, 12, 10,        1300, 3200,     36, 40, 36,   0,
+	  OBJ_REACH_EXIT, 0,         0,             "ATRAVESSE A FLORESTA",
+	  build_test_forest, forest_debug_pts },
 };
 const int num_levels = sizeof(level_defs) / sizeof(level_defs[0]);
