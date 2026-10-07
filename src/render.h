@@ -28,6 +28,7 @@ typedef struct {
 #define DRAW_SEMITRANS  0x02  /* semitransparente (50%) */
 #define DRAW_FLASH      0x04  /* pinta tudo de branco (efeito de dano) */
 #define DRAW_NOCULL     0x08  /* desenha as duas faces do polígono */
+#define DRAW_FIXEDFOG   0x10  /* ignora a lanterna (blocos do mapa) */
 
 typedef struct {
 	const CVECTOR *palette;  /* troca a cor por material: palette[face.mat] */
@@ -54,6 +55,16 @@ void render_rect(int x, int y, int w, int h, int r, int g, int b, int semitrans)
 void hud_print(int x, int y, const char *fmt, ...);
 
 void render_end_frame(void);
+
+/* Névoa por profundidade: some no fundo entre near e far (z da câmera).
+ * A cor da névoa também vira a cor de fundo. */
+void render_set_fog(int near, int far, int r, int g, int b);
+int  render_fog_near(void);
+int  render_fog_far(void);
+/* Luz ambiente (0..255) + cor da luz direcional (ONE = 1.0 por canal) */
+void render_set_light(int amb_r, int amb_g, int amb_b, int sun_r, int sun_g, int sun_b);
+/* Lanternas acesas neste quadro: objetos no cone são vistos mais longe */
+void render_set_lanterns(int n, const VECTOR *pos, const int *angle);
 
 /* Cor de fundo (céu): muda por fase */
 void render_set_clear_color(int r, int g, int b);

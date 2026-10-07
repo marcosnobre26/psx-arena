@@ -122,15 +122,24 @@ static const char *const map_cerco[] = {
 };
 
 const LEVEL_DEF level_defs[] = {
-	/* nome     mapa        chão          parede       céu (R,G,B)  música
-	 *          objetivo      parâmetro  máx. inimigos  texto do objetivo */
-	{ "ARENA",      map_arena,      &tex_floor_t, &tex_wall_t,  20, 24, 48,  0,
-	                OBJ_KILL_ALL,   0,         0,             "DERROTE TODOS OS INIMIGOS" },
-	{ "CORREDORES", map_corredores, &tex_wall_t,  &tex_floor_t, 14, 30, 22,  0,
-	                OBJ_REACH_EXIT, 0,         0,             "ENCONTRE A SAIDA" },
-	{ "RELIQUIAS",  map_reliquias,  &tex_floor_t, &tex_crate_t, 34, 18, 40,  0,
-	                OBJ_COLLECT,    4,         0,             "PEGUE 4 RELIQUIAS E SAIA" },
-	{ "CERCO",      map_cerco,      &tex_wall_t,  &tex_wall_t,  44, 16, 16,  0,
-	                OBJ_SURVIVE,    60,        8,             "SOBREVIVA 60 SEGUNDOS" },
+	/* nome        mapa
+	 *   chão          parede        céu=névoa (R,G,B)  névoa near/far  luz ambiente  música
+	 *   objetivo        parâmetro  máx. inimigos  texto do objetivo
+	 *
+	 * A câmera fica a ~1000 de profundidade do jogador: near abaixo disso
+	 * enevoa o próprio jogador. Lanterna: objetos no cone usam near/far
+	 * x LANTERN_FOG_MUL. Céu/névoa escuros (texturas só escurecem). */
+	{ "ARENA",      map_arena,
+	  &tex_floor_t, &tex_wall_t,   10, 12, 24,        1300, 3200,     40, 40, 56,   0,
+	  OBJ_KILL_ALL,   0,         0,             "DERROTE TODOS OS INIMIGOS" },
+	{ "CORREDORES", map_corredores,
+	  &tex_wall_t,  &tex_floor_t,   6, 14, 10,        1200, 2800,     30, 40, 34,   0,
+	  OBJ_REACH_EXIT, 0,         0,             "ENCONTRE A SAIDA" },
+	{ "RELIQUIAS",  map_reliquias,
+	  &tex_floor_t, &tex_crate_t,  16,  8, 20,        1300, 3000,     40, 30, 48,   0,
+	  OBJ_COLLECT,    4,         0,             "PEGUE 4 RELIQUIAS E SAIA" },
+	{ "CERCO",      map_cerco,
+	  &tex_wall_t,  &tex_wall_t,   20,  8,  8,        1400, 3400,     48, 32, 32,   0,
+	  OBJ_SURVIVE,    60,        8,             "SOBREVIVA 60 SEGUNDOS" },
 };
 const int num_levels = sizeof(level_defs) / sizeof(level_defs[0]);

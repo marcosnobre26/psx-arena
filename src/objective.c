@@ -63,7 +63,7 @@ static int spawn_ok(int x, int z) {
 	}
 	int dx = x - g.cam_pos.vx, dz = z - g.cam_pos.vz;
 	int rel = angle_diff(g.cam_yaw, angle_of(dx, dz));
-	if (rel > -700 && rel < 700 && dist2d(dx, dz) < DRAW_DIST)
+	if (rel > -700 && rel < 700 && dist2d(dx, dz) < render_fog_far())
 		return 0;                                   /* a câmera veria nascer */
 	for (int i = 0; i < MAX_ENEMIES; i++) {
 		const ENEMY *e = &g.enemies[i];

@@ -302,6 +302,7 @@ static void draw_hud(void) {
 
 	if (show_debug) {
 		const PLAYER *p = &g.players[0];
+		hud_print(12, 166, "FOG %d/%d", render_fog_near(), render_fog_far());
 		hud_print(12, 176, "SPU %dK/512K", sound_spu_used() / 1024);
 		hud_print(12, 186, "SEED %08X  POLIS %d", (unsigned)g.seed, render_stats_polys());
 		hud_print(12, 196, "FPS %d  RAM GPU %d/%d", fps, render_stats_bytes(), PACKET_LEN);
@@ -327,6 +328,9 @@ static void select_enter(void) {
 	for (int i = 0; i < MAX_PLAYERS; i++)
 		sel[i].ready = 0;
 	g.state = STATE_SELECT;
+	/* vitrine dos personagens: sem névoa e com luz clara */
+	render_set_fog(MENU_FOG_NEAR, MENU_FOG_FAR, CLEAR_R, CLEAR_G, CLEAR_B);
+	render_set_light(72, 72, 88, ONE, ONE, ONE * 9 / 10);
 }
 
 static void select_tick(void) {
@@ -351,7 +355,11 @@ static void select_tick(void) {
 			if (in->pressed & (PAD_CROSS | PAD_START))
 				s->ready = 1;
 			if (in->pressed & PAD_CIRCLE) {
-				if (i == 0) { g.state = STATE_TITLE; return; }   /* P1 volta */
+				if (i == 0) {                     /* P1 volta ao título */
+					g.state = STATE_TITLE;
+					level_apply_look();           /* o título mostra a fase com névoa */
+					return;
+				}
 				s->joined = 0;                                     /* P2 sai */
 			}
 		} else if (in->pressed & PAD_CIRCLE) {

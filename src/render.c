@@ -54,16 +54,119 @@ static MATRIX light_dir = {{
 	{     0,     0,     0 }    /* luz 3: desligada */
 }};
 
-/* Cor de cada luz: cada COLUNA é uma luz (R, G, B). */
+/* Cor de cada luz: cada COLUNA é uma luz (R, G, B). Definida por
+ * render_set_light() (a fase escolhe: lua azulada, sol, etc). */
 static MATRIX light_color = {{
 	{ ONE, 0, 0 },     /* R */
 	{ ONE, 0, 0 },     /* G */
-	{ ONE*9/10, 0, 0 } /* B: luz levemente amarelada */
+	{ ONE*9/10, 0, 0 } /* B */
 }};
 
-#define AMBIENT_R 72
-#define AMBIENT_G 72
-#define AMBIENT_B 88
+/* ------------------------------------------------------------------ */
+/* Névoa por profundidade ("depth cueing" da GTE)                       */
+/* ------------------------------------------------------------------ */
+/*
+ * A cada projeção (rtps/rtpt) a GTE calcula, de graça, um fator IR0:
+ *     IR0 = (H * 65536 / z * DQA + DQB) / 4096       (limitado a 0..4096)
+ * e as instruções ncds (luz + névoa) e dpcs (só névoa) misturam a cor da
+ * face com a "cor distante" (FarColor) na proporção IR0/4096.
+ * Escolhemos DQA/DQB para IR0 = 0 em fog_near e 4096 em fog_far. Como a
+ * conta é em 1/z, a névoa engrossa mais rápido logo depois do near (no
+ * meio do caminho já está em ~70%): é o visual típico do PS1.
+ *
+ * O SDK não tem macro para DQA/DQB (registradores de controle 27 e 28 da
+ * GTE), então escrevemos a nossa: duas instruções ctc2.
+ */
+#define gte_SetDepthCue(dqa, dqb) __asm__ volatile ( \
+	"ctc2	%0, $27;"	\
+	"ctc2	%1, $28;"	\
+	:					\
+	: "r"( dqa ), "r"( dqb ) )
+
+typedef struct {
+	int near, far;      /* em unidades de profundidade (z da câmera) */
+	int dqa, dqb;
+} FOG;
+
+static FOG fog_base;            /* névoa da fase */
+static FOG fog_lamp;            /* névoa "empurrada" para objetos no cone da lanterna */
+static const FOG *fog_cur;      /* qual está carregada na GTE agora */
+static int draw_dist = DRAW_DIST;
+
+static void fog_calc(FOG *f, int near, int far) {
+	/* limites: near >= 256 e far - near >= 1/8 do far mantêm DQA em 16 bits
+	 * e DQB em 32 bits sem precisar de contas de 64 bits (que puxariam
+	 * rotinas da libgcc) */
+	if (near < 256) near = 256;
+	if (far < near + (near >> 3) + 64) far = near + (near >> 3) + 64;
+	f->near = near;
+	f->far  = far;
+	int t   = (256 * near) / FOV_H;
+	int dqa = -(t * far) / (far - near);
+	if (dqa < -32767) dqa = -32767;
+	f->dqa = dqa;
+	f->dqb = -dqa * ((FOV_H * 65536) / near);
+}
+
+static inline void fog_use(const FOG *f) {
+	if (fog_cur == f) return;
+	gte_SetDepthCue(f->dqa, f->dqb);
+	fog_cur = f;
+}
+
+void render_set_fog(int near, int far, int r, int g, int b) {
+	fog_calc(&fog_base, near, far);
+	fog_calc(&fog_lamp, near * LANTERN_FOG_MUL >> 4, far * LANTERN_FOG_MUL >> 4);
+	fog_cur = NULL;
+	fog_use(&fog_base);
+	gte_SetFarColor(r, g, b);
+	render_set_clear_color(r, g, b);   /* o fundo é a própria névoa */
+	draw_dist = fog_lamp.far + 256;    /* além disso, nem a lanterna mostra */
+}
+
+int render_fog_near(void) { return fog_base.near; }
+int render_fog_far(void)  { return fog_base.far; }
+
+/* Luz ambiente (0..255) e cor da luz direcional (ONE = 1.0 por canal) */
+void render_set_light(int amb_r, int amb_g, int amb_b, int sun_r, int sun_g, int sun_b) {
+	gte_SetBackColor(amb_r, amb_g, amb_b);
+	light_color.m[0][0] = sun_r;
+	light_color.m[1][0] = sun_g;
+	light_color.m[2][0] = sun_b;
+	gte_SetColorMatrix(&light_color);
+}
+
+/* ------------------------------------------------------------------ */
+/* Lanternas: objetos dentro de um cone usam a névoa mais distante       */
+/* ------------------------------------------------------------------ */
+static struct { int x, z, s, c; } lamps[LANTERN_MAX];
+static int num_lamps;
+
+void render_set_lanterns(int n, const VECTOR *pos, const int *angle) {
+	num_lamps = n > LANTERN_MAX ? LANTERN_MAX : n;
+	for (int i = 0; i < num_lamps; i++) {
+		lamps[i].x = pos[i].vx;
+		lamps[i].z = pos[i].vz;
+		lamps[i].s = isin(angle[i]);
+		lamps[i].c = icos(angle[i]);
+	}
+}
+
+/* (x, z) está no cone de alguma lanterna? Teste barato: distância ao
+ * longo da direção (along) e para o lado (side); meio-ângulo ~30 graus
+ * (tan 30 ~ 4/7). */
+static int in_lantern(int x, int z) {
+	for (int i = 0; i < num_lamps; i++) {
+		int dx = x - lamps[i].x, dz = z - lamps[i].z;
+		int along = (dx * lamps[i].s + dz * lamps[i].c) >> 12;
+		if (along <= 0 || along > LANTERN_RANGE) continue;
+		int side = (dx * lamps[i].c - dz * lamps[i].s) >> 12;
+		if (side < 0) side = -side;
+		if (side * 7 < (along + 128) * 4)
+			return 1;
+	}
+	return 0;
+}
 
 /* ------------------------------------------------------------------ */
 
@@ -89,8 +192,8 @@ void render_init(void) {
 	InitGeom();
 	gte_SetGeomOffset(SCREEN_W / 2, SCREEN_H / 2);
 	gte_SetGeomScreen(FOV_H);
-	gte_SetBackColor(AMBIENT_R, AMBIENT_G, AMBIENT_B);
-	gte_SetColorMatrix(&light_color);
+	render_set_light(72, 72, 88, ONE, ONE, ONE * 9 / 10);
+	render_set_fog(6000, 9000, CLEAR_R, CLEAR_G, CLEAR_B);   /* praticamente sem névoa */
 
 	FntLoad(960, 0);
 }
@@ -166,14 +269,23 @@ void render_mesh(const MESH *m, const VECTOR *pos, const SVECTOR *rot,
 	/* Descarte rápido: longe demais ou atrás da câmera */
 	int dx = pos->vx - cam_pos.vx, dy = pos->vy - cam_pos.vy, dz = pos->vz - cam_pos.vz;
 	int r  = (m->radius * scale) >> 12;
-	if (dx > DRAW_DIST + r || dx < -DRAW_DIST - r ||
-	    dz > DRAW_DIST + r || dz < -DRAW_DIST - r)
+	if (dx > draw_dist + r || dx < -draw_dist - r ||
+	    dz > draw_dist + r || dz < -draw_dist - r)
 		return;
 	/* Frustum culling: posição do centro no espaço da câmera.
 	 * Se a esfera do modelo está toda fora do campo de visão, nem processa. */
 	int vz = (view.m[2][0] * dx + view.m[2][1] * dy + view.m[2][2] * dz) >> 12;
 	if (vz < NEAR_Z - r)
 		return;                                  /* atrás da câmera */
+
+	/* névoa deste modelo: a da fase, ou a "empurrada" se estiver no cone
+	 * de uma lanterna (os blocos do mapa ficam de fora: são grandes demais
+	 * para um teste por objeto e "acenderiam" em degraus) */
+	const FOG *fog = (!(opt->flags & DRAW_FIXEDFOG) && num_lamps &&
+	                  in_lantern(pos->vx, pos->vz)) ? &fog_lamp : &fog_base;
+	if (vz - r > fog->far)
+		return;                                  /* inteiro dentro da névoa */
+	fog_use(fog);
 	int vx = (view.m[0][0] * dx + view.m[0][1] * dy + view.m[0][2] * dz) >> 12;
 	int lim = (vz * (SCREEN_W / 2)) / FOV_H + ((r * 3) >> 1);
 	if (vx > lim || vx < -lim)
@@ -224,6 +336,8 @@ void render_mesh(const MESH *m, const VECTOR *pos, const SVECTOR *rot,
 		gte_stsz3(&z0, &z1, &z2);
 		if (z0 < NEAR_Z || z1 < NEAR_Z || z2 < NEAR_Z)
 			continue;
+		if (z0 > fog->far && z1 > fog->far && z2 > fog->far)
+			continue;               /* sumiu na névoa: economiza a primitiva */
 
 		/* Cor da face (ou da paleta do material) */
 		uint8_t cr = f->r, cg = f->g, cb = f->b;
@@ -286,11 +400,17 @@ void render_mesh(const MESH *m, const VECTOR *pos, const SVECTOR *rot,
 			setSemiTrans(pr, 1);
 
 		setRGB0(pr, cr, cg, cb);
-		if (lit && !(f->flags & FACE_UNLIT) && !(opt->flags & DRAW_FLASH)) {
-			/* Luz calculada pela GTE: cor * (ambiente + luz . normal) */
+		if (!(opt->flags & DRAW_FLASH)) {
+			/* IR0 (fator de névoa) veio da última projeção, de um vértice
+			 * desta face: a névoa é por face, como a cor. */
 			gte_ldrgb(&pr->r0);
-			gte_ldv0(&m->norms[f->n]);
-			gte_nccs();
+			if (lit && !(f->flags & FACE_UNLIT)) {
+				/* luz + névoa: cor * (ambiente + luz . normal) -> FarColor */
+				gte_ldv0(&m->norms[f->n]);
+				gte_ncds();
+			} else {
+				gte_dpcs();         /* sem luz: só mistura com a névoa */
+			}
 			gte_strgb(&pr->r0);
 		}
 

@@ -186,7 +186,7 @@ void level_load(int index) {
 	const LEVEL_DEF *ld = &level_defs[index];
 	const char *const *map = ld->map;
 	cur_level = index;
-	render_set_clear_color(ld->sky_r, ld->sky_g, ld->sky_b);
+	level_apply_look();
 
 	memset(grid, ' ', sizeof(grid));
 	memset(solid, 0, sizeof(solid));
@@ -240,8 +240,17 @@ void level_load(int index) {
 	build_geometry();
 }
 
+/* Névoa, céu e luz da fase atual (também chamado ao voltar dos menus) */
+void level_apply_look(void) {
+	const LEVEL_DEF *ld = &level_defs[cur_level];
+	render_set_fog(ld->fog_near, ld->fog_far, ld->sky_r, ld->sky_g, ld->sky_b);
+	render_set_light(ld->amb_r, ld->amb_g, ld->amb_b, MOON_R, MOON_G, MOON_B);
+}
+
 void level_draw(void) {
 	DRAWOPT fo = { 0 }, wo = { 0 };
+	fo.flags = DRAW_FIXEDFOG;   /* blocos grandes: não usam a névoa da lanterna */
+	wo.flags = DRAW_FIXEDFOG;
 	fo.tex = level_defs[cur_level].floor;
 	fo.zbias = 6;               /* chão sempre atrás dos objetos sobre ele */
 	wo.tex = level_defs[cur_level].wall;

@@ -134,7 +134,9 @@ typedef struct {
 	const char *const *map;          /* linhas do mapa, terminadas em NULL */
 	const TEXTURE     *floor;        /* textura do chão */
 	const TEXTURE     *wall;         /* textura das paredes */
-	uint8_t            sky_r, sky_g, sky_b;   /* cor de fundo */
+	uint8_t            sky_r, sky_g, sky_b;   /* cor do céu = cor da névoa */
+	int                fog_near, fog_far;     /* névoa: começa / esconde tudo (z) */
+	uint8_t            amb_r, amb_g, amb_b;   /* luz ambiente (0..255) */
 	int                music;        /* faixa de CD-DA (etapa 01b: ainda não toca) */
 	int                objective;    /* OBJ_* */
 	int                obj_param;    /* COLLECT: itens (0 = todos os Q); SURVIVE: segundos */
@@ -305,6 +307,7 @@ void exit_draw(void);
 
 /* level.c */
 void level_load(int index);
+void level_apply_look(void);            /* névoa e luz da fase atual */
 void level_draw(void);
 int  level_cell_solid(int cx, int cz);
 int  level_blocked(int x, int z, int radius);

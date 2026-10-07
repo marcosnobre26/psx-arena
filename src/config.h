@@ -25,8 +25,22 @@
 #define OT_LEN          2048    /* níveis de profundidade da Ordering Table */
 #define PACKET_LEN      (96*1024) /* memória para primitivas por quadro */
 #define NEAR_Z          40      /* polígonos mais perto que isso são descartados */
-#define DRAW_DIST       4200    /* objetos além disso não são desenhados */
+#define DRAW_DIST       4200    /* distância inicial; com névoa vira fog_far da lanterna */
 #define FOV_H           160     /* "distância da tela": maior = zoom maior */
+
+/* ---------- Clima: luz e névoa ---------- */
+/* Cada fase define névoa (near/far) e luz ambiente em levels.c; aqui ficam
+ * a "lua" (luz direcional, ONE = 1.0 por canal) e o visual dos menus. */
+#define MOON_R          (ONE * 30 / 100)   /* lua: fraca e azulada */
+#define MOON_G          (ONE * 36 / 100)
+#define MOON_B          (ONE * 55 / 100)
+#define MENU_FOG_NEAR   6000    /* tela de seleção: praticamente sem névoa */
+#define MENU_FOG_FAR    9000
+
+/* ---------- Lanterna ---------- */
+#define LANTERN_MAX       MAX_PLAYERS
+#define LANTERN_RANGE     1600  /* alcance do cone (e do "ver mais longe") */
+#define LANTERN_FOG_MUL   26    /* no cone a névoa vai 26/16 = 1,6x mais longe */
 
 /* ---------- Mundo ---------- */
 #define TILE_SIZE       256     /* tamanho de um bloco do mapa */
