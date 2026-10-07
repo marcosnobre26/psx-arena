@@ -117,4 +117,9 @@
  * Para testar uma fase sem jogar as anteriores. */
 /* #define DEBUG_START_LEVEL 3 */
 
+/* Descomente para ajustar a névoa ao vivo: com o overlay L2 aberto, segure
+ * R2 e use o direcional (cima/baixo = far, direita/esquerda = near). Anote
+ * os valores bons e passe para levels.c. Trocar de fase volta ao da tabela. */
+/* #define DEBUG_FOG_TUNING */
+
 #endif

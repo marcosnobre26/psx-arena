@@ -315,7 +315,11 @@ static void draw_hud(void) {
 
 	if (show_debug) {
 		const PLAYER *p = &g.players[0];
+#ifdef DEBUG_FOG_TUNING
+		hud_print(12, 166, "FOG %d/%d  R2+DIR", render_fog_near(), render_fog_far());
+#else
 		hud_print(12, 166, "FOG %d/%d", render_fog_near(), render_fog_far());
+#endif
 		hud_print(12, 176, "SPU %dK/512K", sound_spu_used() / 1024);
 		hud_print(12, 186, "SEED %08X  POLIS %d", (unsigned)g.seed, render_stats_polys());
 		hud_print(12, 196, "FPS %d  RAM GPU %d/%d", fps, render_stats_bytes(), PACKET_LEN);
@@ -665,6 +669,60 @@ static void game_draw(void) {
 	}
 }
 
+/* ------------------------------------------------------------------ */
+/* Depuração (controle 1)                                              */
+/* ------------------------------------------------------------------ */
+
+/* Pula para a próxima fase levando o progresso, como se tivesse vencido */
+static void debug_skip_level(void) {
+	if (g.state != STATE_PLAY && g.state != STATE_PAUSE && g.state != STATE_INTRO &&
+	    g.state != STATE_WIN && g.state != STATE_DEAD)
+		return;
+	progress_save();
+	if (g.level + 1 < num_levels)
+		start_level(g.level + 1, g.frame);
+	else
+		g.state = STATE_END;
+}
+
+/* L2 (solto sozinho) liga/desliga o overlay. Com o overlay aberto:
+ *   L2 segurado + START  -> pula de fase
+ *   R2 segurado + direcional (só com DEBUG_FOG_TUNING) -> ajusta a névoa:
+ *       cima/baixo = far +-100, direita/esquerda = near +-50
+ * Os botões usados aqui são "comidos" para não pausar nem mover o jogador. */
+static void debug_input(INPUT *in) {
+	static int l2_was_held = 0, l2_combo = 0;
+	int l2 = in->held & PAD_L2;
+
+	if (l2 && show_debug && (in->pressed & PAD_START)) {
+		in->pressed &= ~PAD_START;
+		l2_combo = 1;
+		debug_skip_level();
+	}
+	if (!l2 && l2_was_held) {          /* soltou o L2 */
+		if (!l2_combo)
+			show_debug ^= 1;
+		l2_combo = 0;
+	}
+	l2_was_held = l2;
+
+#ifdef DEBUG_FOG_TUNING
+	if (show_debug && (in->held & PAD_R2)) {
+		int near = render_fog_near(), far = render_fog_far();
+		if (in->pressed & PAD_UP)    far  += 100;
+		if (in->pressed & PAD_DOWN)  far  -= 100;
+		if (in->pressed & PAD_RIGHT) near += 50;
+		if (in->pressed & PAD_LEFT)  near -= 50;
+		if (in->pressed & (PAD_UP | PAD_DOWN | PAD_LEFT | PAD_RIGHT)) {
+			const LEVEL_DEF *ld = &level_defs[g.level];
+			render_set_fog(near, far, ld->sky_r, ld->sky_g, ld->sky_b);
+		}
+		in->held    &= ~(PAD_UP | PAD_DOWN | PAD_LEFT | PAD_RIGHT | PAD_R2);
+		in->pressed &= ~(PAD_UP | PAD_DOWN | PAD_LEFT | PAD_RIGHT | PAD_R2);
+	}
+#endif
+}
+
 /* Loops de ambiente (vozes 0 e 1): tocam enquanto há uma partida na tela
  * (jogo, pausa, vitória, derrota) e param no título e na seleção. */
 static void ambience_update(void) {
@@ -707,8 +765,7 @@ int main(void) {
 		if (ticks > 4) ticks = 4;
 
 		input_update(g.in);
-		if (g.in[0].pressed & PAD_L2)   /* L2 liga/desliga a depuração */
-			show_debug ^= 1;
+		debug_input(&g.in[0]);         /* L2: overlay e atalhos (controle 1) */
 
 		for (int t = 0; t < ticks; t++) {
 			game_tick();
