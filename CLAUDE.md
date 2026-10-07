@@ -79,6 +79,26 @@ Gerados no build (não edite): `build/gen/assets_gen.{h,c}` (declara
   `PSX`). O nome do arquivo define o símbolo.
 - Novos `.c` em `src/`, PNGs em `assets/textures/` e `.h` em `models/` entram
   sozinhos no build (globs `CONFIGURE_DEPENDS`); não precisa editar o CMake.
+- **Não use `__builtin_bswap32`** nem outros builtins que puxem a libgcc
+  (o projeto não liga com ela; o link falha ou traz código inesperado).
+
+### Determinismo (preparação para o modo link)
+
+- Toda lógica que muda `g` depende só de `g.in[]` e de `g.rng` (semente
+  `g.seed`). Nada de tempo, `VSync` ou outros valores locais na lógica.
+- Sorteios da **lógica** (`*_update`, `game_tick`, spawns): `rand_range()` ou
+  `rng_next(&g.rng)`. **Nunca** `rand()` da libc.
+- Sorteios **puramente visuais** (partículas, pássaros): `fx_range()`, que usa
+  um gerador separado e não afeta `g`.
+- Nada de ler o controle direto do hardware dentro da lógica (use `g.in[]`).
+- Todo campo novo é inicializado em `*_spawn`/reset (o `memset` de `g` zera o resto).
+
+## Roteiro
+
+O plano de evolução (arena → survival horror na floresta) está em
+`docs/ROADMAP.md`, com um prompt por etapa em `docs/prompts/`. Uma etapa =
+uma branch. As regras do ROADMAP (determinismo, orçamentos de desempenho,
+`CREDITS.md` para assets de terceiros) valem para todas as etapas.
 
 ## Armadilhas conhecidas
 
