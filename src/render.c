@@ -63,6 +63,22 @@ static MATRIX light_color = {{
 }};
 
 /* ------------------------------------------------------------------ */
+/* Barreira de compilador para as macros de CARGA da GTE                 */
+/* ------------------------------------------------------------------ */
+/*
+ * As macros que CARREGAM dados na GTE (gte_SetRotMatrix, gte_SetTransMatrix,
+ * gte_SetColorMatrix, gte_ldv3, gte_ldv0...) leem a memória por dentro de um
+ * asm, mas só declaram o ENDEREÇO como entrada. Para o GCC, então, "ninguém
+ * lê" aquela memória: se a função acabou de escrever os dados numa variável
+ * local, ele pode atrasar ou até APAGAR essas escritas (foi o bug da 04a:
+ * a translação dos blocos sumia e todos eram desenhados na origem).
+ * GTE_BARRIER() obriga o compilador a terminar todas as escritas antes.
+ * Use sempre que montar uma matriz/vértices e carregar na GTE em seguida.
+ * (As macros de GRAVAÇÃO, gte_st*, já declaram "memory" e são seguras.)
+ */
+#define GTE_BARRIER() __asm__ volatile ( "" ::: "memory" )
+
+/* ------------------------------------------------------------------ */
 /* Névoa por profundidade ("depth cueing" da GTE)                       */
 /* ------------------------------------------------------------------ */
 /*
@@ -137,6 +153,7 @@ void render_set_light(int amb_r, int amb_g, int amb_b, int sun_r, int sun_g, int
 	light_color.m[0][0] = sun_r;
 	light_color.m[1][0] = sun_g;
 	light_color.m[2][0] = sun_b;
+	GTE_BARRIER();
 	gte_SetColorMatrix(&light_color);
 }
 
@@ -425,6 +442,7 @@ void render_mesh(const MESH *m, const VECTOR *pos, const SVECTOR *rot,
 		if (!(opt->flags & DRAW_FLASH)) {
 			/* IR0 (fator de névoa) veio da última projeção, de um vértice
 			 * desta face: a névoa é por face, como a cor. */
+			GTE_BARRIER();          /* setRGB0 acima escreveu na memória que gte_ldrgb lê */
 			gte_ldrgb(&pr->r0);
 			if (lit && !(f->flags & FACE_UNLIT)) {
 				/* luz + névoa: cor * (ambiente + luz . normal) -> FarColor */
@@ -479,12 +497,12 @@ void render_chunk_setup(const SVECTOR *verts, const TEXTURE *const *texs, int nt
  * Assim os vértices podem ser pequenos (relativos a esse ponto) mesmo num
  * mapa de 32 768 unidades, que estouraria um SVECTOR (16 bits). */
 static void load_translation(int x, int y, int z) {
+	/* câmera = R * (v + p) + T = R * v + (R * p + T). R * p em inteiros:
+	 * |R| <= 4096 e |p| <= 32768 cabem em 32 bits (sem ApplyMatrixLV). */
 	MATRIX m = view;
-	VECTOR p = { x, y, z }, t;
-	ApplyMatrixLV(&view, &p, &t);
-	m.t[0] = view.t[0] + t.vx;
-	m.t[1] = view.t[1] + t.vy;
-	m.t[2] = view.t[2] + t.vz;
+	for (int i = 0; i < 3; i++)
+		m.t[i] = view.t[i] + ((view.m[i][0] * x + view.m[i][1] * y + view.m[i][2] * z) >> 12);
+	GTE_BARRIER();                  /* sem isto o GCC apagava a soma acima */
 	gte_SetRotMatrix(&m);
 	gte_SetTransMatrix(&m);
 }
@@ -587,6 +605,46 @@ void render_chunk(const CHUNK_GEOM *c) {
 	}
 }
 
+/* Marcador de depuração: quadrado plano (horizontal) de lado 2*half em
+ * (x, y, z), sem luz e sem névoa, puxado para a frente na OT. Não entra
+ * na contagem de POLIS (é só para conferir a colisão). */
+void render_marker(int x, int y, int z, int half, int r, int g, int b) {
+	SVECTOR v[4] = {
+		{ -half, 0, -half, 0 }, { half, 0, -half, 0 },
+		{ -half, 0,  half, 0 }, { half, 0,  half, 0 },    /* ordem "Z" */
+	};
+	if (nextpri + sizeof(POLY_F4) >= fb[cur].pkt + PACKET_LEN - 64)
+		return;
+	load_translation(x, y, z);
+	GTE_BARRIER();
+	POLY_F4 *p = (POLY_F4 *)nextpri;
+	int32_t z0, z1, z2, z3;
+	int otz;
+	gte_ldv3(&v[0], &v[1], &v[2]);
+	gte_rtpt();
+	gte_stsz3(&z0, &z1, &z2);
+	if (z0 < NEAR_Z || z1 < NEAR_Z || z2 < NEAR_Z)
+		return;
+	gte_stsxy3(&p->x0, &p->x1, &p->x2);
+	gte_ldv0(&v[3]);
+	gte_rtps();
+	gte_stsxy(&p->x3);
+	gte_stsz(&z3);
+	if (z3 < NEAR_Z)
+		return;
+	gte_avsz4();
+	gte_stotz(&otz);
+	otz -= 8;                                /* na frente do topo da parede */
+	if (otz < 2 || otz >= OT_LEN)
+		return;
+	if (bad_xy(p->x0, p->y0) || bad_xy(p->x1, p->y1) || bad_xy(p->x2, p->y2) || bad_xy(p->x3, p->y3))
+		return;
+	setPolyF4(p);
+	setRGB0(p, r, g, b);
+	addPrim(fb[cur].ot + otz, p);
+	nextpri += sizeof(POLY_F4);
+}
+
 /* Cone de luz da lanterna no chão: um leque de triângulos POLY_G3 em modo
  * ADITIVO, com a ponta clara e a borda preta (somar preto não muda nada,
  * então o degradê some suavemente sem precisar de textura).
@@ -610,6 +668,7 @@ void render_light_cone(int x, int z, int angle, int r, int g, int b) {
 		v[k + 1].vz = (icos(a) * LANTERN_RANGE) >> 12;
 	}
 	load_translation(x, 0, z);
+	GTE_BARRIER();                  /* v[] acabou de ser escrito: gte_ldv3 lê da memória */
 
 	uint32_t *ot  = fb[cur].ot;
 	uint8_t  *end = fb[cur].pkt + PACKET_LEN - 64;

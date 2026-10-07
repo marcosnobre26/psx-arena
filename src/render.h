@@ -99,6 +99,9 @@ void render_chunk(const CHUNK_GEOM *c);
 /* Cor de uma face com normal fixa, com a luz atual (ambiente + lua) */
 void render_bake_light(const SVECTOR *normal, int r, int g, int b, CVECTOR *out);
 
+/* Depuração: quadrado plano colorido (não conta em POLIS) */
+void render_marker(int x, int y, int z, int half, int r, int g, int b);
+
 /* Cone de luz aditivo no chão (cor da ponta; a borda vai a preto) */
 void render_light_cone(int x, int z, int angle, int r, int g, int b);
 

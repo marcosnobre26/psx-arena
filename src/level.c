@@ -482,5 +482,11 @@ int level_blocked(int x, int z, int radius) {
 	return 0;
 }
 
+/* Altura do topo da célula (unidades, positivo = para cima): 0 no chão,
+ * 384 na parede, 768 na mata. Para a depuração da colisão. */
+int level_cell_top(int cx, int cz) {
+	return type_slices(cell_type(cx, cz)) * WALL_SLICE;
+}
+
 int level_width(void)  { return lw; }
 int level_height(void) { return lh; }

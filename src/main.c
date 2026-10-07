@@ -18,6 +18,7 @@
 GAME    g;
 
 static int show_debug = 0;
+static int show_collision = 0;   /* depuração: marcadores nas células sólidas */
 static int fps = 60, fps_frames = 0, fps_last = 0;
 
 void show_message(const char *text, int frames) {
@@ -470,6 +471,34 @@ static void select_draw(void) {
 /* Mundo                                                               */
 /* ------------------------------------------------------------------ */
 
+/* Depuração (L2 + SELECT com o overlay aberto): um quadrado em cima de cada
+ * célula SÓLIDA da grade de colisão perto do jogador 1, na altura do topo
+ * da célula. Se o desenho e a colisão baterem, cada parede/mata tem um
+ * quadrado vermelho exatamente no topo; quadrado no ar ou no chão vazio =
+ * desenho e colisão desencontrados.
+ *   vermelho = parede/mata   laranja = sólido sem parede (caixa)
+ *   roxo     = vazio (sem chão) */
+static void collision_markers_draw(void) {
+	const PLAYER *p = &g.players[0];
+	if (!p->active) return;
+	int pcx = p->pos.vx / TILE_SIZE, pcz = p->pos.vz / TILE_SIZE;
+	for (int cz = pcz - COLMARK_RADIUS; cz <= pcz + COLMARK_RADIUS; cz++)
+		for (int cx = pcx - COLMARK_RADIUS; cx <= pcx + COLMARK_RADIUS; cx++) {
+			if (cx < 0 || cz < 0 || cx >= level_width() || cz >= level_height())
+				continue;
+			if (!level_cell_solid(cx, cz))
+				continue;
+			int x = cx * TILE_SIZE + TILE_SIZE / 2, z = cz * TILE_SIZE + TILE_SIZE / 2;
+			int top = level_cell_top(cx, cz), t = level_cell_type(cx, cz);
+			if (top > 0)
+				render_marker(x, -top - 6, z, 80, 230, 30, 30);
+			else if (t == CELL_VOID)
+				render_marker(x, -6, z, 80, 150, 40, 200);
+			else
+				render_marker(x, -280, z, 80, 255, 140, 0);   /* caixa: em cima dela */
+		}
+}
+
 /* Lanternas acesas neste quadro: avisa o motor (objetos no cone são vistos
  * mais longe) e desenha o cone de luz no chão de cada uma. */
 static void lanterns_draw(int with_players) {
@@ -500,6 +529,8 @@ static void draw_world(int with_players) {
 	if (with_players)
 		for (int i = 0; i < MAX_PLAYERS; i++)
 			player_draw(&g.players[i]);
+	if (show_debug && show_collision)
+		collision_markers_draw();
 }
 
 /* ------------------------------------------------------------------ */
@@ -717,6 +748,7 @@ static void debug_teleport(int i) {
  *   L2 segurado + direcional -> teleporte para os pontos fixos da fase
  *       (esquerda, direita, cima, baixo = pontos 1 a 4)
  *   L2 segurado + START  -> pula de fase
+ *   L2 segurado + SELECT -> marcadores de colisão (células sólidas)
  *   R2 segurado + direcional (só com DEBUG_FOG_TUNING) -> ajusta a névoa:
  *       cima/baixo = far +-100, direita/esquerda = near +-50
  * Os botões usados aqui são "comidos" para não pausar nem mover o jogador. */
@@ -724,6 +756,11 @@ static void debug_input(INPUT *in) {
 	static int l2_was_held = 0, l2_combo = 0;
 	int l2 = in->held & PAD_L2;
 
+	if (l2 && show_debug && (in->pressed & PAD_SELECT)) {
+		in->pressed &= ~PAD_SELECT;      /* não liga/desliga a lanterna */
+		l2_combo = 1;
+		show_collision ^= 1;
+	}
 	if (l2 && show_debug && (in->pressed & PAD_START)) {
 		in->pressed &= ~PAD_START;
 		l2_combo = 1;

@@ -341,6 +341,7 @@ int  level_cell_type(int cx, int cz);
 void level_place(char ch, int cx, int cz);       /* cria o que a letra representa */
 void level_invalidate(int cx, int cz);  /* célula mudou: remonta o bloco */
 void level_stats(int *loaded, int *slots, int *built, int *overflow);
+int  level_cell_top(int cx, int cz);    /* altura do topo da célula (0, 384, 768) */
 void level_apply_look(void);            /* névoa e luz da fase atual */
 void level_draw(void);
 int  level_cell_solid(int cx, int cz);

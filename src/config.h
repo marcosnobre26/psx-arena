@@ -128,5 +128,6 @@
  * R2 e use o direcional (cima/baixo = far, direita/esquerda = near). Anote
  * os valores bons e passe para levels.c. Trocar de fase volta ao da tabela. */
 /* #define DEBUG_FOG_TUNING */
+#define COLMARK_RADIUS  5       /* depuração da colisão: raio em células */
 
 #endif
