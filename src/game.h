@@ -4,7 +4,8 @@
  * Mapa dos arquivos:
  *   main.c      laço principal, câmera, telas (título, pausa, fim)
  *   data.c      TABELAS: personagens, armas, poderes, inimigos, skins  <- comece por aqui
- *   level.c     mapa da fase (desenhado em texto!) e colisão com paredes
+ *   levels.c    TABELA DE FASES: mapas (desenhados em texto!), aparência, objetivo
+ *   level.c     lê o mapa, gera a geometria e responde à colisão com paredes
  *   player.c    controle do jogador
  *   enemies.c   inteligência e dano dos inimigos
  *   weapons.c   tiros
@@ -123,6 +124,25 @@ typedef struct {
 	int     pitch_var;  /* variação aleatória de tom em % (0 = sempre igual) */
 } SOUND_DEF;
 extern const SOUND_DEF  sound_defs[];
+
+/* Objetivo de uma fase (ver objective.c) */
+enum { OBJ_KILL_ALL, OBJ_REACH_EXIT, OBJ_COLLECT, OBJ_SURVIVE };
+
+/* Uma fase (levels.c): mapa em texto + aparência + objetivo */
+typedef struct {
+	const char        *name;
+	const char *const *map;          /* linhas do mapa, terminadas em NULL */
+	const TEXTURE     *floor;        /* textura do chão */
+	const TEXTURE     *wall;         /* textura das paredes */
+	uint8_t            sky_r, sky_g, sky_b;   /* cor de fundo */
+	int                music;        /* faixa de CD-DA (etapa 01b: ainda não toca) */
+	int                objective;    /* OBJ_* */
+	int                obj_param;    /* COLLECT: itens (0 = todos os Q); SURVIVE: segundos */
+	int                max_enemies;  /* SURVIVE: inimigos vivos no máximo (reforços) */
+	const char        *obj_text;     /* frase da introdução (ASCII, sem acentos) */
+} LEVEL_DEF;
+extern const LEVEL_DEF  level_defs[];
+extern const int        num_levels;
 
 /* ------------------------------------------------------------------ */
 /* Entidades                                                           */

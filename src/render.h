@@ -55,6 +55,9 @@ void hud_print(int x, int y, const char *fmt, ...);
 
 void render_end_frame(void);
 
+/* Cor de fundo (céu): muda por fase */
+void render_set_clear_color(int r, int g, int b);
+
 /* Quantos bytes de primitivas foram usados no último quadro (debug) */
 int render_stats_bytes(void);
 int render_stats_polys(void);

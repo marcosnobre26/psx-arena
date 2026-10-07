@@ -366,6 +366,11 @@ void render_end_frame(void) {
 	ClearOTagR(fb[cur].ot, OT_LEN);
 }
 
+void render_set_clear_color(int r, int g, int b) {
+	for (int i = 0; i < 2; i++)
+		setRGB0(&fb[i].draw, r, g, b);
+}
+
 int render_stats_bytes(void) {
 	return last_bytes;
 }

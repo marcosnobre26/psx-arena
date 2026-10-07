@@ -1,48 +1,14 @@
 /*
  * level.c - A fase: mapa em texto, geração da geometria e colisão
  *
- * O mapa é desenhado com caracteres. Cada caractere é um bloco de
- * TILE_SIZE x TILE_SIZE (1 metro). Legenda:
+ * Os mapas e a aparência de cada fase ficam em levels.c (tabela
+ * level_defs, com a legenda dos caracteres). Aqui fica o "motor": ler o
+ * texto, criar os objetos, gerar a geometria e responder à colisão.
  *
- *   #  parede            .  chão vazio         P  início do jogador
- *   C  caixa (quebra)    G  gema (objetivo)    H  vida
- *   N  energia           W  arma nova          (espaço) = nada/vazio
- *   Letras de inimigos: definidas em data.c (E = grunt, B = bruto, F = veloz)
- *   Dígitos 1..9: objetos de cenário, também em data.c (1 = pilar)
- *
- * Em cima do texto fica o "norte" (Z menor). A câmera começa olhando para
- * baixo do texto (+Z). Mude o desenho, recompile e jogue!
- *
- * Todas as linhas precisam ter o mesmo tamanho (máximo 32x32).
+ * A câmera começa olhando do 'P' para o centro da fase.
  */
 #include <string.h>
 #include "game.h"
-
-static const char *const level_maps[][32] = {
-	{   /* Fase 1: "Arena" */
-		"########################",
-		"#P.......#......C......#",
-		"#........#..E.......G..#",
-		"#..CC....#.....####....#",
-		"#.............H#..#..E.#",
-		"#....G.........#W.#....#",
-		"#####...####...##.###..#",
-		"#.......#..#.1.......1.#",
-		"#..E....#G.#.....F.....#",
-		"#.......#..#....C.C....#",
-		"#..N.........E.........#",
-		"#....####.......####...#",
-		"#....#..#..B....#G.#...#",
-		"#.G..#..#.......#..#.E.#",
-		"#....##.#..C.C..##.#...#",
-		"#.F...........W........#",
-		"#.....E....H.......B...#",
-		"#..C........G...F...N..#",
-		"#..1.....2.....2....1..#",
-		"########################",
-		NULL
-	},
-};
 
 #define MAX_W       32
 #define MAX_H       32
@@ -214,8 +180,13 @@ static void build_geometry(void) {
 
 /* ------------------------------------------------------------------ */
 
+static int cur_level = 0;      /* índice em level_defs (para level_draw) */
+
 void level_load(int index) {
-	const char *const *map = level_maps[index];
+	const LEVEL_DEF *ld = &level_defs[index];
+	const char *const *map = ld->map;
+	cur_level = index;
+	render_set_clear_color(ld->sky_r, ld->sky_g, ld->sky_b);
 
 	memset(grid, ' ', sizeof(grid));
 	memset(solid, 0, sizeof(solid));
@@ -262,9 +233,9 @@ void level_load(int index) {
 
 void level_draw(void) {
 	DRAWOPT fo = { 0 }, wo = { 0 };
-	fo.tex = &tex_floor_t;
+	fo.tex = level_defs[cur_level].floor;
 	fo.zbias = 6;               /* chão sempre atrás dos objetos sobre ele */
-	wo.tex = &tex_wall_t;
+	wo.tex = level_defs[cur_level].wall;
 
 	for (int i = 0; i < n_floor_chunks; i++)
 		render_mesh(&floor_chunks[i].mesh, &floor_chunks[i].pos, NULL, ONE, &fo);
