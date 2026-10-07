@@ -218,6 +218,7 @@ void level_load(int index) {
 		case 'N': pickup_spawn(PICK_ENERGY, wx, wz); break;
 		case 'W': pickup_spawn(PICK_WEAPON, wx, wz); break;
 		case 'Q': pickup_spawn(PICK_QUEST, wx, wz);  break;   /* item de missão */
+		case 'L': pickup_spawn(PICK_BATTERY, wx, wz); break;  /* pilha da lanterna */
 		case 'X': g.has_exit = 1; g.exit_x = wx; g.exit_z = wz; break;  /* saída */
 		case 'S':                                         /* ponto de reforço */
 			if (g.num_spawn_pts < MAX_SPAWN_PTS) {

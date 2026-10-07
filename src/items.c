@@ -12,8 +12,9 @@ static const CVECTOR pickup_colors[NUM_PICKUP_TYPES] = {
 	{  60, 160, 255 },   /* PICK_ENERGY */
 	{ 255, 255, 255 },   /* PICK_WEAPON */
 	{ 190,  90, 255 },   /* PICK_QUEST  (item de missão, letra Q) */
+	{ 140, 255, 110 },   /* PICK_BATTERY (pilha da lanterna, letra L) */
 };
-static const int pickup_scale[NUM_PICKUP_TYPES] = { ONE, ONE * 3 / 4, ONE * 3 / 4, ONE * 3 / 2, ONE * 5 / 4 };
+static const int pickup_scale[NUM_PICKUP_TYPES] = { ONE, ONE * 3 / 4, ONE * 3 / 4, ONE * 3 / 2, ONE * 5 / 4, ONE * 2 / 3 };
 
 /* ------------------------------------------------------------------ */
 /* Itens                                                               */
@@ -47,6 +48,12 @@ static void collect(PICKUP *it, PLAYER *p) {
 	case PICK_ENERGY:
 		p->energy += 40;
 		show_message("+40 ENERGIA", 40);
+		break;
+	case PICK_BATTERY:
+		p->battery += BATTERY_PICKUP;
+		if (p->battery > BATTERY_MAX) p->battery = BATTERY_MAX;
+		p->lantern_dying = 0;
+		show_message("+PILHA", 40);
 		break;
 	case PICK_QUEST:
 		g.quest++;

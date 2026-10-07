@@ -78,6 +78,10 @@ void player_spawn(PLAYER *p, int x, int z) {
 	p->walk_anim = 0;
 	p->regen_timer = 0;
 	p->respawn_timer = 0;
+	p->lantern_on = 1;
+	p->battery = BATTERY_MAX;
+	p->battery_tick = 0;
+	p->lantern_dying = 0;
 }
 
 static void move(PLAYER *p, int dx, int dz) {
@@ -99,9 +103,11 @@ static void respawn(PLAYER *p) {
 		int tx = mate->pos.vx + off[k][0] * 200, tz = mate->pos.vz + off[k][1] * 200;
 		if (!collide_blocked(tx, tz, 0, PLAYER_RADIUS, p, COL_ALL, tx, tz)) { x = tx; z = tz; break; }
 	}
-	int skin = p->skin;
+	int skin = p->skin, battery = p->battery;
 	player_spawn(p, x, z);
 	p->skin = skin;
+	p->battery = battery;               /* a pilha não se recarrega por cair */
+	p->lantern_on = battery > 0;
 	p->hp = p->max_hp / 2;
 	p->invuln = PLAYER_INVULN * 2;
 	effect_spawn(FX_HEAL, x, z, 300, 30, 80, 255, 120);
@@ -203,12 +209,24 @@ void player_update(PLAYER *p, INPUT *in) {
 		if (p->energy < PLAYER_MAX_ENERGY) p->energy++;
 	}
 
-	/* ---- customização (só personagens com use_skins) ---- */
-	if ((in->pressed & PAD_SELECT) && cdef(p)->use_skins) {
-		p->skin = (p->skin + 1) % num_skins;
-		char buf[32];
-		snprintf(buf, sizeof(buf), "SKIN: %s", skin_defs[p->skin].name);
-		pmsg(p, buf, 50);
+	/* ---- lanterna (SELECT). A skin agora só muda na tela de seleção. ---- */
+	if (in->pressed & PAD_SELECT) {
+		if (p->lantern_on)
+			p->lantern_on = 0;
+		else if (p->battery > 0)
+			p->lantern_on = 1;
+		else
+			pmsg(p, "SEM PILHA", 50);
+		p->lantern_dying = 0;
+	}
+	if (p->lantern_on && p->battery > 0 && ++p->battery_tick >= BATTERY_DRAIN) {
+		p->battery_tick = 0;
+		if (--p->battery == 0)
+			p->lantern_dying = LANTERN_DYING;   /* pisca antes de apagar */
+	}
+	if (p->lantern_dying > 0 && --p->lantern_dying == 0) {
+		p->lantern_on = 0;
+		pmsg(p, "LANTERNA APAGOU", 60);
 	}
 
 	if (p->invuln > 0) p->invuln--;
@@ -236,6 +254,18 @@ void player_damage(PLAYER *p, int amount, int from_x, int from_z) {
 			pmsg(p, "CAIU!", 60);
 		}
 	}
+}
+
+/* A lanterna aparece acesa neste quadro? Falhas (bateria fraca ou no fim)
+ * são só visuais: usam fx_range e não mudam g. */
+int lantern_lit(const PLAYER *p) {
+	if (!player_alive(p) || !p->lantern_on)
+		return 0;
+	if (p->lantern_dying > 0)
+		return fx_range(0, 2) == 0;              /* pisca forte */
+	if (p->battery < BATTERY_LOW)
+		return fx_range(0, 40) != 0;             /* falha de vez em quando */
+	return 1;
 }
 
 /* Desenha o modelo de um personagem (usado no jogo e na tela de seleção) */

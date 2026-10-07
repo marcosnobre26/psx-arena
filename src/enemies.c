@@ -73,8 +73,9 @@ void enemy_damage(ENEMY *e, int amount, int push_x, int push_z) {
 
 		/* chance de soltar um item */
 		int r = rng_next(&g.rng) % 100;
-		if (r < 20)      pickup_spawn(PICK_HEALTH, e->pos.vx, e->pos.vz);
-		else if (r < 40) pickup_spawn(PICK_ENERGY, e->pos.vx, e->pos.vz);
+		if (r < 20)      pickup_spawn(PICK_HEALTH, e->pos.vx, e->pos.vz);   /* 20% */
+		else if (r < 35) pickup_spawn(PICK_ENERGY, e->pos.vx, e->pos.vz);   /* 15% */
+		else if (r < 45) pickup_spawn(PICK_BATTERY, e->pos.vx, e->pos.vz);  /* 10% */
 
 	}
 }

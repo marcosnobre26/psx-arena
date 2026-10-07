@@ -120,6 +120,7 @@ typedef struct {
 	int      valid;
 	int      hp, energy, weapon, power;
 	uint32_t weapons_owned;
+	int      battery, lantern_on;
 } CARRY;
 
 static struct {
@@ -140,6 +141,8 @@ static void progress_save(void) {
 		c->weapon        = p->weapon;
 		c->power         = p->power;
 		c->weapons_owned = p->weapons_owned;
+		c->battery       = p->battery;
+		c->lantern_on    = p->lantern_on && p->battery > 0;
 	}
 }
 
@@ -156,6 +159,8 @@ static void start_level(int level, uint32_t seed) {
 		p->weapon        = c->weapon;
 		p->power         = c->power;
 		p->weapons_owned = c->weapons_owned;
+		p->battery       = c->battery;
+		p->lantern_on    = c->lantern_on;
 	}
 	g.state = STATE_INTRO;
 	g.state_timer = INTRO_TIME;
@@ -279,11 +284,19 @@ static void draw_player_hud(const PLAYER *p, int x) {
 	draw_bar(x + 20, 13, 90, p->hp, p->max_hp, 230, 50, 60);
 	hud_print(x, 24, "EN");
 	draw_bar(x + 20, 25, 90, p->energy, PLAYER_MAX_ENERGY, 60, 150, 255);
-	hud_print(x, 36, "%s", weapon_defs[p->weapon].name);
-	if (g.num_players > 1)   /* com 2 jogadores falta espaço: sem o custo */
-		hud_print(x, 46, "%s", power_defs[p->power].name);
+	/* bateria da lanterna: amarela; vermelha quando fraca; apagada = cinza */
+	hud_print(x, 36, "LT");
+	if (!p->lantern_on)
+		draw_bar(x + 20, 37, 90, p->battery, BATTERY_MAX, 110, 110, 110);
+	else if (p->battery < BATTERY_LOW)
+		draw_bar(x + 20, 37, 90, p->battery, BATTERY_MAX, 230, 60, 40);
 	else
-		hud_print(x, 46, "%s (%d)", power_defs[p->power].name, power_defs[p->power].cost);
+		draw_bar(x + 20, 37, 90, p->battery, BATTERY_MAX, 240, 210, 80);
+	hud_print(x, 48, "%s", weapon_defs[p->weapon].name);
+	if (g.num_players > 1)   /* com 2 jogadores falta espaço: sem o custo */
+		hud_print(x, 58, "%s", power_defs[p->power].name);
+	else
+		hud_print(x, 58, "%s (%d)", power_defs[p->power].name, power_defs[p->power].cost);
 }
 
 static void draw_hud(void) {
@@ -584,7 +597,7 @@ static void game_draw(void) {
 		draw_center(96,  "X pular   QUADRADO atirar");
 		draw_center(108, "TRIANGULO arma  CIRCULO poder");
 		draw_center(120, "R2 troca poder  L1/R1 camera");
-		draw_center(132, "SELECT skin  L2 debug");
+		draw_center(132, "SELECT lanterna  L2 debug");
 		break;
 
 	case STATE_INTRO: {

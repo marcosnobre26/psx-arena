@@ -169,6 +169,10 @@ typedef struct PLAYER_S {
 	int      dash_timer;
 	int      walk_anim;
 	int      regen_timer;
+	int      lantern_on;    /* lanterna ligada (SELECT liga/desliga) */
+	int      battery;       /* 0..BATTERY_MAX */
+	int      battery_tick;  /* passos até gastar mais 1 de bateria */
+	int      lantern_dying; /* bateria acabou: passos piscando até apagar */
 } PLAYER;
 
 typedef struct {
@@ -192,7 +196,7 @@ typedef struct {
 	int     weapon;
 } BULLET;
 
-enum { PICK_GEM, PICK_HEALTH, PICK_ENERGY, PICK_WEAPON, PICK_QUEST, NUM_PICKUP_TYPES };
+enum { PICK_GEM, PICK_HEALTH, PICK_ENERGY, PICK_WEAPON, PICK_QUEST, PICK_BATTERY, NUM_PICKUP_TYPES };
 
 typedef struct {
 	int     active;
@@ -298,6 +302,9 @@ uint32_t rng_next(RNG *r);
 int      rng_range(RNG *r, int lo, int hi);   /* lo..hi, inclusive */
 int      rand_range(int lo, int hi);          /* lógica: usa g.rng */
 int      fx_range(int lo, int hi);            /* só efeitos visuais */
+
+/* player.c (lanterna) */
+int  lantern_lit(const PLAYER *p);      /* acesa neste quadro? (só para o desenho) */
 
 /* objective.c */
 void objective_start(void);
