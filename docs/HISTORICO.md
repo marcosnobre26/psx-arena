@@ -147,8 +147,8 @@ automatizar testes visuais.
   mata densa com 3 m; fase 5 `FLORESTA (TESTE)` feita por código (validada
   compilando o gerador no host: tudo alcançável, ≤ 208 quads por bloco);
   L2 + direcional teleporta para 4 pontos fixos; cone da lanterna em
-  coordenadas relativas (o mapa passa de 32 767). RAM: 724 KB (text 84 KB,
-  data 118 KB, bss 523 KB), antes 545 KB. Medições (L2, lanterna ligada):
+  coordenadas relativas (o mapa passa de 32 767). RAM: 707 KB = 723 750 bytes
+  (text 82 KB, data 115 KB, bss 510 KB); antes 532 KB. Medições (L2, lanterna ligada):
 
   | Ponto (fase 5) | FPS | POLIS | RAM GPU | BLOCOS |
   |---|---|---|---|---|
