@@ -480,7 +480,7 @@ static void select_draw(void) {
  * da célula. Se o desenho e a colisão baterem, cada parede/mata tem um
  * quadrado vermelho exatamente no topo; quadrado no ar ou no chão vazio =
  * desenho e colisão desencontrados.
- *   vermelho = parede/mata   laranja = sólido sem parede (caixa)
+ *   vermelho = parede/mata   laranja = sólido sem parede (caixa, árvore)
  *   roxo     = vazio (sem chão) */
 static void collision_markers_draw(void) {
 	const PLAYER *p = &g.players[0];
@@ -499,7 +499,7 @@ static void collision_markers_draw(void) {
 			else if (t == CELL_VOID)
 				render_marker(x, -6, z, 80, 150, 40, 200);
 			else
-				render_marker(x, -280, z, 80, 255, 140, 0);   /* caixa: em cima dela */
+				render_marker(x, -280, z, 80, 255, 140, 0);   /* caixa/árvore: a 1 m do chão */
 		}
 }
 

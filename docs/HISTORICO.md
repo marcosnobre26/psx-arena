@@ -168,3 +168,22 @@ automatizar testes visuais.
   lugar do `ApplyMatrixLV`. Dados verificados compilando `level.c` no host:
   nas 5 fases todo quad de chão cai em célula livre e todo topo em célula
   sólida. Novo atalho L2 + Select: marcadores da grade de colisão.
+- 2026-10-07 — Etapa 04b (árvores em massa): `tools/make_tree_models.py`
+  gera pinheiro (22 faces, 3,5 m), árvore seca (24) e tronco caído (22, 3 m),
+  e as imagens planas 32×64 de 4 bits renderizadas dos próprios modelos.
+  Árvores fora de `g`, 8 bytes cada, ordenadas por bloco; desenho só no 5×5
+  do grupo: modelo até profundidade 1800 (`TREE_LOD_DIST`), imagem plana
+  além, nada depois da névoa (`render_billboard`, com `GTE_BARRIER`).
+  Colisão provisória: o tronco marca a célula sólida (tronco caído: 3
+  células, deitado em X ou Z). Fase 5: moitas de mata viram árvores (5%,
+  16% no canto nordeste), fileira na frente da borda, 15 troncos; hash com
+  semente (`FOREST_TEST_SEED`; etapa 05 deriva de `g.seed`). Validado no
+  host: 883 árvores, tudo alcançável, trilhas e pontos de teleporte livres.
+  RAM: 736 KB. Medições (L2, lanterna ligada, fase 5):
+
+  | Ponto | FPS | POLIS | RAM GPU | ARVORES modelo/plana |
+  |---|---|---|---|---|
+  | ← início | a medir | | | |
+  | → cruzamento | a medir | | | |
+  | ↑ canto denso | a medir | | | |
+  | ↓ clareira | a medir | | | |

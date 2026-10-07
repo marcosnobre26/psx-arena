@@ -264,6 +264,7 @@ psx-arena/
 │   ├── blender_export_psx.py   exportador Blender → MESH (biblioteca + operador + CLI)
 │   ├── export_blend.py         exportação em lote de um .blend (usado por ./dev models)
 │   ├── build_textures.py       PNG → TIM com empacotamento de VRAM (usado pelo CMake)
+│   ├── make_tree_models.py     modelos das árvores + imagens planas (renderizadas dos modelos)
 │   ├── make_forest_textures.py texturas provisórias da floresta (terra, folhas, raízes, mata)
 │   ├── wav2vag.py              WAV → VAG (encoder SPU-ADPCM em Python puro; usado pelo CMake)
 │   ├── make_placeholder_sounds.py  gera os sons provisórios sintetizados
@@ -371,14 +372,20 @@ Separação de responsabilidades: `*_update()` só altera estado; `*_draw()` só
    `rtps`, `nclip`, `NEAR_Z`/névoa, `avsz4`, névoa nas cores com `dpct` (3 cores) + `dpcs` (a
    quarta) → `POLY_GT4`. Vértices relativos à origem do bloco (`load_translation`): o mapa vai a
    32 768 unidades e estouraria um `SVECTOR`.
-7. **HUD:** retângulos (`TILE`) e texto via `FntSort`, inseridos nas entradas 0/1 da OT.
-8. **Névoa (depth cueing):** a cada projeção a GTE calcula `IR0 = (H·65536/z·DQA + DQB)/4096`
+7. **Árvores (`level.c`):** até 1024, 8 bytes cada (posição, tipo, ângulo/16, escala/64), fora de
+   `g` (vêm do mapa, como as células), ordenadas por bloco no fim do `level_load` (contagem +
+   preenchimento). O desenho percorre só os blocos do 5×5 do grupo: profundidade < `TREE_LOD_DIST`
+   → `render_mesh` do modelo (20–40 faces); além → `render_billboard` (um `POLY_FT4` 4 bits em pé,
+   virado para a câmera só em Y, com névoa); depois do `fog_far` → nada. Colisão provisória:
+   o tronco marca a célula como sólida na grade (até a grade espacial da 04c).
+8. **HUD:** retângulos (`TILE`) e texto via `FntSort`, inseridos nas entradas 0/1 da OT.
+9. **Névoa (depth cueing):** a cada projeção a GTE calcula `IR0 = (H·65536/z·DQA + DQB)/4096`
    (0..4096). `render_set_fog()` escolhe DQA/DQB (registradores de controle 27/28, gravados por uma
    macro própria `gte_SetDepthCue`, porque o SDK não tem) para `IR0` = 0 no `near` e 4096 no
    `far`; `gte_SetFarColor` = cor do céu, que também é a cor de fundo. A conta é em 1/z: a névoa
    engrossa logo depois do `near`. É por face (o `IR0` do último vértice projetado). As contas
    evitam 64 bits (que puxariam a libgcc) limitando `near ≥ 256` e `far − near ≥ far/8`.
-9. **Lanterna:** objetos cujo centro está no cone de uma lanterna acesa usam um segundo par
+10. **Lanterna:** objetos cujo centro está no cone de uma lanterna acesa usam um segundo par
    DQA/DQB (névoa 1,6× mais longe); os blocos do mapa (`DRAW_FIXEDFOG`) ficam de fora. O cone no
    chão é um leque de `POLY_G3` em modo **aditivo** (ponta clara, borda preta). Polígonos sem
    textura usam o modo de mistura da última *texture page*, então cada triângulo vai na OT entre
@@ -492,10 +499,10 @@ Custo: O(jogadores + inimigos + objetos) por movimento — trivial para os limit
 
 | Seção | Tamanho | Conteúdo principal |
 |---|---|---|
-| `.text` | ~82 KB | código do jogo + bibliotecas do SDK usadas |
-| `.data` | ~115 KB | modelos, texturas e sons embutidos, tabelas |
-| `.bss` | ~510 KB | 2 × 96 KB de primitivas, 2 × OT, cache de 36 blocos (~277 KB), grade 128×128 (16 KB), pools |
-| **Total** | **~707 KB** de 2 MB | orçamento do roteiro: 1,2 MB |
+| `.text` | ~92 KB | código do jogo + bibliotecas do SDK usadas |
+| `.data` | ~117 KB | modelos, texturas e sons embutidos, tabelas |
+| `.bss` | ~527 KB | 2 × 96 KB de primitivas, 2 × OT, cache de 36 blocos (~277 KB), grade 128×128 (16 KB), árvores (16 KB), pools |
+| **Total** | **~736 KB** de 2 MB | orçamento do roteiro: 1,2 MB |
 
 Medido com `mipsel-linux-gnu-size build/arena.elf` (dentro do `./dev shell`).
 

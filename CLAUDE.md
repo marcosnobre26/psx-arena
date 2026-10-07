@@ -130,6 +130,10 @@ uma branch. As regras do ROADMAP (determinismo, orçamentos de desempenho,
 - Mapa grande: coordenadas do mundo vão a 32 768 → **nunca** guarde posição
   de mundo em `SVECTOR` (16 bits); use `VECTOR` ou vértices relativos a uma
   origem (`load_translation` em `render.c`).
+- Árvores: `level_add_tree` (fora de `g`, por bloco), **depois** das células;
+  colisão provisória pela célula. Posição por hash **com semente** (fase de
+  teste: fixa; etapa 05: derivada de `g.seed`, nunca `g.rng`). Nomes fixos
+  dos modelos: `pinheiro`, `arvore_seca`, `tronco` (+ `*_bb-4bit.png`).
 - Blocos: o 3×3 em volta de cada jogador é montado no mesmo quadro (sem
   buracos); só o anel externo usa a fila de 1 bloco/quadro. `level_invalidate`
   remonta um bloco depois de `level_set_cell`.

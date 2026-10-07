@@ -194,10 +194,61 @@ tela só se aplica a névoa. Texturas da floresta: `tools/make_forest_textures.p
 **Mudou o mapa durante o jogo?** `level_set_cell()` e depois
 `level_invalidate(x, z)`: o bloco da célula é remontado.
 
+**Árvores.** Ficam fora do pool de objetos: até `MAX_TREES` (1024), 8
+bytes cada, guardadas **por bloco** — o desenho só percorre os blocos do
+5×5 em volta do grupo. Por árvore: perto (profundidade da câmera <
+`TREE_LOD_DIST`, 1800) desenha o **modelo**; mais longe, a **imagem plana**
+(um quad virado para a câmera); depois da névoa, nada. O tronco caído não
+tem imagem plana: de longe some. O overlay L2 mostra `ARVORES total
+MODELO n PLANA n`.
+
+- Um mapa por código coloca árvores com `level_add_tree(TREE_PINE, x, z,
+  ângulo, escala)` (posição no mundo, ângulo 0–4095, escala `ONE` = 1,0),
+  **depois** de preencher as células (`level_set_cell` zera a solidez).
+- **Colisão provisória (até a 04c):** o tronco marca a célula como sólida;
+  o tronco caído marca 3 células ao longo do comprimento — por isso ele só
+  pode ficar deitado em X ou em Z (ângulo perto de 0/1024/2048/3072).
+- **Semente:** a posição das árvores vem de um hash **com semente**. A fase
+  de teste usa `FOREST_TEST_SEED` (fixa, para medir sempre no mesmo cenário);
+  a geração da etapa 05 deve usar uma semente derivada de `g.seed`.
+
+**Trocar os modelos das árvores pelos seus (Blender).** O jogo procura
+nomes fixos:
+
+| Arquivo | Símbolo | O que é |
+|---|---|---|
+| `models/pinheiro.h` | `pinheiro_mesh` | árvore 1 |
+| `models/arvore_seca.h` | `arvore_seca_mesh` | árvore 2 |
+| `models/tronco.h` | `tronco_mesh` | tronco caído |
+| `assets/textures/pinheiro_bb-4bit.png` | `tex_pinheiro_bb_t` | imagem plana da árvore 1 |
+| `assets/textures/seca_bb-4bit.png` | `tex_seca_bb_t` | imagem plana da árvore 2 |
+
+Respeite:
+- **Origem no pé** da árvore (centro da base do tronco, no chão, Z = 0 no
+  Blender). O jogo coloca a origem na posição da árvore.
+- **Escala:** 1 unidade do Blender = 1 metro = 256 no jogo. Atuais: pinheiro
+  3,5 m, árvore seca 3 m, tronco 3 m de comprimento. A variação de tamanho
+  vem de `scale_min/scale_max` em `tree_defs` (`data.c`).
+- **Tronco caído deitado ao longo do eixo X**, centrado na origem (a
+  colisão marca a célula do meio e as duas vizinhas em X).
+- **Tronco fino o bastante para caber numa célula** (diâmetro < ~0,6 m), porque
+  a colisão é a célula inteira.
+- **Faces: 20 a 40** (são centenas de árvores; a de perto é a cara).
+  Sem textura: a cor de cada face vem do material (o exportador usa a cor
+  do material); nomes de material livres.
+- **Imagens planas:** PNG 32×64 com transparência (alpha), fundo
+  transparente. O quadro representa **2 m × 4 m**, com o pé da árvore no
+  meio da borda de baixo. Se mudar o tamanho do quadro, mude `bb_w/bb_h`
+  em `tree_defs`. Dica: renderize o seu modelo de lado no Blender
+  (ortográfica, fundo transparente) e reduza para 32×64.
+- Exporte com `./dev models` (coleção `PSX` do `.blend`) usando esses nomes.
+  **Não rode mais** `tools/make_tree_models.py` depois disso: ele sobrescreve
+  os cinco arquivos.
+
 **Conferir a colisão:** com o overlay aberto, **L2 + Select** desenha um
 quadrado em cima de cada célula sólida em volta do jogador 1 (raio
 `COLMARK_RADIUS`), na altura do topo: vermelho = parede/mata, laranja =
-caixa, roxo = vazio. Desenho e colisão batem quando cada parede tem o seu
+caixa ou árvore, roxo = vazio. Desenho e colisão batem quando cada parede tem o seu
 quadrado vermelho exatamente no topo.
 
 **Medir sempre no mesmo lugar (fase 5):** com o overlay aberto, segure
