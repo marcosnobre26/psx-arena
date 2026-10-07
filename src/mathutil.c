@@ -40,7 +40,3 @@ int dist2d(int dx, int dz) {
 	int mx = ax > az ? ax : az, mn = ax > az ? az : ax;
 	return mx + (mn * 3 >> 3);
 }
-
-int rand_range(int lo, int hi) {
-	return lo + (rand() % (hi - lo + 1));
-}

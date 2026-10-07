@@ -198,11 +198,18 @@ typedef struct {
 /* ------------------------------------------------------------------ */
 /* Estado global                                                       */
 /* ------------------------------------------------------------------ */
+/* Gerador aleatório com estado explícito (ver rng.c) */
+typedef struct {
+	uint32_t s;
+} RNG;
+
 enum { STATE_TITLE, STATE_SELECT, STATE_PLAY, STATE_PAUSE, STATE_WIN, STATE_DEAD };
 
 typedef struct {
 	int     state;
 	int     frame;
+	uint32_t seed;          /* semente da partida (no modo link virá do handshake) */
+	RNG     rng;            /* único gerador que a LÓGICA pode usar */
 	int     play_frames;    /* tempo de jogo (para o placar) */
 	int     score;
 	int     gems, gems_total;
@@ -240,7 +247,13 @@ int  angle_of(int dx, int dz);          /* direção do vetor (0..4095) */
 int  angle_diff(int from, int to);      /* diferença em -2048..2047 */
 int  turn_towards(int angle, int target, int rate);
 int  dist2d(int dx, int dz);            /* distância aproximada */
-int  rand_range(int lo, int hi);
+
+/* rng.c */
+void     rng_seed(RNG *r, uint32_t seed);
+uint32_t rng_next(RNG *r);
+int      rng_range(RNG *r, int lo, int hi);   /* lo..hi, inclusive */
+int      rand_range(int lo, int hi);          /* lógica: usa g.rng */
+int      fx_range(int lo, int hi);            /* só efeitos visuais */
 
 /* level.c */
 void level_load(int index);

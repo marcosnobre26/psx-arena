@@ -128,7 +128,7 @@ void crate_damage(int cx, int cz, int amount) {
 			level_set_solid(cx, cz, 0);
 			effect_spawn(FX_BURST, x, z, 260, 16, 200, 140, 70);
 			g.score += 20;
-			int r = rand() % 100;
+			int r = rng_next(&g.rng) % 100;
 			if (r < 35)      pickup_spawn(PICK_HEALTH, x, z);
 			else if (r < 70) pickup_spawn(PICK_ENERGY, x, z);
 		}

@@ -10,7 +10,6 @@
  */
 #include <stdio.h>
 #include <string.h>
-#include <stdlib.h>
 #include <psxapi.h>
 #include <psxpad.h>
 #include "game.h"
@@ -67,11 +66,20 @@ static void free_spot_near(int *x, int *z) {
 	}
 }
 
-static void game_reset(void) {
+/* Começa uma partida nova. A semente vem como parâmetro porque o memset
+ * abaixo apaga g inteiro (inclusive g.frame, de onde ela costuma vir). */
+static void game_reset(uint32_t seed) {
 	INPUT in[MAX_PLAYERS];
 	memcpy(in, g.in, sizeof(in));
 	memset(&g, 0, sizeof(g));
 	memcpy(g.in, in, sizeof(in));
+
+#ifdef DEBUG_FIXED_SEED
+	seed = DEBUG_FIXED_SEED;
+#endif
+	/* semear ANTES do level_load: os inimigos sorteiam ao nascer */
+	g.seed = seed;
+	rng_seed(&g.rng, seed);
 
 	level_load(0);
 
@@ -287,8 +295,7 @@ static void select_tick(void) {
 	for (int i = 0; i < MAX_PLAYERS; i++)
 		if (sel[i].joined && !sel[i].ready) all = 0;
 	if (all && sel[0].joined) {
-		srand(g.frame);
-		game_reset();
+		game_reset(g.frame);   /* tempo na seleção varia: partida diferente */
 		g.state = STATE_PLAY;
 		show_message("DERROTE TODOS OS INIMIGOS!", 120);
 	}
@@ -434,7 +441,7 @@ static void game_tick(void) {
 		effects_update();
 		camera_update(0);
 		if (any_pressed(PAD_START) >= 0) {        /* mesma escolha, de novo */
-			game_reset();
+			game_reset(g.frame);              /* semente nova */
 			g.state = STATE_PLAY;
 		} else if (any_pressed(PAD_SELECT) >= 0) { /* trocar de personagem */
 			select_enter();
@@ -506,8 +513,7 @@ int main(void) {
 
 	assets_load_textures();     /* todas as texturas de assets/ (gerado) */
 
-	srand(12345);
-	game_reset();
+	game_reset(12345);          /* fundo da tela de título: sempre igual */
 	g.state = STATE_TITLE;
 
 	int last_vsync = VSync(-1);

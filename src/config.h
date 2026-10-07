@@ -57,4 +57,10 @@
 #define MAX_EFFECTS     16
 #define MAX_PROPS       64
 
+/* ---------- Depuração ---------- */
+/* Descomente para forçar a mesma semente em toda partida. Útil para
+ * conferir o determinismo: duas partidas com as mesmas entradas devem
+ * se comportar igual (mesmos inimigos, mesmos sorteios). */
+/* #define DEBUG_FIXED_SEED 1234 */
+
 #endif

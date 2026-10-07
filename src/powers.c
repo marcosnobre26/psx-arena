@@ -7,7 +7,6 @@
  *   2. Declare e adicione à tabela power_defs em data.c
  * Pronto: R2 já alterna para ele e CÍRCULO usa.
  */
-#include <stdlib.h>
 #include "game.h"
 
 #define SHOCK_RADIUS 900

@@ -25,7 +25,7 @@ void enemy_spawn(int type, int x, int z) {
 		e->type = type;
 		e->hp = enemy_defs[type].hp;
 		e->pos.vx = x; e->pos.vy = 0; e->pos.vz = z;
-		e->angle = rand() & 4095;
+		e->angle = rng_next(&g.rng) & 4095;
 		e->flash = e->kx = e->kz = 0;
 		e->think = rand_range(30, 120);
 		e->hit_cooldown = 0;
@@ -49,7 +49,7 @@ void enemy_damage(ENEMY *e, int amount, int push_x, int push_z) {
 		             d->palette[0].r, d->palette[0].g, d->palette[0].b);
 
 		/* chance de soltar um item */
-		int r = rand() % 100;
+		int r = rng_next(&g.rng) % 100;
 		if (r < 20)      pickup_spawn(PICK_HEALTH, e->pos.vx, e->pos.vz);
 		else if (r < 40) pickup_spawn(PICK_ENERGY, e->pos.vx, e->pos.vz);
 
@@ -88,9 +88,9 @@ void enemies_update(void) {
 
 		int blocked = collide_move(&e->pos, mx, mz, rad, e, COL_ALL);
 		if (blocked && !chasing)
-			e->angle = (e->angle + 1024 + (rand() & 1023)) & 4095;
+			e->angle = (e->angle + 1024 + (rng_next(&g.rng) & 1023)) & 4095;
 		else if (blocked && chasing && (g.frame & 31) == (i & 31))
-			e->angle = (e->angle + ((rand() & 1) ? 700 : -700)) & 4095;  /* contorna */
+			e->angle = (e->angle + ((rng_next(&g.rng) & 1) ? 700 : -700)) & 4095;  /* contorna */
 
 		/* --- encostou no jogador? (quem está pulando por cima escapa) ---
 		 * Como os dois não se atravessam, "encostar" é chegar a poucas
