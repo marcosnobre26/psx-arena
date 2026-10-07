@@ -688,7 +688,34 @@ static void debug_skip_level(void) {
 		g.state = STATE_END;
 }
 
+/* Leva os jogadores a um dos 4 pontos fixos da fase (LEVEL_DEF.debug_pts),
+ * com a câmera numa direção fixa: medições de FPS/POLIS sempre iguais. */
+static void debug_teleport(int i) {
+	const DEBUG_POINT *pts = level_defs[g.level].debug_pts;
+	if (!pts || (g.state != STATE_PLAY && g.state != STATE_PAUSE))
+		return;
+	int x = pts[i].cx * TILE_SIZE + TILE_SIZE / 2;
+	int z = pts[i].cz * TILE_SIZE + TILE_SIZE / 2;
+	int first = 1;
+	for (int k = 0; k < MAX_PLAYERS; k++) {
+		PLAYER *p = &g.players[k];
+		if (!player_alive(p)) continue;
+		int px = x, pz = z;
+		if (!first)
+			free_spot_near(&px, &pz);            /* o 2o jogador fica ao lado */
+		p->pos.vx = px; p->pos.vy = 0; p->pos.vz = pz;
+		p->vy = 0;
+		p->on_ground = 1;
+		p->angle = pts[i].yaw;
+		first = 0;
+	}
+	g.cam_yaw = pts[i].yaw;
+	camera_update(1);                            /* câmera direto no lugar */
+}
+
 /* L2 (solto sozinho) liga/desliga o overlay. Com o overlay aberto:
+ *   L2 segurado + direcional -> teleporte para os pontos fixos da fase
+ *       (esquerda, direita, cima, baixo = pontos 1 a 4)
  *   L2 segurado + START  -> pula de fase
  *   R2 segurado + direcional (só com DEBUG_FOG_TUNING) -> ajusta a névoa:
  *       cima/baixo = far +-100, direita/esquerda = near +-50
@@ -701,6 +728,17 @@ static void debug_input(INPUT *in) {
 		in->pressed &= ~PAD_START;
 		l2_combo = 1;
 		debug_skip_level();
+	}
+	if (l2 && show_debug) {
+		static const uint16_t dirs[4] = { PAD_LEFT, PAD_RIGHT, PAD_UP, PAD_DOWN };
+		for (int i = 0; i < 4; i++)
+			if (in->pressed & dirs[i]) {
+				l2_combo = 1;
+				debug_teleport(i);
+			}
+		/* o direcional não chega ao jogo enquanto L2 está segurado */
+		in->held    &= ~(PAD_UP | PAD_DOWN | PAD_LEFT | PAD_RIGHT);
+		in->pressed &= ~(PAD_UP | PAD_DOWN | PAD_LEFT | PAD_RIGHT);
 	}
 	if (!l2 && l2_was_held) {          /* soltou o L2 */
 		if (!l2_combo)
