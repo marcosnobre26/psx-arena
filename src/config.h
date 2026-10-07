@@ -57,6 +57,10 @@
 #define MAX_EFFECTS     16
 #define MAX_PROPS       64
 
+/* ---------- Som ---------- */
+#define SOUND_NEAR      300     /* até aqui (da câmera) o som fica no volume cheio */
+#define SOUND_FAR       3000    /* daqui em diante não se ouve nada */
+
 /* ---------- Depuração ---------- */
 /* Descomente para forçar a mesma semente em toda partida. Útil para
  * conferir o determinismo: duas partidas com as mesmas entradas devem

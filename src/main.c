@@ -235,6 +235,7 @@ static void draw_hud(void) {
 
 	if (show_debug) {
 		const PLAYER *p = &g.players[0];
+		hud_print(12, 176, "SPU %dK/512K", sound_spu_used() / 1024);
 		hud_print(12, 186, "SEED %08X  POLIS %d", (unsigned)g.seed, render_stats_polys());
 		hud_print(12, 196, "FPS %d  RAM GPU %d/%d", fps, render_stats_bytes(), PACKET_LEN);
 		hud_print(12, 206, "X %d Z %d ANG %d CAM %d", p->pos.vx, p->pos.vz, p->angle, g.cam_yaw);
@@ -513,6 +514,9 @@ int main(void) {
 	input_init();
 
 	assets_load_textures();     /* todas as texturas de assets/ (gerado) */
+	sound_init();
+	assets_load_sounds();       /* todos os sons de assets/sounds/ para o SPU (gerado) */
+	sound_setup();              /* prioridades e variações (data.c) */
 
 	game_reset(12345);          /* fundo da tela de título: sempre igual */
 	g.state = STATE_TITLE;

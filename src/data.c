@@ -88,3 +88,14 @@ const PROP_DEF prop_defs[] = {
 	{ '2',   &crate_mesh,   ONE/2,    0,      &tex_crate_t },  /* caixinha decorativa */
 };
 const int num_props = sizeof(prop_defs) / sizeof(prop_defs[0]);
+
+/* ------------------------------------------------------------------ */
+/* SONS — prioridade e variação de tom de cada assets/sounds/*.wav.    */
+/* Prioridade: um som novo só corta uma voz de prioridade <= à dele    */
+/* quando as 22 vozes de efeito estão ocupadas. Sons fora da tabela:   */
+/* prioridade 1, sem variação.                                         */
+/* ------------------------------------------------------------------ */
+const SOUND_DEF sound_defs[] = {
+	/* som            prio  variação de tom (%) */
+	{ NULL }
+};

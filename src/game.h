@@ -23,6 +23,7 @@
 #include "config.h"
 #include "mesh.h"
 #include "render.h"
+#include "sound.h"
 
 /* ------------------------------------------------------------------ */
 /* Controle                                                            */
@@ -114,6 +115,14 @@ extern const CHARACTER_DEF character_defs[];
 extern const int        num_characters;
 extern const PROP_DEF   prop_defs[];
 extern const int        num_props;
+
+/* Ajustes de cada som (data.c). A tabela termina com { NULL }. */
+typedef struct {
+	SOUND  *sound;      /* sfx_<nome>, gerado de assets/sounds/<nome>.wav */
+	int     prio;       /* 1 = fundo (passos) ... 3 = importante (dor, morte) */
+	int     pitch_var;  /* variação aleatória de tom em % (0 = sempre igual) */
+} SOUND_DEF;
+extern const SOUND_DEF  sound_defs[];
 
 /* ------------------------------------------------------------------ */
 /* Entidades                                                           */
