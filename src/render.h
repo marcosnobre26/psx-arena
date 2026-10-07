@@ -57,5 +57,6 @@ void render_end_frame(void);
 
 /* Quantos bytes de primitivas foram usados no último quadro (debug) */
 int render_stats_bytes(void);
+int render_stats_polys(void);
 
 #endif

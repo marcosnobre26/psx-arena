@@ -40,6 +40,8 @@ static FRAMEBUF fb[2];
 static int      cur = 0;
 static uint8_t *nextpri;
 static int      last_bytes = 0;
+static int      polys = 0;         /* polígonos enviados à GPU neste quadro */
+static int      last_polys = 0;    /* total do quadro anterior (para o HUD) */
 
 static MATRIX   view;          /* matriz da câmera (mundo -> câmera) */
 static VECTOR   cam_pos;
@@ -311,6 +313,7 @@ void render_mesh(const MESH *m, const VECTOR *pos, const SVECTOR *rot,
 			addPrim(ot + otz, pr);
 			nextpri += quad ? sizeof(POLY_F4) : sizeof(POLY_F3);
 		}
+		polys++;   /* só chega aqui quem passou por todos os descartes */
 	}
 }
 
@@ -347,6 +350,8 @@ void hud_print(int x, int y, const char *fmt, ...) {
 
 void render_end_frame(void) {
 	last_bytes = nextpri - fb[cur].pkt;
+	last_polys = polys;
+	polys = 0;
 
 	DrawSync(0);   /* espera a GPU terminar o quadro anterior */
 	VSync(0);      /* espera o retraço vertical (60 Hz NTSC) */
@@ -363,4 +368,10 @@ void render_end_frame(void) {
 
 int render_stats_bytes(void) {
 	return last_bytes;
+}
+
+/* Polígonos de modelos (render_mesh) no último quadro; o HUD não conta.
+ * Orçamento do roteiro: ~2 500 por quadro. */
+int render_stats_polys(void) {
+	return last_polys;
 }
