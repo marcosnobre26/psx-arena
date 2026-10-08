@@ -385,6 +385,8 @@ int  collide_blocked(int x, int z, int y, int radius, const void *self, int mask
                      int from_x, int from_z);
 int  collide_move(VECTOR *pos, int dx, int dz, int radius, const void *self, int mask);
 int  collide_prop_at(int x, int z, int radius);        /* objeto sólido ali? */
+void collide_tick_begin(void);          /* depuração: zera o contador do passo */
+int  collide_stats(void);               /* testes de círculo no último passo */
 int  enemy_radius(const ENEMY *e);
 
 /* enemies.c */

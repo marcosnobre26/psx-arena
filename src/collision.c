@@ -21,10 +21,24 @@
 
 #define JUMP_CLEAR  150     /* altura do pulo que passa por cima de alguém */
 
+/* Contador de testes de círculo (depuração: overlay L2, "COL"). Mostra o
+ * custo da colisão: hoje cada teste percorre todos os objetos. */
+static int col_tests, col_tests_last;
+
+void collide_tick_begin(void) {
+	col_tests_last = col_tests;
+	col_tests = 0;
+}
+
+int collide_stats(void) {
+	return col_tests_last;
+}
+
 /* Testa um círculo (x,z,r) contra outro (ox,oz,orad).
  * Bloqueia só se vai sobrepor E está se aproximando (de from_x/from_z). */
 static int circle_blocks(int x, int z, int r, int ox, int oz, int orad,
                          int from_x, int from_z) {
+	col_tests++;
 	int min = r + orad;
 	int dx = x - ox, dz = z - oz;
 	if (dx >= min || dx <= -min || dz >= min || dz <= -min)
@@ -92,6 +106,7 @@ int collide_prop_at(int x, int z, int radius) {
 	for (int i = 0; i < MAX_PROPS; i++) {
 		const PROP *p = &g.props[i];
 		if (!p->active || !prop_defs[p->def].solid) continue;
+		col_tests++;
 		int px = p->cx * TILE_SIZE + TILE_SIZE / 2, pz = p->cz * TILE_SIZE + TILE_SIZE / 2;
 		int min = radius + p->radius;
 		int dx = x - px, dz = z - pz;

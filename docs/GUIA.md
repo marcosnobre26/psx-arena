@@ -49,6 +49,7 @@ Depois de qualquer mudança: `./dev run` (compila e abre no emulador) ou
 | **L2 + Start** | (com o overlay aberto) pula para a próxima fase |
 | **L2 + direcional** | (com o overlay aberto) teleporta para os 4 pontos fixos da fase de teste |
 | **L2 + Select** | (com o overlay aberto) mostra a grade de colisão: quadrado em cada célula sólida perto do jogador 1 |
+| **L2 + Triângulo** | (com o overlay aberto) nascem 8 inimigos em volta do jogador 1, até 24 (para medir); `COL` no overlay = testes de colisão no último passo |
 
 **Tela de seleção:** esquerda/direita escolhe, **Select** troca a skin,
 **X** confirma, **Círculo** desfaz (ou volta ao título). O **controle 2**

@@ -328,7 +328,7 @@ static void draw_hud(void) {
 		level_tree_stats(&tt, &tm, &tb);
 		if (tt)
 			hud_print(12, 146, "ARVORES %d  MODELO %d  PLANA %d", tt, tm, tb);
-		hud_print(12, 176, "SPU %dK/512K", sound_spu_used() / 1024);
+		hud_print(12, 176, "SPU %dK/512K  COL %d", sound_spu_used() / 1024, collide_stats());
 		hud_print(12, 186, "SEED %08X  POLIS %d", (unsigned)g.seed, render_stats_polys());
 		hud_print(12, 196, "FPS %d  RAM GPU %d/%d", fps, render_stats_bytes(), PACKET_LEN);
 		hud_print(12, 206, "X %d Z %d ANG %d CAM %d", p->pos.vx, p->pos.vz, p->angle, g.cam_yaw);
@@ -542,6 +542,7 @@ static void draw_world(int with_players) {
 /* Lógica de UM passo (1/60 de segundo). Não desenha nada. */
 static void game_tick(void) {
 	int who;
+	collide_tick_begin();
 	switch (g.state) {
 	case STATE_TITLE:
 		effects_update();
@@ -748,11 +749,28 @@ static void debug_teleport(int i) {
 	camera_update(1);                            /* câmera direto no lugar */
 }
 
+/* Nascem até 8 inimigos num anel em volta do jogador 1 (só onde há chão
+ * livre), para medir com muita gente perto. Respeita MAX_ENEMIES. */
+static void debug_spawn_enemies(void) {
+	const PLAYER *p = &g.players[0];
+	if (!player_alive(p) || (g.state != STATE_PLAY && g.state != STATE_PAUSE))
+		return;
+	for (int k = 0; k < 8; k++) {
+		int a = (p->angle + k * 512) & 4095;
+		int x = p->pos.vx + ((isin(a) * DEBUG_SPAWN_DIST) >> 12);
+		int z = p->pos.vz + ((icos(a) * DEBUG_SPAWN_DIST) >> 12);
+		if (level_blocked(x, z, 140) || collide_prop_at(x, z, 140))
+			continue;
+		enemy_spawn(k % num_enemy_types, x, z);
+	}
+}
+
 /* L2 (solto sozinho) liga/desliga o overlay. Com o overlay aberto:
  *   L2 segurado + direcional -> teleporte para os pontos fixos da fase
  *       (esquerda, direita, cima, baixo = pontos 1 a 4)
  *   L2 segurado + START  -> pula de fase
  *   L2 segurado + SELECT -> marcadores de colisão (células sólidas)
+ *   L2 segurado + TRIANGULO -> nascem 8 inimigos em volta (medição)
  *   R2 segurado + direcional (só com DEBUG_FOG_TUNING) -> ajusta a névoa:
  *       cima/baixo = far +-100, direita/esquerda = near +-50
  * Os botões usados aqui são "comidos" para não pausar nem mover o jogador. */
@@ -764,6 +782,11 @@ static void debug_input(INPUT *in) {
 		in->pressed &= ~PAD_SELECT;      /* não liga/desliga a lanterna */
 		l2_combo = 1;
 		show_collision ^= 1;
+	}
+	if (l2 && show_debug && (in->pressed & PAD_TRIANGLE)) {
+		in->pressed &= ~PAD_TRIANGLE;    /* não troca de arma */
+		l2_combo = 1;
+		debug_spawn_enemies();
 	}
 	if (l2 && show_debug && (in->pressed & PAD_START)) {
 		in->pressed &= ~PAD_START;

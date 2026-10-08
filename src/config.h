@@ -131,5 +131,6 @@
  * os valores bons e passe para levels.c. Trocar de fase volta ao da tabela. */
 /* #define DEBUG_FOG_TUNING */
 #define COLMARK_RADIUS  5       /* depuração da colisão: raio em células */
+#define DEBUG_SPAWN_DIST 640    /* L2 + Triângulo: distância dos 8 inimigos */
 
 #endif
