@@ -269,17 +269,14 @@ automatizar testes visuais.
   | canto denso | 0 / 7 | 30/30 / 20/20 | 760 / 925 | 4 / 54 |
   | clareira | 0 / 8 | 30/30 / 30/30 | 498 / 682 | 10 / 75 |
 
-  **Depois da 04d** (padrões: `TREE_LOD_DIST` 1800, névoa 3200; CPU/GPU em
-  linhas, 30 FPS = ~525):
+  **Primeira medição depois da 04d** (padrões antigos: `TREE_LOD_DIST` 1800,
+  névoa 3200, sem limite entre jogadores; CPU em linhas, 30 FPS = ~525):
 
-  | Ponto | +ini | FPS | POLIS | CAM testes/cél | 50% | CPU | espera GPU | lógica |
-  |---|---|---|---|---|---|---|---|---|
-  | início | 0 / 8 | 30 / 30 | 506 / 692 | 2/8 | 0 | 306 / 411 | 0 | 34 / 66 |
-  | cruzamento | 0 / 8 | 30 / 30 | 429 / 616 | 2/6 | 0 | 267 / 376 | 0 | 36 / 71 |
-  | canto denso | 0 / 7 | 30 / **20** | 789 / 946 | 2/6 | 0 | 461 / **599** | 0 | 33 / 98 |
-  | clareira | 0 / 8 | 30 / 30 | 473 / 660 | 2/8 | 0 | 291 / 401 | 0 | 35 / 73 |
-  | canto tapado | 0 / 3 | 30 / 30 | 556 / 650 | 2/4 | **1** | 359 / 402 | 0 | 33 / 45 |
-  | canto 2 jogadores | 0 / 3 | **15** / **15** | 1823 / 1892 | 3/27 | 1 | 822 / 869 | 0 | 74 / 97 |
+  | Ponto | +ini | FPS | POLIS | 50% | CPU | espera GPU |
+  |---|---|---|---|---|---|---|
+  | canto denso | 0 / 7 | 30 / **20** | 789 / 946 | 0 | 461 / **599** | 0 |
+  | canto 2 jogadores | 0 / 3 | **15** / **15** | 1823 / 1892 | 1 | 822 / 869 | 0 |
+  (os outros pontos ficaram em 30 FPS)
 
   **CPU ou GPU?** A espera pela GPU é 0 em todos os pontos: o gargalo é a
   **CPU** (no emulador). Canto denso +7 (599 linhas): lógica 98, desenho dos
@@ -307,3 +304,35 @@ automatizar testes visuais.
   **Folga pequena:** o canto denso com inimigos fica em ~498 de ~525
   linhas de CPU. A **etapa 10 precisa otimizar a CPU**, principalmente o
   desenho dos blocos (~214 linhas) e das árvores (~160).
+- 2026-10-10 — 04d, ajustes finais: **`MAX_PLAYER_SEPARATION` = 896**
+  (lógica em `player.c`: o eixo que afastaria além do limite não anda; de
+  lado e de volta, livre). Escolha pelo `./dev bench -D` no `canto_2j` com
+  inimigos, jogador 2 colocado no limite em 8 direções: 896 dá 30 FPS em
+  todas (pior CPU 499, ≥ 62% do buffer de primitivas livre); 960 falha em 1
+  direção; valores menores também falham em 1–2 direções por causa da folga
+  de CPU do canto denso, não da distância. Antes disso, a câmera ao
+  aproximar por tronco ficava quase vertical (até ~1 800 de altura, 15 FPS
+  com 2 jogadores): agora desliza na própria linha de visão e sobe no
+  máximo `CAM_BLOCK_RAISE` (120). **Buffer de primitivas:** a proteção
+  contra estouro já existia, mas cortava jogadores e HUD (desenhados por
+  último); agora há reserva de 16 KB para eles, blocos e árvores são
+  desenhados do perto para o longe e o cortado é o mais distante (aviso
+  `CORTE` no L2). Estresse com buffer de 40 KB: sem travar, máximo 26 KB
+  usados. RAM: 805 KB (824 470 bytes), sobram ~423 KB.
+
+  **Depois da 04d — tabela final** (padrões: `TREE_LOD_DIST` 1300, névoa da
+  fase 5 2800, separação 896):
+
+  | Ponto | +ini | FPS mín/méd | POLIS máx | RAM GPU máx | CPU | lógica | 50% | corte |
+  |---|---|---|---|---|---|---|---|---|
+  | início | 0 / 8 | 30/30 / 30/30 | 391 / 577 | 19 956 / 23 860 | 274 / 380 | 34 / 65 | 0 | 0 |
+  | cruzamento | 0 / 8 | 60/60 / 30/30 | 384 / 569 | 18 880 / 22 764 | 232 / 368 | 18 / 73 | 0 | 0 |
+  | canto denso | 0 / 7 | 30/30 / **30/30** | 610 / 769 | 27 228 / 30 572 | 410 / **504** | 35 / 64 | 0 | 0 |
+  | clareira | 0 / 8 | 30/30 / 30/30 | 410 / 593 | 19 572 / 23 420 | 283 / 394 | 38 / 75 | 0 | 0 |
+  | canto tapado | 0 / 3 | 30/30 / 30/30 | 463 / 533 | 21 692 / 23 160 | 335 / 373 | 35 / 45 | 1 | 0 |
+  | canto 2 jogadores (sep. 941) | 0 / 3 | **30/30** / **30/30** | 626 / 697 | 27 424 / 28 920 | 408 / 443 | 37 / 47 | 1 | 0 |
+
+  Atenção: o canto denso com inimigos fica em 504 de ~525 linhas. Perto do
+  limite o jogo "trava" em 20 FPS (um quadro longo faz o próximo rodar 3
+  passos de lógica em vez de 2); a **etapa 10 precisa abrir folga na CPU**
+  (blocos ~203, árvores ~118 linhas).

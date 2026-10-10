@@ -290,7 +290,18 @@ são só visuais e ficam em `camera.c` (fora de `g`). Regras:
   — se você trocar os modelos por versões texturizadas, essa transparência
   precisa de uma segunda CLUT com STP ligado.
 - **2 jogadores:** o enquadramento vence a aproximação da mata
-  (`CAM_FRAME_FULL`): os dois precisam caber na tela.
+  (`CAM_FRAME_FULL`): os dois precisam caber na tela. Eles não podem se
+  afastar mais que `MAX_PLAYER_SEPARATION` (896, regra de jogo em
+  `player.c`): quem tenta passar do limite não anda naquela direção, mas
+  anda de lado ou volta.
+- Ao aproximar por causa de um tronco, a câmera **desliza na própria linha
+  de visão** (mesmo ângulo) e sobe no máximo `CAM_BLOCK_RAISE`; se subisse
+  muito, viraria uma vista de cima que enxerga chão demais (lento).
+- **Buffer de primitivas** (`PACKET_LEN`, 96 KB): 16 KB ficam reservados
+  para inimigos, jogadores, efeitos e HUD (`PACKET_RESERVE`); blocos e
+  árvores são desenhados do mais perto para o mais longe e, se o buffer
+  apertar, o mais distante deixa de ser desenhado — o L2 pisca
+  `CORTE n!`. Nunca estoura.
 - Overlay L2: `CAM testes/células` = custo da câmera no quadro (separado do
   `COL`), `ARV ... TRANSP n` = árvores a 50%, `CPU n GPU n FOLGA n (linhas)`
   = perfil do quadro (ver abaixo).

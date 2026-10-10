@@ -137,6 +137,10 @@ uma branch. As regras do ROADMAP (determinismo, orçamentos de desempenho,
 - Mapa grande: coordenadas do mundo vão a 32 768 → **nunca** guarde posição
   de mundo em `SVECTOR` (16 bits); use `VECTOR` ou vértices relativos a uma
   origem (`load_translation` em `render.c`).
+- **2 jogadores:** `MAX_PLAYER_SEPARATION` é regra de jogo (`player.c`,
+  só posições em `g`). Buffer de primitivas: o mundo para em
+  `PACKET_LEN - PACKET_RESERVE` (blocos/árvores do perto para o longe);
+  qualquer desenho novo de cenário deve respeitar o mesmo orçamento.
 - **Câmera:** `g.cam_yaw` é lógica (fica em `g`); posição/distância/suavização
   são visuais (`camera.c`, fora de `g`). **Nenhuma lógica pode ler a câmera
   visual** (`camera_eye()` só para som/visual).
