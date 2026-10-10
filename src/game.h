@@ -356,6 +356,7 @@ void exit_draw(void);
 
 /* level.c */
 void level_load(int index);
+int  level_load_lines(void);            /* tempo do último level_load em linhas (~63,5 us) */
 void level_begin(int w, int h);         /* mapa por código: tamanho (tudo vazio) */
 void level_set_cell(int cx, int cz, int type);   /* CELL_* (solidez automática) */
 int  level_cell_type(int cx, int cz);

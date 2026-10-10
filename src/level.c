@@ -21,6 +21,7 @@
  * Isso é só desenho: nada aqui muda g. A colisão usa a grade, não os blocos.
  */
 #include <string.h>
+#include <hwregs_c.h>
 #include "game.h"
 
 static uint8_t cells[MAP_MAX_H][MAP_MAX_W];
@@ -647,7 +648,14 @@ int level_placed(int i, char *ch, int *cx, int *cz) {
 	return num_placed;
 }
 
+static int load_lines;                 /* tempo do último level_load (linhas) */
+
+int level_load_lines(void) {
+	return load_lines;
+}
+
 void level_load(int index) {
+	uint16_t t_load = TIMER_VALUE(1);  /* perfil: quanto a carga leva no console */
 	const LEVEL_DEF *ld = &level_defs[index];
 	cur_level = index;
 	level_apply_look();               /* a luz entra na cor dos blocos */
@@ -685,6 +693,7 @@ void level_load(int index) {
 	for (int dz = -CHUNK_LOAD_RADIUS; dz <= CHUNK_LOAD_RADIUS; dz++)
 		for (int dx = -CHUNK_LOAD_RADIUS; dx <= CHUNK_LOAD_RADIUS; dx++)
 			ensure(fcx + dx, fcz + dz);
+	load_lines = (uint16_t)(TIMER_VALUE(1) - t_load);   /* < 65536 linhas (~4 s) */
 }
 
 /* Névoa, céu e luz da fase atual (também chamado ao voltar dos menus) */

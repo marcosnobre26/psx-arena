@@ -958,6 +958,8 @@ static void bench_start(void) {
 	bench.point = BENCH_FROM;            /* ./dev bench -D BENCH_FROM=6: só as fases 1-4 */
 #endif
 	printf("BENCH INICIO fase=%d semente=%d pontos=%d\n", BENCH_LEVEL + 1, BENCH_SEED, BENCH_POINTS);
+	printf("BENCH carga fase=%d nome=TESTE linhas=%d ms=%d\n", BENCH_LEVEL + 1,
+	       level_load_lines(), level_load_lines() * 635 / 10000);
 }
 
 static void bench_remove_extras(void) {
@@ -1009,7 +1011,8 @@ static void bench_frame(int vs) {
 			const BENCH_PT *bp = &bench_pts[bench.point];
 			if (g.level != bp->level) {          /* outra fase: começa ela (semente fixa) */
 				start_level(bp->level, BENCH_SEED);
-				printf("BENCH fase=%d (%s)\n", bp->level + 1, level_defs[bp->level].name);
+				printf("BENCH carga fase=%d nome=%s linhas=%d ms=%d\n", bp->level + 1,
+				       level_defs[bp->level].name, level_load_lines(), level_load_lines() * 635 / 10000);
 			}
 			g.state = STATE_PLAY;                /* pula a introdução */
 			if (bp->pt >= 0)
