@@ -201,7 +201,7 @@ troque para `Debug` em [`CMakePresets.json`](CMakePresets.json) (`-Og`).
 | `image` | recria a imagem Docker |
 | `doctor` | verifica Docker, SDK, emulador e Blender |
 | `clean` | apaga `build/` |
-| `bench` | benchmark automático: compila com `DEBUG_BENCHMARK` em `build-bench/`, roda no DuckStation Linux, mostra a tabela (detalhes no GUIA) |
+| `bench [-D N=V ...]` | benchmark automático: compila com `DEBUG_BENCHMARK` em `build-bench/` (variantes com `-D` em `build-bench-var/`), roda no DuckStation Linux, mostra a tabela (detalhes no GUIA) |
 
 ---
 
@@ -483,6 +483,19 @@ Tiros: `collide_solid_at` (células sólidas, inclusive baixas, e obstáculos fi
 `collide_enemy_at` (inimigos das células perto; entre vários, o de menor índice).
 `collide_line_of_sight()` percorre as células do segmento (DDA em inteiros): parede, mata, caixa e
 tronco em pé bloqueiam; tronco caído e chão vazio não; pessoas não. A IA ainda não usa (etapa 07).
+
+### Câmera (`camera.c`)
+
+- `camera_turn()` (lógica, no `game_tick`) gira `g.cam_yaw` pelos controles; fica em `g` porque o
+  `player.c` converte o direcional pelo ângulo da câmera (no modo link os dois consoles precisam do
+  mesmo ângulo). `camera_view_update(ticks)` (visual, uma vez por quadro, depois da lógica) guarda
+  olho/mira/suavização em `static`; a suavização é repetida pelos passos do quadro. Nada da lógica lê
+  a câmera visual (o reforço do SURVIVE usa o centro do grupo + `g.cam_yaw`).
+- Distância livre: `collide_camera_clear` (DDA da grade, modo câmera: troncos em pé com folga e
+  células mais altas que `CAM_HEIGHT`), começando da distância do quadro anterior; garantia de que o
+  olho suavizado nunca fica com tronco no caminho. Aproximação na mata (`level_tree_density`) e
+  árvores que tapam a 50% (`level_mark_occluders`, sempre como modelo sem textura: a mistura não
+  depende do bit STP).
 
 ### Fases, objetivos e progressão
 

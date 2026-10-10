@@ -245,3 +245,60 @@ automatizar testes visuais.
   agora o gargalo é o desenho (27 árvores-modelo + 45 imagens planas + 7
   inimigos extras; antes nasciam só 5 porque a árvore ocupava a célula
   inteira) — primeira alavanca: `TREE_LOD_DIST`.
+- 2026-10-10 — Etapa 04d (câmera na mata): câmera visual sai de `g` para
+  `camera.c` (`g.cam_yaw` fica, é lógica); reforço do SURVIVE passa a usar o
+  centro do grupo + `g.cam_yaw`. Câmera nunca atravessa troncos
+  (`collide_camera_clear`: só troncos em pé e mata alta; começa da
+  distância anterior, ~2 testes/quadro; garantia de puxar o olho na hora;
+  7 casos testados no PC). Aproxima na mata densa (`CAM_DENSE_DIST` 540).
+  Árvores que tapam ficam a 50% por ~0,3 s: os modelos de árvore não têm
+  textura, então a mistura vale no polígono todo sem depender do bit STP;
+  a imagem plana tem textura e CLUT sem STP (só o quase-preto 0x8000),
+  por isso árvore marcada é sempre desenhada como modelo. 2 jogadores: o
+  enquadramento vence a aproximação. Bench: pontos `canto_tapado` (50%
+  ativo) e `canto_2j`, custo da câmera (`cam_*`), perfil do quadro por
+  linhas (timer 1) e por categoria, variantes `./dev bench -D`. RAM: 804 KB
+  (823 402 bytes), sobram ~425 KB.
+
+  **Antes da 04d** (= fim da 04c, 4 pontos):
+
+  | Ponto | +inimigos | FPS mín/méd | POLIS máx | COL máx |
+  |---|---|---|---|---|
+  | início | 0 / 8 | 30/30 / 30/30 | 506 / 692 | 2 / 57 |
+  | cruzamento | 0 / 8 | 30/50 / 30/30 | 430 / 615 | 6 / 81 |
+  | canto denso | 0 / 7 | 30/30 / 20/20 | 760 / 925 | 4 / 54 |
+  | clareira | 0 / 8 | 30/30 / 30/30 | 498 / 682 | 10 / 75 |
+
+  **Depois da 04d** (padrões: `TREE_LOD_DIST` 1800, névoa 3200; CPU/GPU em
+  linhas, 30 FPS = ~525):
+
+  | Ponto | +ini | FPS | POLIS | CAM testes/cél | 50% | CPU | espera GPU | lógica |
+  |---|---|---|---|---|---|---|---|---|
+  | início | 0 / 8 | 30 / 30 | 506 / 692 | 2/8 | 0 | 306 / 411 | 0 | 34 / 66 |
+  | cruzamento | 0 / 8 | 30 / 30 | 429 / 616 | 2/6 | 0 | 267 / 376 | 0 | 36 / 71 |
+  | canto denso | 0 / 7 | 30 / **20** | 789 / 946 | 2/6 | 0 | 461 / **599** | 0 | 33 / 98 |
+  | clareira | 0 / 8 | 30 / 30 | 473 / 660 | 2/8 | 0 | 291 / 401 | 0 | 35 / 73 |
+  | canto tapado | 0 / 3 | 30 / 30 | 556 / 650 | 2/4 | **1** | 359 / 402 | 0 | 33 / 45 |
+  | canto 2 jogadores | 0 / 3 | **15** / **15** | 1823 / 1892 | 3/27 | 1 | 822 / 869 | 0 | 74 / 97 |
+
+  **CPU ou GPU?** A espera pela GPU é 0 em todos os pontos: o gargalo é a
+  **CPU** (no emulador). Canto denso +7 (599 linhas): lógica 98, desenho dos
+  blocos 214, árvores 160, resto (inimigos/itens) 102, câmera/HUD 25. No
+  canto com 2 jogadores, os blocos sozinhos gastam 585 (câmera recuada e
+  alta vê muito mais chão; GPU RAM 93 KB de 96 KB).
+
+  **Varredura** (canto denso com inimigos extras; `./dev bench -D`):
+
+  | Variante | FPS | CPU | árvores modelo/plana |
+  |---|---|---|---|
+  | `TREE_LOD_DIST` 1800 (atual) | 20 | 599 | 28 / 39 |
+  | 1500 | 20 | 576 | 22 / 42 |
+  | 1300 | 20 | 557 | 18 / 46 |
+  | 1100 | 20 | 554 | 17 / 47 |
+  | 900 | 30 | 506 | 15 / 48 |
+  | 1300 + névoa 2800 | 30 | 498 | 18 / 45 |
+  | 1300 + canto denso 12% (era 16%) | 30 | 494 | 12 / 37 |
+  | 1300 + névoa 2600 | 30 | 472 | 18 / 36 (2 jogadores: 20 FPS) |
+  | 1500 + névoa 2800 | 20 | 552 | 22 / 41 |
+
+  Padrões **não** alterados nesta etapa (decisão do Marcos).

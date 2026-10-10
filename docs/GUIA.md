@@ -270,6 +270,31 @@ volta do jogador 1 (raio `COLMARK_RADIUS`):
 Desenho e colisão batem quando cada parede tem o seu quadrado vermelho
 exatamente no topo e cada tronco tem o seu quadrado laranja no pé.
 
+**Câmera na mata.** A câmera tem duas partes: o **ângulo** (`g.cam_yaw`,
+girado por L1/R1 e analógico direito) é lógica de jogo e fica em `g`, porque
+o direcional do jogador gira com ele; **posição, distância e suavização**
+são só visuais e ficam em `camera.c` (fora de `g`). Regras:
+
+- **Nunca atravessa troncos:** testa a linha jogador → olho pela grade
+  (`collide_camera_clear`); só troncos em pé e o que é mais alto que a
+  câmera (a mata de 3 m) contam — inimigos, troncos caídos, paredes baixas
+  e caixas ficam por baixo. Começa da distância do quadro anterior (~2
+  testes por quadro) e, se o olho suavizado ficar com tronco no caminho, ele
+  é puxado na hora.
+- **Mais perto na mata densa:** a distância vai de `CAM_DIST` (820) a
+  `CAM_DENSE_DIST` (540) conforme as árvores em ~4 células
+  (`CAM_DENSE_FULL`), em ~1 s; a altura acompanha.
+- **Árvore que tapa o jogador fica a 50%** por ~0,3 s (`TREE_OCCLUDE_TICKS`).
+  Funciona porque os modelos de árvore **não têm textura**: em polígonos
+  **com** textura o PS1 só mistura os texels cuja cor na CLUT tem o bit STP
+  — se você trocar os modelos por versões texturizadas, essa transparência
+  precisa de uma segunda CLUT com STP ligado.
+- **2 jogadores:** o enquadramento vence a aproximação da mata
+  (`CAM_FRAME_FULL`): os dois precisam caber na tela.
+- Overlay L2: `CAM testes/células` = custo da câmera no quadro (separado do
+  `COL`), `ARV ... TRANSP n` = árvores a 50%, `CPU n GPU n FOLGA n (linhas)`
+  = perfil do quadro (ver abaixo).
+
 **Benchmark automático (`./dev bench`).** Mede sem ninguém abrir o jogo:
 
 1. compila com `DEBUG_BENCHMARK` numa pasta separada (`build-bench/`), então
@@ -285,6 +310,20 @@ exatamente no topo e cada tronco tem o seu quadrado laranja no pé.
    `DUCKSTATION_LINUX`), com a TTY no console e velocidade ilimitada; espera
    o `BENCH FIM` (até `BENCH_TIMEOUT` s), fecha o emulador e mostra a tabela.
    Resultado bruto em `build-bench/bench.txt`.
+
+**Variantes:** `./dev bench -D TREE_LOD_DIST=1300 -D FOREST_FOG_FAR=2800`
+compila numa pasta à parte (`build-bench-var/`) com essas definições, sem
+mexer no `config.h` — para comparar valores antes de mudar o padrão. Dá
+para variar tudo que estiver em `#ifndef` (`TREE_LOD_DIST`,
+`FOREST_FOG_FAR`, `FOREST_DENSE`, `FOREST_DENSE_NE`...).
+
+**Perfil (colunas do bench, em linhas de vídeo ≈ 63,5 µs; 30 FPS = até ~525
+por quadro):** `cpu` = do começo do quadro até entregar a lista à GPU;
+`gpu_espera` = tempo esperando a GPU terminar o quadro anterior (ela
+trabalha em paralelo; espera grande = gargalo de preenchimento); `logica` =
+os passos de `game_tick`; `desenho_blocos/arvores/resto` = partes do
+desenho. Se `gpu_espera` ≈ 0 e `cpu` > 525, o gargalo é a CPU. (O
+DuckStation estima o tempo da GPU; confirme no console real.)
 
 O FPS vem dos retraços **emulados** (`VSync`), então velocidade ilimitada não
 muda o resultado (o benchmark inteiro leva ~5 s). Com semente fixa e sem

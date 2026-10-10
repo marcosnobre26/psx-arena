@@ -26,7 +26,8 @@ modificação: `docs/GUIA.md`.
 ./dev run            # compila e abre no emulador do Windows
 ./dev models         # exporta assets/blender/*.blend -> models/*.h (Blender do Windows)
 ./dev vram           # mapa das texturas na VRAM
-./dev bench          # benchmark automático (FPS/POLIS/COL nos 4 pontos da fase 5)
+./dev bench          # benchmark automático (FPS/POLIS/COL/CPU nos pontos da fase 5)
+./dev bench -D TREE_LOD_DIST=1300   # variante sem mexer no config.h
 ./dev clean          # apaga build/
 VERBOSE=1 ./dev build
 ```
@@ -136,6 +137,15 @@ uma branch. As regras do ROADMAP (determinismo, orçamentos de desempenho,
 - Mapa grande: coordenadas do mundo vão a 32 768 → **nunca** guarde posição
   de mundo em `SVECTOR` (16 bits); use `VECTOR` ou vértices relativos a uma
   origem (`load_translation` em `render.c`).
+- **Câmera:** `g.cam_yaw` é lógica (fica em `g`); posição/distância/suavização
+  são visuais (`camera.c`, fora de `g`). **Nenhuma lógica pode ler a câmera
+  visual** (`camera_eye()` só para som/visual).
+- Transparência em polígono **texturizado** só vale nos texels com o bit STP
+  na CLUT (o `build_textures.py` só liga no quase-preto 0x8000). Os modelos
+  de árvore não têm textura, por isso o 50% funciona neles.
+- Tuning: `./dev bench -D NOME=VALOR` compara valores sem editar arquivos
+  (constantes em `#ifndef`). Perfil: `cpu`/`gpu_espera`/`logica`/`desenho_*`
+  em linhas (30 FPS = ~525).
 - **Grade de colisão:** toda posição definida direto (sem `collide_move`) —
   nascer, morrer, respawn, teleporte — precisa de `collide_track(ent)` logo
   depois, senão a colisão fica desencontrada (`./dev bench` mostra
