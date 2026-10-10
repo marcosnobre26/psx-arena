@@ -186,8 +186,11 @@ static void start_new_game(void) {
 static void camera_title(void) {
 	int cx = level_width() * TILE_SIZE / 2, cz = level_height() * TILE_SIZE / 2;
 	int a = (g.frame * 6) & 4095;
-	VECTOR eye  = { cx + ((isin(a) * 2600) >> 12), -1900, cz + ((icos(a) * 2600) >> 12) };
-	VECTOR look = { cx, 0, cz };
+	/* baixa e perto: alta (1900, raio 2600) virava vista de cima da floresta,
+	 * enxergando chão demais (lento) */
+	VECTOR eye  = { cx + ((isin(a) * TITLE_CAM_DIST) >> 12), -TITLE_CAM_HEIGHT,
+	                cz + ((icos(a) * TITLE_CAM_DIST) >> 12) };
+	VECTOR look = { cx, -120, cz };
 	render_set_camera(&eye, &look);
 }
 
