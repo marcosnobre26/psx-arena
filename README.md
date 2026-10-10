@@ -3,7 +3,7 @@
 **Um jogo 3D completo para PlayStation 1, feito em C, para estudar e modificar.**
 
 Arena em terceira pessoa com seleção de personagem, até 2 jogadores, inimigos,
-armas, poderes, itens, colisão e cenário montado a partir de um mapa em texto —
+armas, poderes, itens, colisão e uma floresta grande montada por código —
 com um pipeline que leva modelos do **Blender** e imagens **PNG** direto para o
 jogo. Roda em emuladores e em console real (CD-R).
 

@@ -52,7 +52,7 @@ VERBOSE=1 ./dev build
 | `data.c` | **tabelas**: `character_defs`, `weapon_defs`, `power_defs`, `enemy_defs`, `skin_defs`, `prop_defs` |
 | `config.h` | constantes globais |
 | `game.h` | tipos, `GAME g` (estado global), protótipos |
-| `levels.c` | **tabela de fases** `level_defs`: mapa em texto, texturas, céu, objetivo |
+| `levels.c` | **tabela de fases** `level_defs`: gerador da floresta (`build_forest`), posicionamento (`level_place_safe`), céu, objetivo |
 | `level.c` | grade 128×128 (tipo + bit sólido), blocos 8×8 montados sob demanda num cache de 36, colisão com a grade |
 | `objective.c` | objetivo da fase (`objective_update/text`), saída `X`, reforços `S` |
 | `player.c` | até 2 jogadores (`g.players[2]`, `g.in[2]`), respawn |
@@ -154,6 +154,8 @@ uma branch. As regras do ROADMAP (determinismo, orçamentos de desempenho,
   nascer, morrer, respawn, teleporte — precisa de `collide_track(ent)` logo
   depois, senão a colisão fica desencontrada (`./dev bench` mostra
   `grade_erros`). Nada de percorrer `g.enemies`/`g.props` para colidir.
+- Fases: tudo é colocado com `level_place_safe` (nunca dentro de tronco ou
+  mata; se não achar lugar, não coloca). Fase 5 = só teste (`num_levels` = 4).
 - Árvores: `level_add_tree` (fora de `g`, por bloco), **depois** das células;
   em pé = círculo na grade, tronco caído = células baixas (`CELL_LOW`). Posição por hash **com semente** (fase de
   teste: fixa; etapa 05: derivada de `g.seed`, nunca `g.rng`). Nomes fixos

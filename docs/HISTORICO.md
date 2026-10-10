@@ -344,3 +344,39 @@ automatizar testes visuais.
   do limite não sai. O limite só vale entre jogadores vivos e ativos
   (`player_alive`); o começo da fase (`free_spot_near`, ≤ ~362) e o
   renascimento (ao lado do parceiro, ~283) já ficam dentro do limite.
+- 2026-10-10 — Etapa 04e (integração): a floresta substitui a arena. As 4
+  fases da etapa 02 viram florestas com `build_forest` (gerador da fase 5
+  parametrizado: tamanho, semente fixa por fase, densidade, trilhas,
+  clareiras, troncos caídos) e a névoa/luz da etapa 03: CACADA (64×64, 12
+  inimigos), TRAVESSIA (128×128, oeste → leste), RELIQUIAS (64×64, 4 Q +
+  saída), CERCO (64×64, 4 pontos S em células livres na borda da clareira).
+  Tudo colocado com `level_place_safe` (célula livre mais próxima até 6;
+  senão não coloca). Teste no PC: 0 falhas, tudo alcançável do início
+  (tronco caído passável), nada na mata, nas 5 fases; fase 5 idêntica.
+  Fase 5 fora da sequência (`num_levels` = 4). Título com câmera mais baixa
+  (a floresta vista de cima era lenta). Removidos (nada mais usava): mapas
+  de texto, `load_text_map`, `CELL_FLOOR`/`CELL_WALL`, campos
+  `map`/`floor`/`wall`, `floor.png`/`wall.png` → **RAM −17 300 bytes, VRAM
+  −16 KB**. RAM total: **790 KB** (808 586 bytes); sobram ~438 KB do
+  orçamento de 1,2 MB. Bench: pior momento de cada fase.
+
+  **Antes** (fim da 04d): só os 6 pontos da fase 5, todos a 30 FPS
+  (canto denso com inimigos: 504 linhas).
+
+  **Depois** (CPU em linhas, 30 FPS = ~525):
+
+  | Ponto | Inimigos (natural / pior) | FPS | POLIS máx | CPU | lógica |
+  |---|---|---|---|---|---|
+  | fase 5 (6 pontos) | — | 30 em todos | — | ≤ 504 | — |
+  | f1_pior (CACADA) | 12 / 12 juntos | 30 / 30 | 564 / 774 | 335 / 436 | 41 / 60 |
+  | f2_pior (TRAVESSIA) | 14 / 14 juntos | 30 / 30 | 452 / 753 | 303 / 446 | 45 / 70 |
+  | f3_pior (RELIQUIAS) | 8 / 8 juntos | 30 / 30 | 447 / 587 | 291 / 354 | 27 / 35 |
+  | f4_pior (CERCO) | 3 / 11 (+8 reforços) | 30 / 30 | 527 / 710 | 277 / 390 | 15 / 55 |
+  | f4_pior_2j (CERCO, 2 jogadores) | 4 / 12 | 30 / **20** | 759 / 941 | 401 / **544** | 20 / 85 |
+
+  **Abaixo de 30 FPS:** só o CERCO com 2 jogadores e os 8 reforços (544:
+  blocos 225 — névoa 3 400, a maior das fases —, resto 187 = 12 inimigos +
+  2 jogadores/cones/sombras). Opções medidas (`./dev bench -D`), todas a 30
+  FPS: névoa da fase 4 3 000 → 478; 2 800 → 470; reforços 6 → 485; névoa
+  3 000 + 6 reforços → 452; `MAX_PLAYER_SEPARATION` 768 → 489. **Padrões
+  não alterados** (decisão do Marcos).

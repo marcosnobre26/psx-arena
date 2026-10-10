@@ -81,47 +81,63 @@ Exemplos:
 
 ## 3. Criar uma fase e escolher o objetivo
 
-As fases ficam em [`src/levels.c`](../src/levels.c): um mapa em texto e uma
-linha na tabela `level_defs`. **A ordem da tabela é a ordem do jogo.**
+As fases ficam em [`src/levels.c`](../src/levels.c): uma **função que monta
+a floresta** e uma linha na tabela `level_defs`. **A ordem da tabela é a
+ordem do jogo**; as `num_levels` primeiras são a sequência normal (a fase de
+teste fica depois, só para `DEBUG_START_LEVEL 5` e o `./dev bench`).
 
-**1. Desenhe o mapa** (vetor de strings terminado em `NULL`):
+**1. Parâmetros da floresta e posicionamento:**
 
 ```c
-static const char *const map_ponte[] = {
-	"################",
-	"#P....E.....#..#",
-	"#..####..Q..#X.#",
-	"################",
-	NULL
+static const CLEARING f9_clear[] = { { 16, 16, 5 }, { 47, 47, 6 } };   /* x, z, raio */
+static const FOREST_PARAMS f9_forest = {
+	64, 64,          /* tamanho (até 128x128) */
+	0xf0e57009u,     /* semente: floresta própria (etapa 05: derivada de g.seed) */
+	50, 0,           /* árvores por mil células; e no canto nordeste (0 = igual) */
+	31, 31,          /* coluna/linha das trilhas */
+	f9_clear, NCLEAR(f9_clear),
+	6,               /* troncos caídos */
 };
+static void build_f9(void) {
+	build_forest(&f9_forest);
+	static const THING t[] = {
+		{ 'P', 8, 31 }, { 'X', 55, 31 }, { 'Q', 16, 16 },
+		{ 'E', 47, 47 }, { 'H', 20, 31 }, { 'C', 10, 10 },
+	};
+	PLACE_ALL(t);           /* cada uma na célula livre mais próxima */
+}
+static const DEBUG_POINT f9_pts[4] = { { 8, 31, 1024 }, { 31, 31, 512 }, { 47, 47, 0 }, { 16, 16, 0 } };
 ```
 
-| Caractere | Significado | Caractere | Significado |
+`PLACE_ALL` usa `level_place_safe`: a coisa vai para a célula livre mais
+próxima (até `PLACE_SEARCH` = 6 células) sem tronco, mata ou tronco caído no
+círculo dela; **se não achar, não coloca** (o teste do PC acusa). O jogador 2
+nasce ao lado do `P`, dentro do `MAX_PLAYER_SEPARATION`.
+
+| Letra | Significado | Letra | Significado |
 |---|---|---|---|
-| `#` | parede | `.` | chão |
 | `P` | início dos jogadores | `C` | caixa destrutível |
 | `G` | gema (pontos) | `H` | vida |
 | `N` | energia | `W` | arma nova |
 | `X` | **saída** da fase | `Q` | **item de missão** |
-| `S` | **ponto de reforço** (objetivo SURVIVE) | `L` | **pilha** da lanterna |
-| espaço | vazio | | |
+| `S` | **ponto de reforço** (SURVIVE; em célula livre, nunca na mata) | `L` | **pilha** da lanterna |
 | `E` `B` `F` | inimigos (`enemy_defs`) | `1`…`9` | objetos de cenário (`prop_defs`) |
 
-Regras: todas as linhas com o mesmo tamanho, máximo 128×128. Chão, paredes
-(com 2 "andares" de textura) e colisão são gerados a partir do texto. O
-segundo jogador nasce na primeira célula livre ao lado do `P`. Ao criar
-inimigo ou cenário novo, **não use letras reservadas**: `# . P C G H N W X
-Q S L` e `A` (reservada para o ATIRADOR).
+Ao criar inimigo ou cenário novo, **não use letras reservadas**: `P C G H N
+W X Q S L` e `A` (reservada para o ATIRADOR).
 
-**2. Acrescente a linha na tabela:**
+**2. Acrescente a linha na tabela** (antes da fase de teste) e aumente
+`num_levels`:
 
 ```c
-/* nome      mapa
- *   chão          parede       céu=névoa   névoa near/far  luz ambiente  música
- *   objetivo      parâmetro  máx. inimigos  texto do objetivo */
-{ "PONTE",   map_ponte,
-  &tex_floor_t, &tex_wall_t, 10, 12, 24,  1300, 3200,     40, 40, 56,   0,
-  OBJ_COLLECT,  0,         0,             "PEGUE O ITEM E SAIA" },
+/* nome
+ *   céu=névoa  névoa near/far  luz ambiente  música
+ *   objetivo   parâmetro  máx. inimigos  texto do objetivo
+ *   gerador    pontos de teleporte (o 3o = pior ponto do bench) */
+{ "PONTE",
+  10, 12, 24,  1300, 2800,  40, 40, 56,  0,
+  OBJ_COLLECT,  0,  0,  "PEGUE O ITEM E SAIA",
+  build_f9, f9_pts },
 ```
 
 | Objetivo | Vence quando | Parâmetro | HUD |
@@ -145,12 +161,13 @@ Q S L` e `A` (reservada para o ATIRADOR).
   fase com o estado de quando ela começou. Depois da última: `FIM DE JOGO`.
 
 **3. Testar a fase sem jogar as anteriores:** em `config.h`, descomente
-`#define DEBUG_START_LEVEL 3` e troque o número pela fase (1 = primeira).
+`#define DEBUG_START_LEVEL 3` e troque o número pela fase (1 = primeira; 5 =
+fase de teste).
 O jogo novo, ao sair da seleção, começa direto nela. Comente de novo antes
 do commit.
 
-Mapas grandes com muitas paredes custam desempenho: confira o FPS com **L2**
-no ponto mais pesado. **Atalho:** com o overlay L2 aberto, segure **L2** e
+Florestas densas e névoa longa custam CPU: meça com `./dev bench` (ele mede
+o pior momento de cada fase: todos os inimigos juntos em volta do jogador). **Atalho:** com o overlay L2 aberto, segure **L2** e
 aperte **Start** para pular para a próxima fase (levando o progresso).
 
 ### Como o mundo é montado
@@ -162,8 +179,6 @@ bits 0–5 e o bit 7 (`CELL_SOLID`) diz se bloqueia. Tipos (`game.h`):
 | Tipo | O que é | Sólido | Altura |
 |---|---|---|---|
 | `CELL_VOID` | nada (sem chão) | sim | — |
-| `CELL_FLOOR` | chão dos mapas de texto (`.`), textura da fase | não | — |
-| `CELL_WALL` | parede dos mapas de texto (`#`), textura da fase | sim | 1,5 m |
 | `CELL_DIRT` / `CELL_LEAVES` / `CELL_ROOTS` | chão de terra / folhas / raízes | não | — |
 | `CELL_THICKET` | mata densa | sim | 3 m |
 
