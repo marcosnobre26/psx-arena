@@ -817,14 +817,39 @@ static void debug_input(INPUT *in) {
 #define BENCH_SETTLE_E 30     /* depois de criar os inimigos */
 #define BENCH_MEASURE  180    /* ~3 s a 60 quadros por segundo */
 
-/* Os 4 primeiros são os pontos do teleporte (L2 + direcional) da fase 5;
- * os outros só existem no benchmark. */
-#define BENCH_POINTS 6
 #ifndef BENCH_P2_ANGLE
 #define BENCH_P2_ANGLE 1024     /* direção em que o jogador 2 é colocado (-D testa outras) */
 #endif
-static const char *const bench_names[BENCH_POINTS] = {
-	"inicio", "cruzamento", "canto_denso", "clareira", "canto_tapado", "canto_2j" };
+
+/* Pontos medidos. Os 6 primeiros são os da fase 5 (comparáveis com as
+ * etapas anteriores); depois, o PIOR MOMENTO de cada fase da sequência:
+ * no 3o ponto de teleporte da fase, com o máximo de inimigos que ela
+ * permite juntos em volta do jogador. Cada ponto mede 2 vezes: o estado
+ * natural e depois a "multidão" (crowd). */
+enum { CROWD_SPAWN8,     /* + DEBUG_SPAWN_COUNT inimigos (fase 5) */
+       CROWD_GATHER,     /* todos os inimigos da fase juntados em volta */
+       CROWD_SURVIVE };  /* reforços até iniciais + max_enemies (SURVIVE) */
+typedef struct {
+	const char *name;
+	int level;          /* índice em level_defs */
+	int pt;             /* ponto de teleporte (0..3) ou -1/-2 = bench_extra[0/1] */
+	int crowd;
+	int two;            /* 1 = com o jogador 2 no limite de distância */
+} BENCH_PT;
+static const BENCH_PT bench_pts[] = {
+	{ "inicio",       4,  0, CROWD_SPAWN8,  0 },
+	{ "cruzamento",   4,  1, CROWD_SPAWN8,  0 },
+	{ "canto_denso",  4,  2, CROWD_SPAWN8,  0 },
+	{ "clareira",     4,  3, CROWD_SPAWN8,  0 },
+	{ "canto_tapado", 4, -1, CROWD_SPAWN8,  0 },
+	{ "canto_2j",     4, -2, CROWD_SPAWN8,  1 },
+	{ "f1_pior",      0,  2, CROWD_GATHER,  0 },
+	{ "f2_pior",      1,  2, CROWD_GATHER,  0 },
+	{ "f3_pior",      2,  2, CROWD_GATHER,  0 },
+	{ "f4_pior",      3,  2, CROWD_SURVIVE, 0 },
+	{ "f4_pior_2j",   3,  2, CROWD_SURVIVE, 1 },
+};
+#define BENCH_POINTS ((int)(sizeof(bench_pts) / sizeof(bench_pts[0])))
 static const DEBUG_POINT bench_extra[2] = {
 	{ 110, 24, 512 },       /* canto denso onde 2 árvores tapam o jogador (50%) */
 	{ 110, 24, 512 },       /* o mesmo, com o jogador 2 no limite de distância */
@@ -864,7 +889,7 @@ static void bench_player2(int on) {
 enum { BENCH_TELEPORT, BENCH_WAIT, BENCH_MEASURING, BENCH_DONE };
 
 static struct {
-	int      phase, point, timer, extras;
+	int      phase, point, timer, extras, stage;
 	uint32_t spawned;               /* bits: inimigos criados pelo benchmark */
 	int      frames, vsyncs, fps_min;
 	int      polis_max, polis_sum, ram_max;
@@ -879,6 +904,49 @@ static struct {
 	int      cut_max;                             /* blocos+árvores cortados (buffer) */
 } bench;
 
+/* Lugar livre para um inimigo num anel em volta do jogador 1 */
+static int bench_ring_spot(int k, int n, int *x, int *z) {
+	const PLAYER *p = &g.players[0];
+	for (int r = 640 + (k % 3) * 128; r >= 320; r -= 64) {
+		int a = (k * 4096 / n + p->angle) & 4095;
+		*x = p->pos.vx + ((isin(a) * r) >> 12);
+		*z = p->pos.vz + ((icos(a) * r) >> 12);
+		if (!collide_solid_at(*x, *z, 140))
+			return 1;
+	}
+	return 0;
+}
+
+/* Fases 1-3: todos os inimigos da fase vêm para perto do jogador (posição
+ * definida direto: passa pela grade). Devolve quantos foram juntados. */
+static int bench_gather(void) {
+	int n = 0, k = 0;
+	for (int i = 0; i < MAX_ENEMIES; i++) n += g.enemies[i].active;
+	for (int i = 0; i < MAX_ENEMIES; i++) {
+		ENEMY *e = &g.enemies[i];
+		int x, z;
+		if (!e->active || !bench_ring_spot(k++, n ? n : 1, &x, &z)) continue;
+		e->pos.vx = x; e->pos.vz = z; e->pos.vy = 0; e->vy = 0;
+		collide_track(e);
+	}
+	return n;
+}
+
+/* Fase 4: reforços até o máximo que ela permite (iniciais + max_enemies) */
+static void bench_survive_fill(void) {
+	int alive = 0;
+	for (int i = 0; i < MAX_ENEMIES; i++) alive += g.enemies[i].active;
+	int want = alive + level_defs[g.level].max_enemies, k = 0;
+	if (want > MAX_ENEMIES) want = MAX_ENEMIES;
+	for (int tries = 0; alive < want && tries < 32; tries++) {
+		int x, z;
+		if (!bench_ring_spot(k, want, &x, &z)) { k++; continue; }
+		enemy_spawn(k % num_enemy_types, x, z);
+		alive++;
+		k++;
+	}
+}
+
 static void bench_start(void) {
 	sel[0].joined = 1; sel[0].ready = 1; sel[0].character = 0; sel[0].skin = 0;
 	sel[1].joined = 0;
@@ -886,7 +954,7 @@ static void bench_start(void) {
 	start_level(BENCH_LEVEL, BENCH_SEED);
 	g.state = STATE_PLAY;                    /* pula a introdução */
 	memset(&bench, 0, sizeof(bench));
-	printf("BENCH INICIO fase=%d semente=%d\n", BENCH_LEVEL + 1, BENCH_SEED);
+	printf("BENCH INICIO fase=%d semente=%d pontos=%d\n", BENCH_LEVEL + 1, BENCH_SEED, BENCH_POINTS);
 }
 
 static void bench_remove_extras(void) {
@@ -934,14 +1002,22 @@ static void bench_frame(int vs) {
 			bench.phase = BENCH_DONE;
 			break;
 		}
-		g.state = STATE_PLAY;
-		if (bench.point < 4)
-			debug_teleport(bench.point);
-		else
-			teleport_to(&bench_extra[bench.point - 4]);
-		if (bench.point == 5)
-			bench_player2(1);
+		{
+			const BENCH_PT *bp = &bench_pts[bench.point];
+			if (g.level != bp->level) {          /* outra fase: começa ela (semente fixa) */
+				start_level(bp->level, BENCH_SEED);
+				printf("BENCH fase=%d (%s)\n", bp->level + 1, level_defs[bp->level].name);
+			}
+			g.state = STATE_PLAY;                /* pula a introdução */
+			if (bp->pt >= 0)
+				teleport_to(&level_defs[bp->level].debug_pts[bp->pt]);
+			else
+				teleport_to(&bench_extra[-bp->pt - 1]);
+			if (bp->two)
+				bench_player2(1);
+		}
 		bench.extras = 0;
+		bench.stage = 0;
 		bench.timer = BENCH_SETTLE;
 		bench.phase = BENCH_WAIT;
 		break;
@@ -996,7 +1072,7 @@ static void bench_frame(int vs) {
 		       "arvores_modelo=%d arvores_plana=%d grade_erros=%d cam_max=%d cam_med=%d cam_celulas_max=%d arvores_transp=%d "
 		       "cpu_max=%d cpu_med=%d gpu_espera_max=%d gpu_espera_med=%d logica_med=%d "
 		       "desenho_blocos=%d desenho_arvores=%d desenho_resto=%d separacao=%d corte=%d\n",
-		       bench_names[bench.point], bench.extras, n, bench.fps_min,
+		       bench_pts[bench.point].name, bench.extras, n, bench.fps_min,
 		       bench.vsyncs ? bench.frames * 60 / bench.vsyncs : 0,
 		       bench.polis_max, bench.frames ? bench.polis_sum / bench.frames : 0, bench.ram_max,
 		       bench.col_max, bench.col_ticks ? bench.col_sum / bench.col_ticks : 0,
@@ -1013,15 +1089,22 @@ static void bench_frame(int vs) {
 		                                    g.players[1].pos.vz - g.players[0].pos.vz) : 0,
 		       bench.cut_max);
 
-		if (bench.extras == 0) {             /* agora com inimigos extras */
+		if (bench.stage == 0) {              /* agora a "multidão" */
 			uint32_t before = 0, after = 0;
 			for (int i = 0; i < MAX_ENEMIES; i++) before |= (uint32_t)g.enemies[i].active << i;
-			debug_spawn_enemies();
+			switch (bench_pts[bench.point].crowd) {
+			case CROWD_SPAWN8:  debug_spawn_enemies(); break;
+			case CROWD_GATHER:  bench.extras = bench_gather(); break;
+			case CROWD_SURVIVE: bench_survive_fill(); break;
+			}
 			for (int i = 0; i < MAX_ENEMIES; i++) after |= (uint32_t)g.enemies[i].active << i;
 			bench.spawned = after & ~before;
-			bench.extras = 0;                /* contar bits sem builtin (libgcc) */
-			for (uint32_t m = bench.spawned; m; m &= m - 1)
-				bench.extras++;
+			if (bench_pts[bench.point].crowd != CROWD_GATHER) {
+				bench.extras = 0;            /* contar bits sem builtin (libgcc) */
+				for (uint32_t m = bench.spawned; m; m &= m - 1)
+					bench.extras++;
+			}
+			bench.stage = 1;
 			bench.timer = BENCH_SETTLE_E;
 			bench.phase = BENCH_WAIT;
 		} else {
