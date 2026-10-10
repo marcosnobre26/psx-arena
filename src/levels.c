@@ -26,112 +26,6 @@
  */
 #include "game.h"
 
-static const char *const map_arena[] = {
-	"########################",
-	"#P.......#......C......#",
-	"#........#..E.......G..#",
-	"#..CC....#.....####....#",
-	"#.............H#..#..E.#",
-	"#....G.........#W.#....#",
-	"#####...####...##.###..#",
-	"#...L...#..#.1.......1.#",
-	"#..E....#G.#.....F.....#",
-	"#.......#..#....C.C....#",
-	"#..N.........E.........#",
-	"#....####.......####...#",
-	"#....#..#..B....#G.#...#",
-	"#.G..#..#......L#..#.E.#",
-	"#....##.#..C.C..##.#...#",
-	"#.F...........W........#",
-	"#.....E....H.......B...#",
-	"#..C........G...F...N..#",
-	"#..1.....2.....2....1..#",
-	"########################",
-	NULL
-};
-
-/* Fase 2: labirinto; a saída (X) fica no canto oposto ao início. */
-static const char *const map_corredores[] = {
-	"########################",
-	"#P..#.......#.....#....#",
-	"#...#..E....#..C..#..H.#",
-	"#...#...##..#.....#....#",
-	"#...#...#...####..#..E.#",
-	"#.......#......#.......#",
-	"######..#..F...#..######",
-	"#.......#####..#.......#",
-	"#..N....#.L.E..#####...#",
-	"#..######......#.......#",
-	"#.......#..B...#...C...#",
-	"#..E....#......#..######",
-	"####..###..#####.......#",
-	"#.........1#...L.E.....#",
-	"#..C.......#..######...#",
-	"#.....######..#....#...#",
-	"#..H..#.......#.F..#...#",
-	"#.........E...#....#.X.#",
-	"#..2..#.......2....#...#",
-	"########################",
-	NULL
-};
-
-/* Fase 3: quatro relíquias (Q) nos cantos; a saída (X) só abre com todas. */
-static const char *const map_reliquias[] = {
-	"########################",
-	"#Q.....#.........#....Q#",
-	"#..E...#....G....#..E..#",
-	"#.L....#..........C....#",
-	"#..C......####.........#",
-	"#.........#..#....###..#",
-	"####..1...#H.#....#....#",
-	"#.........##.##...#..F.#",
-	"#..F...............N...#",
-	"#......#....P....#.....#",
-	"#..G...#.........#..G..#",
-	"#......####...####.....#",
-	"#.....E...........B....#",
-	"#..1.......X...........#",
-	"#.....####...####..C...#",
-	"#.H...#.........#...L..#",
-	"#.....#..E...E..#...1..#",
-	"#..C..#.........#......#",
-	"#Q....#....W....#.....Q#",
-	"########################",
-	NULL
-};
-
-/* Fase 4: sobreviver; reforços chegam pelos quatro cantos (S). */
-static const char *const map_cerco[] = {
-	"########################",
-	"#S.........#..........S#",
-	"#......................#",
-	"#..1....C.......C...1..#",
-	"#..........L...........#",
-	"#.....####......####...#",
-	"#.....#..........H.#...#",
-	"#..E..#..1....1....#.E.#",
-	"#..........P...........#",
-	"#..N.......G..........N#",
-	"#.....#..1....1....#...#",
-	"#.....#.H..........#...#",
-	"#.....####......####...#",
-	"#......................#",
-	"#..1....C.......C...1..#",
-	"#......................#",
-	"#S.........#..........S#",
-	"########################",
-	NULL
-};
-
-/* ------------------------------------------------------------------ */
-/* Fase 5: floresta de TESTE (128 x 128), feita por código              */
-/* ------------------------------------------------------------------ */
-/* Enquanto a geração procedural (etapa 05) não existe, este mapa fixo
- * serve para testar o mundo grande: borda de mata densa, duas trilhas que
- * se cruzam no meio, quatro clareiras, moitas espalhadas e um canto
- * nordeste mais fechado (o pior caso de desempenho). Nada aleatório: a
- * "variedade" vem de um hash da posição, então o mapa é sempre igual. */
-
 #define FOREST_BORDER  4
 
 /* Hash de posição COM SEMENTE. Cada fase usa uma semente fixa própria
@@ -270,6 +164,8 @@ static void build_forest(const FOREST_PARAMS *fp) {
 	}
 }
 
+#define NCLEAR(list) ((int)(sizeof(list) / sizeof(list[0])))   /* nº de clareiras */
+
 /* Coloca uma lista de coisas, cada uma na célula livre mais próxima */
 typedef struct { char ch; int x, z; } THING;
 
@@ -291,7 +187,7 @@ static const CLEARING test_clearings[] = {
 };
 static const FOREST_PARAMS test_forest = {
 	128, 128, FOREST_TEST_SEED, FOREST_DENSE, FOREST_DENSE_NE, TRAIL_X, TRAIL_Z,
-	test_clearings, sizeof(test_clearings) / sizeof(test_clearings[0]), 15,
+	test_clearings, NCLEAR(test_clearings), 15,
 };
 
 static void build_test_forest(void) {
@@ -308,6 +204,83 @@ static void build_test_forest(void) {
 	PLACE_ALL(things);
 }
 
+/* ------------------------------------------------------------------ */
+/* Fases 1-4 na floresta (cada uma com semente fixa própria)            */
+/* ------------------------------------------------------------------ */
+/* Tudo é colocado com level_place_safe (nada nasce dentro de tronco ou de
+ * mata). Ângulos dos pontos de teleporte: 0 = sul (+Z), 1024 = leste. */
+
+/* Fase 1: CACADA (derrotar todos), 64x64 */
+static const CLEARING f1_clear[] = { { 16, 16, 5 }, { 47, 16, 4 }, { 47, 47, 6 }, { 16, 47, 5 } };
+static const FOREST_PARAMS f1_forest = { 64, 64, 0xf0e57001u, 50, 0, 31, 31, f1_clear, NCLEAR(f1_clear), 6 };
+static void build_f1(void) {
+	build_forest(&f1_forest);
+	static const THING t[] = {
+		{ 'P', 8, 31 },
+		{ 'E', 16, 16 }, { 'E', 18, 15 }, { 'F', 14, 18 }, { 'E', 47, 16 }, { 'B', 45, 17 },
+		{ 'E', 47, 47 }, { 'E', 49, 46 }, { 'F', 46, 49 }, { 'E', 16, 47 }, { 'F', 18, 48 },
+		{ 'E', 31, 12 }, { 'E', 31, 52 },
+		{ 'H', 17, 17 }, { 'H', 46, 46 }, { 'N', 47, 15 }, { 'L', 15, 46 }, { 'L', 31, 40 },
+		{ 'W', 31, 31 }, { 'G', 20, 31 }, { 'G', 40, 31 }, { 'G', 31, 20 },
+		{ 'C', 10, 10 }, { 'C', 52, 52 }, { 'C', 52, 12 },
+	};
+	PLACE_ALL(t);
+}
+static const DEBUG_POINT f1_pts[4] = { { 8, 31, 1024 }, { 31, 31, 512 }, { 47, 47, 3072 }, { 16, 16, 0 } };
+
+/* Fase 2: TRAVESSIA (chegar à saída), 128x128, oeste -> leste */
+static const CLEARING f2_clear[] = { { 32, 32, 7 }, { 96, 96, 9 }, { 96, 30, 6 }, { 30, 96, 7 } };
+static const FOREST_PARAMS f2_forest = { 128, 128, 0xf0e57002u, 50, 0, 63, 63, f2_clear, NCLEAR(f2_clear), 15 };
+static void build_f2(void) {
+	build_forest(&f2_forest);
+	static const THING t[] = {
+		{ 'P', 8, 63 }, { 'X', 119, 63 },
+		{ 'E', 20, 60 }, { 'E', 30, 30 }, { 'F', 34, 33 }, { 'E', 45, 63 }, { 'E', 63, 40 },
+		{ 'F', 63, 52 }, { 'E', 63, 75 }, { 'B', 63, 90 }, { 'E', 80, 63 }, { 'F', 85, 60 },
+		{ 'E', 96, 96 }, { 'E', 93, 99 }, { 'B', 96, 29 }, { 'F', 105, 66 },
+		{ 'L', 33, 31 }, { 'L', 97, 95 }, { 'L', 63, 20 }, { 'H', 31, 97 }, { 'H', 75, 63 },
+		{ 'N', 95, 31 }, { 'W', 63, 63 }, { 'G', 20, 63 }, { 'G', 63, 110 }, { 'G', 110, 60 },
+		{ 'C', 40, 70 }, { 'C', 90, 50 },
+	};
+	PLACE_ALL(t);
+}
+static const DEBUG_POINT f2_pts[4] = { { 8, 63, 1024 }, { 63, 63, 512 }, { 96, 30, 2048 }, { 96, 96, 3072 } };
+
+/* Fase 3: RELIQUIAS (4 itens e a saída), 64x64 */
+static const CLEARING f3_clear[] = { { 14, 14, 5 }, { 49, 14, 5 }, { 49, 49, 5 }, { 14, 49, 5 } };
+static const FOREST_PARAMS f3_forest = { 64, 64, 0xf0e57003u, 50, 0, 31, 31, f3_clear, NCLEAR(f3_clear), 6 };
+static void build_f3(void) {
+	build_forest(&f3_forest);
+	static const THING t[] = {
+		{ 'P', 31, 56 }, { 'X', 31, 31 },
+		{ 'Q', 14, 14 }, { 'Q', 49, 14 }, { 'Q', 49, 49 }, { 'Q', 14, 49 },
+		{ 'E', 16, 15 }, { 'F', 13, 16 }, { 'E', 48, 15 }, { 'B', 50, 13 },
+		{ 'E', 48, 48 }, { 'F', 50, 50 }, { 'E', 15, 48 }, { 'E', 13, 50 },
+		{ 'H', 31, 44 }, { 'N', 20, 31 }, { 'L', 42, 31 }, { 'L', 31, 18 }, { 'G', 24, 24 },
+		{ 'C', 40, 40 }, { 'C', 22, 40 },
+	};
+	PLACE_ALL(t);
+}
+static const DEBUG_POINT f3_pts[4] = { { 31, 56, 2048 }, { 31, 31, 0 }, { 49, 49, 3072 }, { 14, 14, 1024 } };
+
+/* Fase 4: CERCO (sobreviver), 64x64. Começa no meio de uma clareira grande;
+ * os reforços (S) ficam em células LIVRES perto da borda da clareira (não na
+ * mata alta, que é sólida); objective.c escolhe o S fora do cone de visão. */
+static const CLEARING f4_clear[] = { { 31, 31, 11 } };
+static const FOREST_PARAMS f4_forest = { 64, 64, 0xf0e57004u, 50, 0, 31, 31, f4_clear, NCLEAR(f4_clear), 6 };
+static void build_f4(void) {
+	build_forest(&f4_forest);
+	static const THING t[] = {
+		{ 'P', 31, 31 },
+		{ 'S', 24, 24 }, { 'S', 38, 24 }, { 'S', 38, 38 }, { 'S', 24, 38 },
+		{ 'E', 26, 34 }, { 'F', 36, 28 }, { 'E', 28, 27 },
+		{ 'H', 33, 33 }, { 'N', 29, 33 }, { 'L', 33, 29 }, { 'L', 27, 29 },
+		{ 'C', 35, 35 }, { 'C', 27, 35 },
+	};
+	PLACE_ALL(t);
+}
+static const DEBUG_POINT f4_pts[4] = { { 31, 31, 0 }, { 31, 31, 1024 }, { 31, 31, 512 }, { 24, 24, 2560 } };
+
 /* Teleporte de depuração (L2 + direcional com o overlay aberto): sempre
  * os mesmos lugares e a mesma direção de câmera, para medir FPS/POLIS.
  * Ordem: esquerda, direita, cima, baixo. Ângulo: 0 = sul (+Z), 1024 = leste. */
@@ -322,26 +295,35 @@ const LEVEL_DEF level_defs[] = {
 	/* nome        mapa
 	 *   chão          parede        céu=névoa (R,G,B)  névoa near/far  luz ambiente  música
 	 *   objetivo        parâmetro  máx. inimigos  texto do objetivo
+	 *   gerador  pontos de teleporte (L2 + direcional; o 3o = pior ponto do bench)
 	 *
 	 * A câmera fica a ~1000 de profundidade do jogador: near abaixo disso
 	 * enevoa o próprio jogador. Lanterna: objetos no cone usam near/far
-	 * x LANTERN_FOG_MUL. Céu/névoa escuros (texturas só escurecem). */
-	{ "ARENA",      map_arena,
-	  &tex_floor_t, &tex_wall_t,   10, 12, 24,        1300, 3200,     40, 40, 56,   0,
-	  OBJ_KILL_ALL,   0,         0,             "DERROTE TODOS OS INIMIGOS" },
-	{ "CORREDORES", map_corredores,
-	  &tex_wall_t,  &tex_floor_t,   6, 14, 10,        1200, 2800,     30, 40, 34,   0,
-	  OBJ_REACH_EXIT, 0,         0,             "ENCONTRE A SAIDA" },
-	{ "RELIQUIAS",  map_reliquias,
-	  &tex_floor_t, &tex_crate_t,  16,  8, 20,        1300, 3000,     40, 30, 48,   0,
-	  OBJ_COLLECT,    4,         0,             "PEGUE 4 RELIQUIAS E SAIA" },
-	{ "CERCO",      map_cerco,
-	  &tex_wall_t,  &tex_wall_t,   20,  8,  8,        1400, 3400,     48, 32, 32,   0,
-	  OBJ_SURVIVE,    60,        8,             "SOBREVIVA 60 SEGUNDOS" },
-	/* teste do mundo grande (04a): mapa por código, sem texto */
+	 * x LANTERN_FOG_MUL. Céu/névoa escuros (texturas só escurecem).
+	 * Névoa e luz de cada fase = etapa 03. */
+	{ "CACADA",     NULL,
+	  &tex_terra_t, &tex_mata_t,   10, 12, 24,        1300, 3200,     40, 40, 56,   0,
+	  OBJ_KILL_ALL,   0,         0,             "DERROTE TODOS OS INIMIGOS",
+	  build_f1, f1_pts },
+	{ "TRAVESSIA",  NULL,
+	  &tex_terra_t, &tex_mata_t,    6, 14, 10,        1200, 2800,     30, 40, 34,   0,
+	  OBJ_REACH_EXIT, 0,         0,             "ATRAVESSE A FLORESTA",
+	  build_f2, f2_pts },
+	{ "RELIQUIAS",  NULL,
+	  &tex_terra_t, &tex_mata_t,   16,  8, 20,        1300, 3000,     40, 30, 48,   0,
+	  OBJ_COLLECT,    4,         0,             "PEGUE 4 RELIQUIAS E SAIA",
+	  build_f3, f3_pts },
+	{ "CERCO",      NULL,
+	  &tex_terra_t, &tex_mata_t,   20,  8,  8,        1400, 3400,     48, 32, 32,   0,
+	  OBJ_SURVIVE,    60,        8,             "SOBREVIVA 60 SEGUNDOS",
+	  build_f4, f4_pts },
+	/* SÓ TESTE (fora da sequência normal): DEBUG_START_LEVEL 5 e ./dev bench */
 	{ "FLORESTA (TESTE)", NULL,
 	  &tex_terra_t, &tex_mata_t,    8, 12, 10,        1300, FOREST_FOG_FAR, 36, 40, 36,   0,
 	  OBJ_REACH_EXIT, 0,         0,             "ATRAVESSE A FLORESTA",
 	  build_test_forest, forest_debug_pts },
 };
-const int num_levels = sizeof(level_defs) / sizeof(level_defs[0]);
+/* num_levels = fases da sequência normal (a de teste fica depois delas) */
+const int num_level_defs = sizeof(level_defs) / sizeof(level_defs[0]);
+const int num_levels = 4;
+

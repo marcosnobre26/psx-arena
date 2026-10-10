@@ -172,7 +172,7 @@ static void start_new_game(void) {
 #ifdef DEBUG_START_LEVEL
 	first = DEBUG_START_LEVEL - 1;            /* 1 = primeira fase */
 	if (first < 0) first = 0;
-	if (first >= num_levels) first = num_levels - 1;
+	if (first >= num_level_defs) first = num_level_defs - 1;   /* 5 = fase de teste */
 #endif
 	memset(&progress, 0, sizeof(progress));
 	start_level(first, g.frame);              /* tempo na seleção varia: partida diferente */
@@ -624,7 +624,10 @@ static void game_draw(void) {
 		camera_apply();
 		draw_world(1);
 		render_rect(0, 64, SCREEN_W, 64, 0, 0, 0, 1);   /* faixa escura atrás do texto */
-		hud_print(124, 72, "FASE %d/%d", g.level + 1, num_levels);
+		if (g.level < num_levels)
+			hud_print(124, 72, "FASE %d/%d", g.level + 1, num_levels);
+		else
+			draw_center(72, "FASE DE TESTE");
 		draw_center(88, ld->name);
 		draw_center(108, ld->obj_text);
 		break;

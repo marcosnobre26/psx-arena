@@ -180,7 +180,8 @@ typedef struct {
 	const DEBUG_POINT *debug_pts;    /* 4 pontos de teleporte (L2 + direcional) */
 } LEVEL_DEF;
 extern const LEVEL_DEF  level_defs[];
-extern const int        num_levels;
+extern const int        num_levels;       /* fases da sequência normal */
+extern const int        num_level_defs;   /* todas, inclusive a de teste */
 
 /* ------------------------------------------------------------------ */
 /* Entidades                                                           */
