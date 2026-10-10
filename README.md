@@ -201,6 +201,7 @@ troque para `Debug` em [`CMakePresets.json`](CMakePresets.json) (`-Og`).
 | `image` | recria a imagem Docker |
 | `doctor` | verifica Docker, SDK, emulador e Blender |
 | `clean` | apaga `build/` |
+| `bench` | benchmark automático: compila com `DEBUG_BENCHMARK` em `build-bench/`, roda no DuckStation Linux, mostra a tabela (detalhes no GUIA) |
 
 ---
 

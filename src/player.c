@@ -233,6 +233,9 @@ void player_update(PLAYER *p, INPUT *in) {
 }
 
 void player_damage(PLAYER *p, int amount, int from_x, int from_z) {
+#ifdef DEBUG_BENCHMARK
+	return;          /* benchmark: o jogador não pode morrer no meio da medição */
+#endif
 	if (!player_alive(p) || p->invuln > 0 || p->dash_timer > 0 || g.state != STATE_PLAY)
 		return;
 	p->hp -= amount;

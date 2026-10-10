@@ -755,8 +755,8 @@ static void debug_spawn_enemies(void) {
 	const PLAYER *p = &g.players[0];
 	if (!player_alive(p) || (g.state != STATE_PLAY && g.state != STATE_PAUSE))
 		return;
-	for (int k = 0; k < 8; k++) {
-		int a = (p->angle + k * 512) & 4095;
+	for (int k = 0; k < DEBUG_SPAWN_COUNT; k++) {
+		int a = (p->angle + k * (4096 / DEBUG_SPAWN_COUNT)) & 4095;
 		int x = p->pos.vx + ((isin(a) * DEBUG_SPAWN_DIST) >> 12);
 		int z = p->pos.vz + ((icos(a) * DEBUG_SPAWN_DIST) >> 12);
 		if (level_blocked(x, z, 140) || collide_prop_at(x, z, 140))
@@ -828,6 +828,148 @@ static void debug_input(INPUT *in) {
 #endif
 }
 
+/* ------------------------------------------------------------------ */
+/* Benchmark automático (./dev bench)                                  */
+/* ------------------------------------------------------------------ */
+#ifdef DEBUG_BENCHMARK
+/*
+ * O jogo mede sozinho: começa direto na fase de teste (semente fixa), passa
+ * pelos 4 pontos do teleporte e, em cada um, mede BENCH_MEASURE quadros sem
+ * e depois com DEBUG_SPAWN_COUNT inimigos extras. Cada medição vira uma
+ * linha de texto na TTY (printf -> BIOS -> log do emulador), fácil de ler
+ * por script:
+ *   BENCH ponto=inicio inimigos=0 fps_min=30 fps_med=30 polis_max=... ...
+ * e no fim "BENCH FIM". O FPS é medido pelos retraços EMULADOS (VSync), então
+ * o resultado é o mesmo com o emulador em velocidade ilimitada.
+ */
+#define BENCH_LEVEL    4      /* fase 5 (FLORESTA TESTE) */
+#define BENCH_SEED     12345
+#define BENCH_SETTLE   60     /* quadros para blocos/câmera assentarem */
+#define BENCH_SETTLE_E 30     /* depois de criar os inimigos */
+#define BENCH_MEASURE  180    /* ~3 s a 60 quadros por segundo */
+
+static const char *const bench_names[4] = { "inicio", "cruzamento", "canto_denso", "clareira" };
+
+enum { BENCH_TELEPORT, BENCH_WAIT, BENCH_MEASURING, BENCH_DONE };
+
+static struct {
+	int      phase, point, timer, extras;
+	uint32_t spawned;               /* bits: inimigos criados pelo benchmark */
+	int      frames, vsyncs, fps_min;
+	int      polis_max, polis_sum, ram_max;
+	int      col_max, col_sum, col_ticks;
+	int      tree_m_max, tree_b_max;
+} bench;
+
+static void bench_start(void) {
+	sel[0].joined = 1; sel[0].ready = 1; sel[0].character = 0; sel[0].skin = 0;
+	sel[1].joined = 0;
+	memset(&progress, 0, sizeof(progress));
+	start_level(BENCH_LEVEL, BENCH_SEED);
+	g.state = STATE_PLAY;                    /* pula a introdução */
+	memset(&bench, 0, sizeof(bench));
+	printf("BENCH INICIO fase=%d semente=%d\n", BENCH_LEVEL + 1, BENCH_SEED);
+}
+
+static void bench_remove_extras(void) {
+	for (int i = 0; i < MAX_ENEMIES; i++)
+		if ((bench.spawned & (1u << i)) && g.enemies[i].active) {
+			g.enemies[i].active = 0;
+			g.enemies_left--;
+		}
+	bench.spawned = 0;
+}
+
+static void bench_reset_stats(void) {
+	bench.frames = bench.vsyncs = 0;
+	bench.fps_min = 60;
+	bench.polis_max = bench.polis_sum = bench.ram_max = 0;
+	bench.col_max = bench.col_sum = bench.col_ticks = 0;
+	bench.tree_m_max = bench.tree_b_max = 0;
+}
+
+/* Depois de cada passo de lógica: custo da colisão naquele passo */
+static void bench_tick(void) {
+	if (bench.phase != BENCH_MEASURING) return;
+	int c = collide_tests_now();
+	if (c > bench.col_max) bench.col_max = c;
+	bench.col_sum += c;
+	bench.col_ticks++;
+}
+
+/* Depois de cada quadro desenhado. vs = retraços que o quadro anterior levou */
+static void bench_frame(int vs) {
+	switch (bench.phase) {
+	case BENCH_TELEPORT:
+		bench_remove_extras();
+		if (bench.point >= 4) {
+			printf("BENCH FIM\n");
+			bench.phase = BENCH_DONE;
+			break;
+		}
+		g.state = STATE_PLAY;
+		debug_teleport(bench.point);
+		bench.extras = 0;
+		bench.timer = BENCH_SETTLE;
+		bench.phase = BENCH_WAIT;
+		break;
+
+	case BENCH_WAIT:
+		if (--bench.timer <= 0) {
+			bench_reset_stats();
+			bench.timer = BENCH_MEASURE;
+			bench.phase = BENCH_MEASURING;
+		}
+		break;
+
+	case BENCH_MEASURING: {
+		int fps = vs > 0 ? 60 / vs : 60;
+		if (fps < bench.fps_min) bench.fps_min = fps;
+		bench.frames++;
+		bench.vsyncs += vs;
+		int p = render_stats_polys(), r = render_stats_bytes();
+		if (p > bench.polis_max) bench.polis_max = p;
+		bench.polis_sum += p;
+		if (r > bench.ram_max) bench.ram_max = r;
+		int tt, tm, tb;
+		level_tree_stats(&tt, &tm, &tb);
+		if (tm > bench.tree_m_max) bench.tree_m_max = tm;
+		if (tb > bench.tree_b_max) bench.tree_b_max = tb;
+		if (--bench.timer > 0)
+			break;
+
+		int n = 0;
+		for (int i = 0; i < MAX_ENEMIES; i++) n += g.enemies[i].active;
+		printf("BENCH ponto=%s inimigos_extra=%d inimigos_total=%d fps_min=%d fps_med=%d "
+		       "polis_max=%d polis_med=%d ram_gpu_max=%d col_max=%d col_med=%d "
+		       "arvores_modelo=%d arvores_plana=%d\n",
+		       bench_names[bench.point], bench.extras, n, bench.fps_min,
+		       bench.vsyncs ? bench.frames * 60 / bench.vsyncs : 0,
+		       bench.polis_max, bench.frames ? bench.polis_sum / bench.frames : 0, bench.ram_max,
+		       bench.col_max, bench.col_ticks ? bench.col_sum / bench.col_ticks : 0,
+		       bench.tree_m_max, bench.tree_b_max);
+
+		if (bench.extras == 0) {             /* agora com inimigos extras */
+			uint32_t before = 0, after = 0;
+			for (int i = 0; i < MAX_ENEMIES; i++) before |= (uint32_t)g.enemies[i].active << i;
+			debug_spawn_enemies();
+			for (int i = 0; i < MAX_ENEMIES; i++) after |= (uint32_t)g.enemies[i].active << i;
+			bench.spawned = after & ~before;
+			bench.extras = 0;                /* contar bits sem builtin (libgcc) */
+			for (uint32_t m = bench.spawned; m; m &= m - 1)
+				bench.extras++;
+			bench.timer = BENCH_SETTLE_E;
+			bench.phase = BENCH_WAIT;
+		} else {
+			bench.point++;
+			bench.phase = BENCH_TELEPORT;
+		}
+		break;
+	}
+	}
+}
+#endif
+
 /* Loops de ambiente (vozes 0 e 1): tocam enquanto há uma partida na tela
  * (jogo, pausa, vitória, derrota) e param no título e na seleção. */
 static void ambience_update(void) {
@@ -856,6 +998,9 @@ int main(void) {
 
 	game_reset(0, 12345);       /* fundo da tela de título: sempre igual */
 	g.state = STATE_TITLE;
+#ifdef DEBUG_BENCHMARK
+	bench_start();
+#endif
 
 	int last_vsync = VSync(-1);
 
@@ -865,6 +1010,9 @@ int main(void) {
 		 * "em câmera lenta" quando a cena é pesada. */
 		int now   = VSync(-1);
 		int ticks = now - last_vsync;
+#ifdef DEBUG_BENCHMARK
+		int frame_vs = ticks;          /* retraços do quadro anterior (sem limite) */
+#endif
 		last_vsync = now;
 		if (ticks < 1) ticks = 1;
 		if (ticks > 4) ticks = 4;
@@ -874,6 +1022,9 @@ int main(void) {
 
 		for (int t = 0; t < ticks; t++) {
 			game_tick();
+#ifdef DEBUG_BENCHMARK
+			bench_tick();
+#endif
 			for (int i = 0; i < MAX_PLAYERS; i++)
 				g.in[i].pressed = 0;    /* "apertou agora" vale só 1 passo */
 		}
@@ -881,6 +1032,9 @@ int main(void) {
 		ambience_update();
 		game_draw();
 		render_end_frame();
+#ifdef DEBUG_BENCHMARK
+		bench_frame(frame_vs);
+#endif
 
 		/* medidor de FPS (VSync(-1) conta os retraços desde o boot) */
 		fps_frames++;

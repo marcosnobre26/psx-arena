@@ -10,6 +10,7 @@
 #   ./dev shell          abre um terminal dentro do ambiente de compilação
 #   ./dev image          (re)cria a imagem Docker do SDK
 #   ./dev vram           mostra onde cada textura ficou na VRAM
+#   ./dev bench          mede FPS/POLIS/COL sozinho no DuckStation Linux (build-bench/)
 #   ./dev doctor         confere se está tudo instalado
 #
 #  Por padrão usa Docker. Se você instalou o SDK direto no Ubuntu
@@ -27,6 +28,9 @@ EMULATOR_ARGS=""
 RUN_FILE="cue"
 BLENDER=""
 SDK_DIR="/opt/psn00bsdk"
+DUCKSTATION_LINUX="$HOME/emuladores/duckstation/AppRun"   # ./dev bench
+DUCKSTATION_DATA="$HOME/.local/share/duckstation"         # de onde vêm config e BIOS
+BENCH_TIMEOUT=${BENCH_TIMEOUT:-300}                         # segundos
 
 # Configuração pessoal (não vai para o git)
 if [[ ! -f dev.conf && -f dev.conf.example ]]; then
@@ -245,6 +249,85 @@ cmd_doctor() {
 	[[ -n "$b" ]] && c_ok "Blender:   $b" || echo "Blender:   não encontrado (opcional)"
 }
 
+# ---------------------------------------------------------------------------
+# Benchmark automático: compila com DEBUG_BENCHMARK numa pasta separada
+# (build-bench/, o build normal nunca fica com o modo ligado), roda no
+# DuckStation Linux com o log da TTY no console, espera "BENCH FIM", fecha
+# o emulador e mostra a tabela. Resultado bruto em build-bench/bench.txt.
+# ---------------------------------------------------------------------------
+cmd_bench() {
+	local t; t="$(target_triple)"
+	c_info "Compilando com DEBUG_BENCHMARK em build-bench/ ..."
+	sdk sh -c "
+		if [ ! -f build-bench/build.ninja ]; then
+			cmake --preset default -B build-bench -DPSN00BSDK_TARGET=$t -DARENA_BENCHMARK=ON > build-bench-config.log 2>&1 || { cat build-bench-config.log; exit 1; }
+			rm -f build-bench-config.log
+		fi
+		cmake --build ./build-bench
+	" 2>&1 | quiet_filter || { c_err "A compilação do benchmark falhou."; return 1; }
+
+	if [[ ! -x "$DUCKSTATION_LINUX" ]]; then
+		c_err "DuckStation Linux não encontrado em $DUCKSTATION_LINUX (mude DUCKSTATION_LINUX no dev.conf)."
+		return 1
+	fi
+	# Configuração ISOLADA. O DuckStation usa ~/.local/share/duckstation se
+	# ela existir (ignora XDG_DATA_HOME), então rodamos uma CÓPIA do emulador
+	# em modo portátil (portable.txt ao lado do executável): configuração,
+	# saves e tempo de jogo ficam dentro de build-bench/duckstation. A sua
+	# instalação e a sua pasta de dados não são tocadas (conferido no fim).
+	# Cópia real (não hardlink): se o emulador gravasse num arquivo da própria
+	# pasta, um hardlink mudaria também o original.
+	local ds="$ROOT/build-bench/duckstation" log="$ROOT/build-bench/bench.log" out="$ROOT/build-bench/bench.txt"
+	local src_dir; src_dir="$(dirname "$DUCKSTATION_LINUX")"
+	if [[ ! -e "$ds/AppRun" ]]; then
+		c_info "Copiando o DuckStation para build-bench/duckstation (só na primeira vez)..."
+		cp -a "$src_dir" "$ds" || return 1
+	fi
+	local exe_dir; exe_dir="$(dirname "$(readlink -f "$ds/AppRun")")"
+	touch "$exe_dir/portable.txt"
+	python3 "$ROOT/tools/bench_settings.py" "$DUCKSTATION_DATA/settings.ini" \
+		"$exe_dir/settings.ini" "$DUCKSTATION_DATA/bios" || return 1
+	rm -f "$log" "$out"
+	local before; before="$(ls -laR --time-style=full-iso "$DUCKSTATION_DATA" 2>/dev/null | md5sum)"
+
+	c_info "Rodando no DuckStation (até ${BENCH_TIMEOUT}s)..."
+	"$ds/AppRun" -earlyconsole -batch -fastboot -nogui -- "$ROOT/build-bench/arena.cue" > "$log" 2>&1 &
+	local pid=$! waited=0
+	while (( waited < BENCH_TIMEOUT )); do
+		grep -q "BENCH FIM" "$log" 2>/dev/null && break
+		kill -0 "$pid" 2>/dev/null || break
+		sleep 1; waited=$((waited + 1))
+	done
+	# SIGKILL: o fechamento "educado" às vezes trava; a cópia não guarda nada útil
+	kill -9 "$pid" 2>/dev/null || true
+	wait "$pid" 2>/dev/null || true
+
+	if [[ "$(ls -laR --time-style=full-iso "$DUCKSTATION_DATA" 2>/dev/null | md5sum)" != "$before" ]]; then
+		c_err "AVISO: algo mudou em $DUCKSTATION_DATA durante o benchmark (deveria ficar intacto)."
+	fi
+	sed 's/\x1b\[[0-9;]*m//g' "$log" | grep -o "BENCH .*" | tr -d '\r' > "$out" || true
+	if ! grep -q "BENCH FIM" "$out"; then
+		c_err "Não chegou o BENCH FIM (tempo esgotado ou emulador fechou). Log: build-bench/bench.log"
+		tail -20 "$log"
+		return 1
+	fi
+	awk '
+		/^BENCH ponto=/ {
+			for (i = 2; i <= NF; i++) { split($i, kv, "="); v[kv[1]] = kv[2] }
+			printf "%-12s %4s %4s | %4s %4s | %5s %5s | %6s | %5s %4s | %4s %4s\n",
+				v["ponto"], v["inimigos_extra"], v["inimigos_total"], v["fps_min"], v["fps_med"],
+				v["polis_max"], v["polis_med"], v["ram_gpu_max"], v["col_max"], v["col_med"],
+				v["arvores_modelo"], v["arvores_plana"]
+		}
+		BEGIN {
+			printf "%-12s %4s %4s | %4s %4s | %5s %5s | %6s | %5s %4s | %4s %4s\n",
+				"ponto", "+ini", "ini", "fps", "fps", "polis", "polis", "RAMGPU", "COL", "COL", "arv", "arv"
+			printf "%-12s %4s %4s | %4s %4s | %5s %5s | %6s | %5s %4s | %4s %4s\n",
+				"", "", "", "min", "med", "max", "med", "max", "max", "med", "mod", "pla"
+		}' "$out"
+	c_ok "Resultado bruto: build-bench/bench.txt"
+}
+
 case "${1:-build}" in
 	build)  cmd_build ;;
 	run)    shift; cmd_run "$@" ;;
@@ -255,5 +338,6 @@ case "${1:-build}" in
 	image)  cmd_image ;;
 	vram)   cmd_vram ;;
 	doctor) cmd_doctor ;;
-	*)      sed -n '3,18p' "$0" | sed 's/^#//' ;;
+	bench)  cmd_bench ;;
+	*)      sed -n '3,19p' "$0" | sed 's/^#//' ;;
 esac

@@ -181,9 +181,37 @@ automatizar testes visuais.
   host: 883 árvores, tudo alcançável, trilhas e pontos de teleporte livres.
   RAM: 738 KB (755 450 bytes). Medições (L2, lanterna ligada, fase 5):
 
-  | Ponto | FPS | POLIS | RAM GPU | ARVORES modelo/plana |
+  | Ponto | FPS mín/méd | POLIS máx | RAM GPU máx | ARVORES modelo/plana |
   |---|---|---|---|---|
-  | ← início | a medir | | | |
-  | → cruzamento | a medir | | | |
-  | ↑ canto denso | a medir | | | |
-  | ↓ clareira | a medir | | | |
+  | ← início | 30 / 30 | 506 | 24 828 | 9 / 6 |
+  | → cruzamento | 30 / 30 | 431 | 21 108 | 3 / 5 |
+  | ↑ canto denso | 30 / 30 | 760 | 32 808 | 27 / 45 |
+  | ↓ clareira | 30 / 30 | 523 | 24 444 | 3 / 4 |
+
+  (Medido em 2026-10-10 com `./dev bench`, DuckStation Linux, sem inimigos
+  extras; ver a linha "antes da 04c" abaixo.)
+- 2026-10-10 — Benchmark automático: `DEBUG_BENCHMARK` (fase 5, semente
+  fixa, 4 pontos do teleporte, ~3 s sem e com 8 inimigos extras, linhas
+  `BENCH ...` na TTY) e `./dev bench` (build em `build-bench/`, cópia
+  portátil do DuckStation Linux, espera `BENCH FIM`, mostra a tabela).
+  Determinístico (duas execuções idênticas); ~5 s com velocidade ilimitada.
+  Isolamento: o DuckStation ignora `XDG_DATA_HOME` se `~/.local/share/duckstation`
+  existir; por isso a cópia portátil. Os primeiros testes rodaram com a
+  configuração real e somaram ~5 min ao `playtime.dat` do usuário (o save
+  state criado foi apagado; `settings.ini` intacto).
+  **Depois da 04b / antes da 04c** (`col` = testes de colisão por passo):
+
+  | Ponto | Inimigos extra/total | FPS mín/méd | POLIS máx | RAM GPU máx | COL máx/méd | Árvores mod/plana |
+  |---|---|---|---|---|---|---|
+  | início | 0 / 11 | 30 / 30 | 506 | 24 828 | 220 / 204 | 9 / 6 |
+  | início | 8 / 19 | 20 / 21 | 692 | 28 732 | 605 / 525 | 9 / 6 |
+  | cruzamento | 0 / 11 | 30 / 30 | 431 | 21 108 | 232 / 210 | 3 / 5 |
+  | cruzamento | 8 / 19 | 30 / 30 | 619 | 25 056 | 574 / 478 | 3 / 5 |
+  | canto denso | 0 / 11 | 30 / 30 | 760 | 32 808 | 242 / 224 | 27 / 45 |
+  | canto denso | 5 / 16 | 20 / 20 | 878 | 35 288 | 428 / 384 | 27 / 45 |
+  | clareira | 0 / 11 | 30 / 30 | 523 | 24 444 | 242 / 217 | 3 / 4 |
+  | clareira | 8 / 19 | 20 / 28 | 708 | 28 336 | 537 / 474 | 3 / 4 |
+
+  Com 8 inimigos perto o FPS cai para 20 em 3 dos 4 pontos, com POLIS baixo
+  (< 900): o gargalo é CPU (colisão + IA + desenho), não a GPU. No canto
+  denso só 5 dos 8 nasceram (o resto cairia em árvore).

@@ -8,3 +8,5 @@ __pycache__/
 CLAUDE.local.md
 .claude/settings.local.json
 *:Zone.Identifier
+build-bench/
+build-bench-config.log

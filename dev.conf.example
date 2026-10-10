@@ -23,3 +23,11 @@
 # 1 = compila dentro do Docker (padrão)
 # 0 = usa o SDK instalado no Ubuntu por scripts/setup-linux.sh
 USE_DOCKER=1
+
+# --- Benchmark (./dev bench) -------------------------------------------------
+# DuckStation para Linux (AppImage extraída). O ./dev bench roda uma CÓPIA
+# portátil dele em build-bench/ (sua configuração não é tocada) e usa a
+# configuração/BIOS de DUCKSTATION_DATA como ponto de partida.
+#DUCKSTATION_LINUX="$HOME/emuladores/duckstation/AppRun"
+#DUCKSTATION_DATA="$HOME/.local/share/duckstation"
+#BENCH_TIMEOUT=300

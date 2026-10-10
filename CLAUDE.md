@@ -26,11 +26,17 @@ modificação: `docs/GUIA.md`.
 ./dev run            # compila e abre no emulador do Windows
 ./dev models         # exporta assets/blender/*.blend -> models/*.h (Blender do Windows)
 ./dev vram           # mapa das texturas na VRAM
+./dev bench          # benchmark automático (FPS/POLIS/COL nos 4 pontos da fase 5)
 ./dev clean          # apaga build/
 VERBOSE=1 ./dev build
 ```
 
 - **Sempre rode `./dev build` depois de editar** e corrija erros/avisos novos.
+- **Medição de desempenho: use `./dev bench`** (você mesmo roda; ~5 s). Ele
+  compila com `DEBUG_BENCHMARK` em `build-bench/` (o build normal nunca liga o
+  modo), roda uma cópia portátil do DuckStation Linux (a pasta do usuário não
+  é tocada) e imprime a tabela. É determinístico: compare entre etapas e
+  registre no HISTORICO. Valores de emulador, não de console real.
 - Você **não consegue ver o jogo rodando** (o emulador é do Windows). Depois
   de mudanças visuais ou de jogabilidade, peça ao Marcos para testar com
   `./dev run` e descreva exatamente o que conferir.

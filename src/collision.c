@@ -34,6 +34,11 @@ int collide_stats(void) {
 	return col_tests_last;
 }
 
+/* Testes do passo em andamento (válido logo depois de game_tick) */
+int collide_tests_now(void) {
+	return col_tests;
+}
+
 /* Testa um círculo (x,z,r) contra outro (ox,oz,orad).
  * Bloqueia só se vai sobrepor E está se aproximando (de from_x/from_z). */
 static int circle_blocks(int x, int z, int r, int ox, int oz, int orad,

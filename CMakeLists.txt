@@ -55,6 +55,13 @@ target_include_directories(arena PRIVATE
 )
 target_compile_options(arena PRIVATE -Wall -Wno-unused-function -Wno-comment)
 
+# Benchmark automático (./dev bench): compilado numa pasta separada
+# (build-bench/), para o build normal nunca sair com o modo ligado.
+option(ARENA_BENCHMARK "Compila com DEBUG_BENCHMARK (mede sozinho e imprime BENCH ...)" OFF)
+if(ARENA_BENCHMARK)
+	target_compile_definitions(arena PRIVATE DEBUG_BENCHMARK)
+endif()
+
 # ---------------------------------------------------------------------------
 # Texturas: PNG -> TIM (tools/build_textures.py escolhe a posição na VRAM)
 # ---------------------------------------------------------------------------

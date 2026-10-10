@@ -252,6 +252,28 @@ quadrado em cima de cada célula sólida em volta do jogador 1 (raio
 caixa ou árvore, roxo = vazio. Desenho e colisão batem quando cada parede tem o seu
 quadrado vermelho exatamente no topo.
 
+**Benchmark automático (`./dev bench`).** Mede sem ninguém abrir o jogo:
+
+1. compila com `DEBUG_BENCHMARK` numa pasta separada (`build-bench/`), então
+   o build normal nunca sai com o modo ligado;
+2. o jogo vai sozinho para a fase 5 (semente fixa) e passa pelos 4 pontos do
+   teleporte; em cada um mede ~3 s sem e depois com `DEBUG_SPAWN_COUNT` (8)
+   inimigos extras (o jogador fica invulnerável só nesse modo);
+3. cada medição sai por `printf` na TTY:
+   `BENCH ponto=inicio inimigos_extra=0 ... fps_min=30 fps_med=30 polis_max=506 ... col_max=220 ...`
+   e no fim `BENCH FIM`;
+4. o `./dev bench` roda uma **cópia portátil** do DuckStation Linux
+   (`build-bench/duckstation`, criada na primeira vez a partir de
+   `DUCKSTATION_LINUX`), com a TTY no console e velocidade ilimitada; espera
+   o `BENCH FIM` (até `BENCH_TIMEOUT` s), fecha o emulador e mostra a tabela.
+   Resultado bruto em `build-bench/bench.txt`.
+
+O FPS vem dos retraços **emulados** (`VSync`), então velocidade ilimitada não
+muda o resultado (o benchmark inteiro leva ~5 s). Com semente fixa e sem
+controle, ele é **determinístico**: duas execuções dão o mesmo número, e dá
+para comparar etapas. São valores do emulador — boa estimativa, não o console.
+A sua pasta do DuckStation não é tocada (o comando confere e avisa).
+
 **Medir sempre no mesmo lugar (fase 5):** com o overlay aberto, segure
 **L2** e aperte o direcional: ← início, → cruzamento das trilhas, ↑ canto
 denso (pior caso), ↓ maior clareira. A câmera fica sempre na mesma direção.

@@ -131,6 +131,10 @@
  * os valores bons e passe para levels.c. Trocar de fase volta ao da tabela. */
 /* #define DEBUG_FOG_TUNING */
 #define COLMARK_RADIUS  5       /* depuração da colisão: raio em células */
-#define DEBUG_SPAWN_DIST 640    /* L2 + Triângulo: distância dos 8 inimigos */
+#define DEBUG_SPAWN_DIST 640    /* L2 + Triângulo: distância dos inimigos extras */
+#define DEBUG_SPAWN_COUNT 8     /* L2 + Triângulo: quantos inimigos extras */
+
+/* DEBUG_BENCHMARK: NÃO defina aqui. Use ./dev bench, que compila numa
+ * pasta separada (build-bench/) com o modo ligado. */
 
 #endif
