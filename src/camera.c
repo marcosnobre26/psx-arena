@@ -154,6 +154,9 @@ void camera_view_update(int ticks) {
 		eye.vz += (want.vz - eye.vz) >> 2;
 	}
 
+	/* árvores que tapam alguém ficam semitransparentes (~0,3 s de memória) */
+	level_mark_occluders(eye.vx, eye.vz, grp_x, grp_z, grp_n, ticks);
+
 	/* Garantia: o olho suavizado nunca fica com tronco no caminho. Se ficou
 	 * (girou rápido, aproximou), puxa NA HORA para o ponto livre na mesma
 	 * direção, sem esperar a suavização. Começa da distância livre atual,

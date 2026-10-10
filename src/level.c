@@ -335,13 +335,14 @@ typedef struct {
 	uint8_t  type;          /* TREE_* */
 	uint8_t  rot;           /* ângulo / 16 */
 	uint8_t  scale;         /* escala / 64 (64 = 1.0) */
-	uint8_t  pad;
+	uint8_t  occlude;       /* tapou o jogador: passos restantes a 50% (visual) */
 } TREE;
 
 static TREE     trees[MAX_TREES], tree_tmp[MAX_TREES];
 static int      num_trees;
 static uint16_t tree_start[MAX_CCZ][MAX_CCX], tree_count[MAX_CCZ][MAX_CCX];
-static int      trees_drawn_mesh, trees_drawn_bb;
+static int      trees_drawn_mesh, trees_drawn_bb, trees_drawn_trans;
+static int      occl_ticks;     /* passos do quadro (contagem regressiva da transparência) */
 static CVECTOR  bb_tint;        /* cor das imagens planas (luz da fase) */
 
 void level_add_tree(int type, int x, int z, int angle, int scale) {
@@ -355,6 +356,7 @@ void level_add_tree(int type, int x, int z, int angle, int scale) {
 	t->type = type;
 	t->rot = (angle & 4095) >> 4;
 	t->scale = scale >> 6;
+	t->occlude = 0;
 
 	/* colisão: em pé = círculo do tronco na grade espacial (collision.c),
 	 * redondo para o jogador contornar suave; deitado = 3 células sólidas
@@ -393,8 +395,9 @@ static void trees_finish(void) {
 
 /* Só os blocos do 5x5 em volta do grupo; perto = modelo, longe = imagem */
 static void trees_draw(void) {
-	DRAWOPT opt = { 0 };
-	trees_drawn_mesh = trees_drawn_bb = 0;
+	DRAWOPT opt = { 0 }, trans = { 0 };
+	trans.flags = DRAW_SEMITRANS;   /* modelos sem textura: 50% no polígono todo */
+	trees_drawn_mesh = trees_drawn_bb = trees_drawn_trans = 0;
 	for (int bz = fcz - CHUNK_LOAD_RADIUS; bz <= fcz + CHUNK_LOAD_RADIUS; bz++)
 		for (int bx = fcx - CHUNK_LOAD_RADIUS; bx <= fcx + CHUNK_LOAD_RADIUS; bx++) {
 			if (bx < 0 || bz < 0 || bx >= ncx || bz >= ncz)
@@ -404,6 +407,21 @@ static void trees_draw(void) {
 				const TREE_DEF *d = &tree_defs[t->type];
 				int scale = t->scale << 6;
 				int depth = render_view_depth(t->x, -256, t->z);
+				TREE *tw = (TREE *)t;            /* contagem regressiva da transparência */
+				if (tw->occlude)
+					tw->occlude = tw->occlude > occl_ticks ? tw->occlude - occl_ticks : 0;
+				if (t->occlude) {
+					/* tapa o jogador: SEMPRE modelo (sem textura, a 50%).
+					 * A imagem plana tem textura e, nela, a semitransparência
+					 * só vale nos texels com o bit STP da CLUT (aqui, quase
+					 * nenhum): ela continuaria opaca. */
+					VECTOR  pos = { t->x, 0, t->z };
+					SVECTOR rot = { 0, t->rot << 4, 0 };
+					int ok = render_mesh(d->mesh, &pos, &rot, scale, &trans);
+					trees_drawn_mesh += ok;
+					trees_drawn_trans += ok;
+					continue;
+				}
 				if (depth > TREE_LOD_DIST) {
 					if (d->bb)
 						trees_drawn_bb += render_billboard(t->x, t->z, (d->bb_w * scale) >> 12,
@@ -440,6 +458,53 @@ int level_tree_density(int x, int z, int radius) {
 			if (cell_type(cx, cz) == CELL_THICKET)
 				thicket++;
 	return n + thicket / 4;
+}
+
+int level_tree_transparent(void) {
+	return trees_drawn_trans;
+}
+
+/* Marca as árvores em pé cuja copa cruza algum segmento olho -> jogador
+ * (no plano X/Z), mais perto do olho que o jogador. Percorre só os blocos
+ * que a caixa dos segmentos toca. Visual (não muda g). */
+void level_mark_occluders(int ex, int ez, const int *x, const int *z, int n, int ticks) {
+	occl_ticks = ticks;
+	int minx = ex, maxx = ex, minz = ez, maxz = ez;
+	for (int i = 0; i < n; i++) {
+		if (x[i] < minx) minx = x[i];
+		if (x[i] > maxx) maxx = x[i];
+		if (z[i] < minz) minz = z[i];
+		if (z[i] > maxz) maxz = z[i];
+	}
+	const int margin = 320;              /* maior copa x escala */
+	int bx0 = (minx - margin) / CHUNK_SIZE, bx1 = (maxx + margin) / CHUNK_SIZE;
+	int bz0 = (minz - margin) / CHUNK_SIZE, bz1 = (maxz + margin) / CHUNK_SIZE;
+	if (bx0 < 0) bx0 = 0;
+	if (bz0 < 0) bz0 = 0;
+	for (int bz = bz0; bz <= bz1 && bz < ncz; bz++)
+		for (int bx = bx0; bx <= bx1 && bx < ncx; bx++) {
+			TREE *t = &trees[tree_start[bz][bx]];
+			for (int k = tree_count[bz][bx]; k > 0; k--, t++) {
+				const TREE_DEF *d = &tree_defs[t->type];
+				if (d->cells != 1 || !d->canopy_r)
+					continue;
+				int r = (d->canopy_r * (t->scale << 6)) >> 12;
+				for (int i = 0; i < n; i++) {
+					/* distância da copa ao segmento olho -> jogador i */
+					int sx = x[i] - ex, sz = z[i] - ez;
+					int len = dist2d(sx, sz);
+					if (len <= 0) continue;
+					int ux = (sx * 4096) / len, uz = (sz * 4096) / len;
+					int rx = t->x - ex, rz = t->z - ez;
+					int along = (rx * ux + rz * uz) >> 12;
+					if (along <= 0 || along >= len - PLAYER_RADIUS)
+						continue;            /* atrás do olho ou além do jogador */
+					int side = (rx * uz - rz * ux) >> 12;
+					if (side < r + PLAYER_RADIUS && side > -(r + PLAYER_RADIUS))
+						t->occlude = TREE_OCCLUDE_TICKS;
+				}
+			}
+		}
 }
 
 void level_tree_stats(int *total, int *models, int *billboards) {

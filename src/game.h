@@ -149,6 +149,7 @@ typedef struct {
 	int            scale_min, scale_max;   /* variação de tamanho (ONE = 1.0) */
 	int            cells;       /* 1 = em pé (círculo do tronco); 3 = deitado (3 células baixas) */
 	int            trunk_r;     /* em pé: raio do tronco na escala ONE (colisão) */
+	int            canopy_r;    /* em pé: raio da copa (câmera: "esta árvore tapa?") */
 } TREE_DEF;
 extern const TREE_DEF tree_defs[];
 
@@ -371,6 +372,10 @@ int  level_cell_top(int cx, int cz);    /* altura do topo da célula (0, 384, 76
  * ângulo perto de 0/1024/2048/3072 (a colisão é por célula). */
 void level_add_tree(int type, int x, int z, int angle, int scale);
 void level_tree_stats(int *total, int *models, int *billboards);
+int  level_tree_transparent(void);      /* árvores desenhadas a 50% no último quadro */
+/* Câmera: marca as árvores cuja copa tapa algum ponto (x[i], z[i]) visto do
+ * olho (ex, ez); ficam semitransparentes por TREE_OCCLUDE_TICKS passos */
+void level_mark_occluders(int ex, int ez, const int *x, const int *z, int n, int ticks);
 int  level_tree_density(int x, int z, int radius);   /* árvores (+mata) perto: para a câmera */
 void level_apply_look(void);            /* névoa e luz da fase atual */
 void level_draw(void);
