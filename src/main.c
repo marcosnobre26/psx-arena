@@ -954,6 +954,9 @@ static void bench_start(void) {
 	start_level(BENCH_LEVEL, BENCH_SEED);
 	g.state = STATE_PLAY;                    /* pula a introdução */
 	memset(&bench, 0, sizeof(bench));
+#ifdef BENCH_FROM
+	bench.point = BENCH_FROM;            /* ./dev bench -D BENCH_FROM=6: só as fases 1-4 */
+#endif
 	printf("BENCH INICIO fase=%d semente=%d pontos=%d\n", BENCH_LEVEL + 1, BENCH_SEED, BENCH_POINTS);
 }
 

@@ -267,7 +267,8 @@ static const DEBUG_POINT f3_pts[4] = { { 31, 56, 2048 }, { 31, 31, 0 }, { 49, 49
  * os reforços (S) ficam em células LIVRES perto da borda da clareira (não na
  * mata alta, que é sólida); objective.c escolhe o S fora do cone de visão. */
 #ifndef F4_FOG_FAR
-#define F4_FOG_FAR     3400     /* névoa do CERCO (etapa 03); ./dev bench -D compara */
+#define F4_FOG_FAR     3000     /* névoa do CERCO (3400 da etapa 03 -> 3000 na 04e:
+                                   2 jogadores + 8 reforços a 30 FPS) */
 #endif
 #ifndef F4_MAX_ENEMIES
 #define F4_MAX_ENEMIES 8        /* reforços: inimigos vivos no máximo */

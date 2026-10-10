@@ -374,9 +374,28 @@ automatizar testes visuais.
   | f4_pior (CERCO) | 3 / 11 (+8 reforços) | 30 / 30 | 527 / 710 | 277 / 390 | 15 / 55 |
   | f4_pior_2j (CERCO, 2 jogadores) | 4 / 12 | 30 / **20** | 759 / 941 | 401 / **544** | 20 / 85 |
 
+  (tabela acima: névoa da fase 4 ainda em 3 400)
+
   **Abaixo de 30 FPS:** só o CERCO com 2 jogadores e os 8 reforços (544:
   blocos 225 — névoa 3 400, a maior das fases —, resto 187 = 12 inimigos +
   2 jogadores/cones/sombras). Opções medidas (`./dev bench -D`), todas a 30
   FPS: névoa da fase 4 3 000 → 478; 2 800 → 470; reforços 6 → 485; névoa
   3 000 + 6 reforços → 452; `MAX_PLAYER_SEPARATION` 768 → 489. **Padrões
   não alterados** (decisão do Marcos).
+- 2026-10-10 — Decisão (04e): névoa da fase 4 (CERCO) 3 400 → **3 000**;
+  mantidos 8 reforços e `MAX_PLAYER_SEPARATION` 896. Bench só das fases 1–4
+  (`./dev bench -D BENCH_FROM=6`). **Depois — tabela final** (CPU em linhas,
+  30 FPS = ~525):
+
+  | Ponto | Inimigos (natural / pior) | FPS | POLIS máx | CPU | lógica |
+  |---|---|---|---|---|---|
+  | f1_pior (CACADA) | 12 / 12 juntos | 30 / 30 | 564 / 774 | 335 / 435 | 41 / 59 |
+  | f2_pior (TRAVESSIA) | 14 / 14 juntos | 30 / 30 | 452 / 753 | 303 / 446 | 45 / 70 |
+  | f3_pior (RELIQUIAS) | 8 / 8 juntos | 30 / 30 | 447 / 587 | 291 / 354 | 27 / 35 |
+  | f4_pior (CERCO) | 3 / 11 (+8 reforços) | 60 / 30 | 470 / 654 | 247 / 375 | 7 / 56 |
+  | f4_pior_2j (CERCO, 2 jogadores) | 4 / 12 | 30 / 30 | 669 / 851 | 360 / **480** | 18 / 60 |
+
+  Todas as fases a 30 FPS no pior momento. **A folga de CPU continua sendo
+  a prioridade da etapa 10**: canto denso da fase 5 em 504 e CERCO com 2
+  jogadores em 480 de ~525 linhas (o maior custo segue sendo o desenho dos
+  blocos e das árvores).
