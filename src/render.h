@@ -116,6 +116,7 @@ void render_set_clear_color(int r, int g, int b);
 
 /* Quantos bytes de primitivas foram usados no último quadro (debug) */
 int render_stats_bytes(void);
+int render_bytes_used(void);     /* bytes de primitivas já usados NESTE quadro */
 int render_stats_polys(void);
 /* Perfil por categoria (linhas no último quadro): só para depuração */
 enum { PROF_CHUNKS, PROF_TREES, PROF_OTHER, PROF_SLOTS };

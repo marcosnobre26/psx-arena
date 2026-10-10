@@ -23,7 +23,16 @@
 
 /* ---------- Renderização ---------- */
 #define OT_LEN          2048    /* níveis de profundidade da Ordering Table */
+#ifndef PACKET_LEN                      /* (./dev bench -D testa outros tamanhos) */
 #define PACKET_LEN      (96*1024) /* memória para primitivas por quadro */
+#endif
+/* Orçamento do buffer de primitivas: o mundo (blocos e árvores) pode usar
+ * até PACKET_LEN - PACKET_RESERVE; a reserva fica para inimigos, jogadores,
+ * efeitos e HUD. Os blocos param antes, em ... - PACKET_TREE_ROOM, para
+ * sobrar lugar às árvores próximas. Tudo é desenhado do perto para o longe,
+ * então o que é cortado é sempre o mais distante (aviso CORTE no L2). */
+#define PACKET_RESERVE   (16*1024)
+#define PACKET_TREE_ROOM (8*1024)
 #define NEAR_Z          40      /* polígonos mais perto que isso são descartados */
 #define DRAW_DIST       4200    /* distância inicial; com névoa vira fog_far da lanterna */
 #define FOV_H           160     /* "distância da tela": maior = zoom maior */

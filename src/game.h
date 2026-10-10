@@ -373,6 +373,7 @@ int  level_cell_top(int cx, int cz);    /* altura do topo da célula (0, 384, 76
 void level_add_tree(int type, int x, int z, int angle, int scale);
 void level_tree_stats(int *total, int *models, int *billboards);
 int  level_tree_transparent(void);      /* árvores desenhadas a 50% no último quadro */
+int  level_cut_count(void);             /* blocos+árvores cortados por falta de buffer */
 /* Câmera: marca as árvores cuja copa tapa algum ponto (x[i], z[i]) visto do
  * olho (ex, ez); ficam semitransparentes por TREE_OCCLUDE_TICKS passos */
 void level_mark_occluders(int ex, int ez, const int *x, const int *z, int n, int ticks);

@@ -342,6 +342,7 @@ static TREE     trees[MAX_TREES], tree_tmp[MAX_TREES];
 static int      num_trees;
 static uint16_t tree_start[MAX_CCZ][MAX_CCX], tree_count[MAX_CCZ][MAX_CCX];
 static int      trees_drawn_mesh, trees_drawn_bb, trees_drawn_trans;
+static int      cut_chunks, cut_trees;   /* cortados por falta de buffer (L2) */
 static int      occl_ticks;     /* passos do quadro (contagem regressiva da transparência) */
 static CVECTOR  bb_tint;        /* cor das imagens planas (luz da fase) */
 
@@ -393,15 +394,29 @@ static void trees_finish(void) {
 	memcpy(trees, tree_tmp, num_trees * sizeof(TREE));
 }
 
-/* Só os blocos do 5x5 em volta do grupo; perto = modelo, longe = imagem */
+/* Só os blocos do 5x5 em volta do grupo, em ANÉIS do centro para fora
+ * (perto -> longe): se o buffer de primitivas acabar, o cortado é o mais
+ * distante. Perto = modelo, longe = imagem plana. */
 static void trees_draw(void) {
 	DRAWOPT opt = { 0 }, trans = { 0 };
 	trans.flags = DRAW_SEMITRANS;   /* modelos sem textura: 50% no polígono todo */
 	trees_drawn_mesh = trees_drawn_bb = trees_drawn_trans = 0;
-	for (int bz = fcz - CHUNK_LOAD_RADIUS; bz <= fcz + CHUNK_LOAD_RADIUS; bz++)
-		for (int bx = fcx - CHUNK_LOAD_RADIUS; bx <= fcx + CHUNK_LOAD_RADIUS; bx++) {
+	cut_trees = 0;
+	const int budget = PACKET_LEN - PACKET_RESERVE;
+	for (int ring = 0; ring <= CHUNK_LOAD_RADIUS; ring++)
+	for (int bz = fcz - ring; bz <= fcz + ring; bz++)
+		for (int bx = fcx - ring; bx <= fcx + ring; bx++) {
+			if (bx != fcx - ring && bx != fcx + ring && bz != fcz - ring && bz != fcz + ring)
+				continue;                    /* só a borda do anel */
 			if (bx < 0 || bz < 0 || bx >= ncx || bz >= ncz)
 				continue;
+			/* buffer quase cheio: as árvores deste bloco (e dos mais longe)
+			 * ficam de fora. Testado por bloco, não por árvore (mais barato;
+			 * um bloco a mais cabe na reserva) */
+			if (render_bytes_used() > budget) {
+				cut_trees += tree_count[bz][bx];
+				continue;
+			}
 			const TREE *t = &trees[tree_start[bz][bx]];
 			for (int n = tree_count[bz][bx]; n > 0; n--, t++) {
 				const TREE_DEF *d = &tree_defs[t->type];
@@ -505,6 +520,11 @@ void level_mark_occluders(int ex, int ez, const int *x, const int *z, int n, int
 				}
 			}
 		}
+}
+
+/* Quantos blocos e árvores ficaram de fora por falta de buffer no quadro */
+int level_cut_count(void) {
+	return cut_chunks + cut_trees;
 }
 
 void level_tree_stats(int *total, int *models, int *billboards) {
@@ -649,9 +669,27 @@ void level_apply_look(void) {
 void level_draw(void) {
 	prof_begin(PROF_CHUNKS);
 	stream_update();
-	for (int i = 0; i < CHUNK_SLOTS; i++)
-		if (slot_cx[i] >= 0)
-			render_chunk(&slot_geom[i]);
+	/* do mais perto para o mais longe da câmera (inserção: são <= 36) */
+	const VECTOR *cam = render_camera_pos();
+	int order[CHUNK_SLOTS], dist[CHUNK_SLOTS], n = 0;
+	for (int i = 0; i < CHUNK_SLOTS; i++) {
+		if (slot_cx[i] < 0) continue;
+		int d = dist2d(slot_geom[i].origin.vx + CHUNK_SIZE / 2 - cam->vx,
+		               slot_geom[i].origin.vz + CHUNK_SIZE / 2 - cam->vz);
+		int k = n++;
+		while (k > 0 && dist[k - 1] > d) { dist[k] = dist[k - 1]; order[k] = order[k - 1]; k--; }
+		dist[k] = d;
+		order[k] = i;
+	}
+	cut_chunks = 0;
+	const int budget = PACKET_LEN - PACKET_RESERVE - PACKET_TREE_ROOM;
+	for (int k = 0; k < n; k++) {
+		if (render_bytes_used() > budget) {
+			cut_chunks = n - k;              /* o resto é o mais distante */
+			break;
+		}
+		render_chunk(&slot_geom[order[k]]);
+	}
 	prof_end(PROF_CHUNKS);
 	prof_begin(PROF_TREES);
 	trees_draw();

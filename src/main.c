@@ -271,7 +271,10 @@ static void draw_hud(void) {
 		render_stats_time(&pc, &pg, &pv);
 		hud_print(12, 136, "CPU %d GPU %d FOLGA %d (linhas)", pc, pg, pv);
 		hud_print(12, 186, "SEED %08X  POLIS %d", (unsigned)g.seed, render_stats_polys());
-		hud_print(12, 196, "FPS %d  RAM GPU %d/%d", fps, render_stats_bytes(), PACKET_LEN);
+		if (level_cut_count() && ((g.frame >> 3) & 1))   /* pisca: buffer no limite */
+			hud_print(12, 196, "FPS %d RAM GPU %d CORTE %d!", fps, render_stats_bytes(), level_cut_count());
+		else
+			hud_print(12, 196, "FPS %d  RAM GPU %d/%d", fps, render_stats_bytes(), PACKET_LEN);
 		hud_print(12, 206, "X %d Z %d ANG %d CAM %d", p->pos.vx, p->pos.vz, p->angle, g.cam_yaw);
 	}
 }
@@ -864,6 +867,7 @@ static struct {
 	int      cpu_max, cpu_sum, gpu_max, gpu_sum;  /* perfil do quadro, em linhas */
 	int      logic_sum, logic_last;               /* parte da CPU gasta na lógica */
 	int      p_chunks, p_trees, p_other;          /* desenho por categoria (soma) */
+	int      cut_max;                             /* blocos+árvores cortados (buffer) */
 } bench;
 
 static void bench_start(void) {
@@ -898,6 +902,7 @@ static void bench_reset_stats(void) {
 	bench.cpu_max = bench.cpu_sum = bench.gpu_max = bench.gpu_sum = 0;
 	bench.logic_sum = 0;
 	bench.p_chunks = bench.p_trees = bench.p_other = 0;
+	bench.cut_max = 0;
 }
 
 /* Depois de cada passo de lógica: custo da colisão naquele passo */
@@ -969,6 +974,7 @@ static void bench_frame(int vs) {
 		bench.p_chunks += prof_get(PROF_CHUNKS);
 		bench.p_trees  += prof_get(PROF_TREES);
 		bench.p_other  += prof_get(PROF_OTHER);
+		if (level_cut_count() > bench.cut_max) bench.cut_max = level_cut_count();
 		int ge = collide_check_grid();
 		if (ge > bench.grid_err) bench.grid_err = ge;
 		if (--bench.timer > 0)
@@ -980,7 +986,7 @@ static void bench_frame(int vs) {
 		       "polis_max=%d polis_med=%d ram_gpu_max=%d col_max=%d col_med=%d "
 		       "arvores_modelo=%d arvores_plana=%d grade_erros=%d cam_max=%d cam_med=%d cam_celulas_max=%d arvores_transp=%d "
 		       "cpu_max=%d cpu_med=%d gpu_espera_max=%d gpu_espera_med=%d logica_med=%d "
-		       "desenho_blocos=%d desenho_arvores=%d desenho_resto=%d separacao=%d\n",
+		       "desenho_blocos=%d desenho_arvores=%d desenho_resto=%d separacao=%d corte=%d\n",
 		       bench_names[bench.point], bench.extras, n, bench.fps_min,
 		       bench.vsyncs ? bench.frames * 60 / bench.vsyncs : 0,
 		       bench.polis_max, bench.frames ? bench.polis_sum / bench.frames : 0, bench.ram_max,
@@ -995,7 +1001,8 @@ static void bench_frame(int vs) {
 		       bench.frames ? bench.p_trees / bench.frames : 0,
 		       bench.frames ? bench.p_other / bench.frames : 0,
 		       g.players[1].active ? dist2d(g.players[1].pos.vx - g.players[0].pos.vx,
-		                                    g.players[1].pos.vz - g.players[0].pos.vz) : 0);
+		                                    g.players[1].pos.vz - g.players[0].pos.vz) : 0,
+		       bench.cut_max);
 
 		if (bench.extras == 0) {             /* agora com inimigos extras */
 			uint32_t before = 0, after = 0;

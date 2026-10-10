@@ -895,6 +895,10 @@ int render_stats_bytes(void) {
 	return last_bytes;
 }
 
+int render_bytes_used(void) {
+	return nextpri - fb[cur].pkt;
+}
+
 /* Polígonos de modelos (render_mesh) no último quadro; o HUD não conta.
  * Orçamento do roteiro: ~2 500 por quadro. */
 int render_stats_polys(void) {
