@@ -60,7 +60,7 @@ static void free_spot_near(int *x, int *z) {
 	static const int off[8][2] = { {1,0},{0,1},{-1,0},{0,-1},{1,1},{-1,1},{1,-1},{-1,-1} };
 	for (int k = 0; k < 8; k++) {
 		int tx = *x + off[k][0] * TILE_SIZE, tz = *z + off[k][1] * TILE_SIZE;
-		if (!level_blocked(tx, tz, PLAYER_RADIUS) && !collide_prop_at(tx, tz, PLAYER_RADIUS)) {
+		if (!collide_solid_at(tx, tz, PLAYER_RADIUS)) {
 			*x = tx; *z = tz;
 			return;
 		}
@@ -475,13 +475,15 @@ static void select_draw(void) {
 /* Mundo                                                               */
 /* ------------------------------------------------------------------ */
 
-/* Depuração (L2 + SELECT com o overlay aberto): um quadrado em cima de cada
- * célula SÓLIDA da grade de colisão perto do jogador 1, na altura do topo
- * da célula. Se o desenho e a colisão baterem, cada parede/mata tem um
- * quadrado vermelho exatamente no topo; quadrado no ar ou no chão vazio =
- * desenho e colisão desencontrados.
- *   vermelho = parede/mata   laranja = sólido sem parede (caixa, árvore)
- *   roxo     = vazio (sem chão) */
+/* Depuração (L2 + SELECT com o overlay aberto): mostra a colisão em volta do
+ * jogador 1. Se o desenho e a colisão baterem, cada parede/mata tem um
+ * quadrado vermelho exatamente no topo e cada tronco tem um quadrado laranja
+ * do tamanho do seu círculo de colisão.
+ *   vermelho = parede/mata (célula sólida)      roxo = vazio (sem chão)
+ *   laranja  = caixa (célula) ou tronco em pé (círculo, tamanho = raio)
+ *   amarelo  = tronco caído (célula BAIXA: pula-se por cima, a visão passa)
+ *   em cima de cada inimigo perto: VERDE = o jogador 1 o enxerga (linha de
+ *   visão livre), VERMELHO = algo bloqueia a visão */
 static void collision_markers_draw(void) {
 	const PLAYER *p = &g.players[0];
 	if (!p->active) return;
@@ -490,6 +492,9 @@ static void collision_markers_draw(void) {
 		for (int cx = pcx - COLMARK_RADIUS; cx <= pcx + COLMARK_RADIUS; cx++) {
 			if (cx < 0 || cz < 0 || cx >= level_width() || cz >= level_height())
 				continue;
+			int ox, oz, orad;
+			for (int k = 0; collide_cell_obstacle(cx, cz, k, &ox, &oz, &orad); k++)
+				render_marker(ox, -300, oz, orad, 255, 140, 0);       /* tronco: círculo */
 			if (!level_cell_solid(cx, cz))
 				continue;
 			int x = cx * TILE_SIZE + TILE_SIZE / 2, z = cz * TILE_SIZE + TILE_SIZE / 2;
@@ -498,9 +503,19 @@ static void collision_markers_draw(void) {
 				render_marker(x, -top - 6, z, 80, 230, 30, 30);
 			else if (t == CELL_VOID)
 				render_marker(x, -6, z, 80, 150, 40, 200);
+			else if (level_cell_low(cx, cz))
+				render_marker(x, -130, z, 80, 240, 220, 40);           /* tronco caído */
 			else
-				render_marker(x, -280, z, 80, 255, 140, 0);   /* caixa/árvore: a 1 m do chão */
+				render_marker(x, -280, z, 80, 255, 140, 0);            /* caixa */
 		}
+	/* linha de visão do jogador 1 até cada inimigo perto */
+	for (int i = 0; i < MAX_ENEMIES; i++) {
+		const ENEMY *e = &g.enemies[i];
+		if (!e->active) continue;
+		if (dist2d(e->pos.vx - p->pos.vx, e->pos.vz - p->pos.vz) > 12 * TILE_SIZE) continue;
+		int see = collide_line_of_sight(p->pos.vx, p->pos.vz, e->pos.vx, e->pos.vz);
+		render_marker(e->pos.vx, -420, e->pos.vz, 50, see ? 40 : 240, see ? 230 : 30, 40);
+	}
 }
 
 /* Lanternas acesas neste quadro: avisa o motor (objetos no cone são vistos
@@ -743,6 +758,7 @@ static void debug_teleport(int i) {
 		p->vy = 0;
 		p->on_ground = 1;
 		p->angle = pts[i].yaw;
+		collide_track(p);                        /* posição definida direto */
 		first = 0;
 	}
 	g.cam_yaw = pts[i].yaw;
@@ -759,7 +775,7 @@ static void debug_spawn_enemies(void) {
 		int a = (p->angle + k * (4096 / DEBUG_SPAWN_COUNT)) & 4095;
 		int x = p->pos.vx + ((isin(a) * DEBUG_SPAWN_DIST) >> 12);
 		int z = p->pos.vz + ((icos(a) * DEBUG_SPAWN_DIST) >> 12);
-		if (level_blocked(x, z, 140) || collide_prop_at(x, z, 140))
+		if (collide_solid_at(x, z, 140))
 			continue;
 		enemy_spawn(k % num_enemy_types, x, z);
 	}
@@ -859,6 +875,7 @@ static struct {
 	int      polis_max, polis_sum, ram_max;
 	int      col_max, col_sum, col_ticks;
 	int      tree_m_max, tree_b_max;
+	int      grid_err;              /* entidades fora da célula certa (deve ser 0) */
 } bench;
 
 static void bench_start(void) {
@@ -876,6 +893,7 @@ static void bench_remove_extras(void) {
 		if ((bench.spawned & (1u << i)) && g.enemies[i].active) {
 			g.enemies[i].active = 0;
 			g.enemies_left--;
+			collide_track(&g.enemies[i]);    /* sai da grade */
 		}
 	bench.spawned = 0;
 }
@@ -886,6 +904,7 @@ static void bench_reset_stats(void) {
 	bench.polis_max = bench.polis_sum = bench.ram_max = 0;
 	bench.col_max = bench.col_sum = bench.col_ticks = 0;
 	bench.tree_m_max = bench.tree_b_max = 0;
+	bench.grid_err = 0;
 }
 
 /* Depois de cada passo de lógica: custo da colisão naquele passo */
@@ -935,6 +954,8 @@ static void bench_frame(int vs) {
 		level_tree_stats(&tt, &tm, &tb);
 		if (tm > bench.tree_m_max) bench.tree_m_max = tm;
 		if (tb > bench.tree_b_max) bench.tree_b_max = tb;
+		int ge = collide_check_grid();
+		if (ge > bench.grid_err) bench.grid_err = ge;
 		if (--bench.timer > 0)
 			break;
 
@@ -942,12 +963,12 @@ static void bench_frame(int vs) {
 		for (int i = 0; i < MAX_ENEMIES; i++) n += g.enemies[i].active;
 		printf("BENCH ponto=%s inimigos_extra=%d inimigos_total=%d fps_min=%d fps_med=%d "
 		       "polis_max=%d polis_med=%d ram_gpu_max=%d col_max=%d col_med=%d "
-		       "arvores_modelo=%d arvores_plana=%d\n",
+		       "arvores_modelo=%d arvores_plana=%d grade_erros=%d\n",
 		       bench_names[bench.point], bench.extras, n, bench.fps_min,
 		       bench.vsyncs ? bench.frames * 60 / bench.vsyncs : 0,
 		       bench.polis_max, bench.frames ? bench.polis_sum / bench.frames : 0, bench.ram_max,
 		       bench.col_max, bench.col_ticks ? bench.col_sum / bench.col_ticks : 0,
-		       bench.tree_m_max, bench.tree_b_max);
+		       bench.tree_m_max, bench.tree_b_max, bench.grid_err);
 
 		if (bench.extras == 0) {             /* agora com inimigos extras */
 			uint32_t before = 0, after = 0;

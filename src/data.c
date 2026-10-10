@@ -115,8 +115,8 @@ const SOUND_DEF sound_defs[] = {
 /* mundo (2 x 4 m no script).                                          */
 /* ------------------------------------------------------------------ */
 const TREE_DEF tree_defs[NUM_TREE_TYPES] = {
-	/* modelo            imagem plana          bb_w  bb_h   escala mín/máx          células */
-	{ &pinheiro_mesh,    &tex_pinheiro_bb_t,   512, 1024,  ONE * 85 / 100, ONE * 130 / 100, 1 },
-	{ &arvore_seca_mesh, &tex_seca_bb_t,       512, 1024,  ONE * 85 / 100, ONE * 120 / 100, 1 },
-	{ &tronco_mesh,      NULL,                 0,   0,     ONE * 90 / 100, ONE * 110 / 100, 3 },
+	/* modelo            imagem plana          bb_w  bb_h   escala mín/máx          células  raio do tronco */
+	{ &pinheiro_mesh,    &tex_pinheiro_bb_t,   512, 1024,  ONE * 85 / 100, ONE * 130 / 100, 1,  36 },
+	{ &arvore_seca_mesh, &tex_seca_bb_t,       512, 1024,  ONE * 85 / 100, ONE * 120 / 100, 1,  44 },
+	{ &tronco_mesh,      NULL,                 0,   0,     ONE * 90 / 100, ONE * 110 / 100, 3,  0  },
 };

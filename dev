@@ -314,16 +314,16 @@ cmd_bench() {
 	awk '
 		/^BENCH ponto=/ {
 			for (i = 2; i <= NF; i++) { split($i, kv, "="); v[kv[1]] = kv[2] }
-			printf "%-12s %4s %4s | %4s %4s | %5s %5s | %6s | %5s %4s | %4s %4s\n",
+			printf "%-12s %4s %4s | %4s %4s | %5s %5s | %6s | %5s %4s | %4s %4s | %5s\n",
 				v["ponto"], v["inimigos_extra"], v["inimigos_total"], v["fps_min"], v["fps_med"],
 				v["polis_max"], v["polis_med"], v["ram_gpu_max"], v["col_max"], v["col_med"],
-				v["arvores_modelo"], v["arvores_plana"]
+				v["arvores_modelo"], v["arvores_plana"], (v["grade_erros"] == "" ? "-" : v["grade_erros"])
 		}
 		BEGIN {
-			printf "%-12s %4s %4s | %4s %4s | %5s %5s | %6s | %5s %4s | %4s %4s\n",
-				"ponto", "+ini", "ini", "fps", "fps", "polis", "polis", "RAMGPU", "COL", "COL", "arv", "arv"
-			printf "%-12s %4s %4s | %4s %4s | %5s %5s | %6s | %5s %4s | %4s %4s\n",
-				"", "", "", "min", "med", "max", "med", "max", "max", "med", "mod", "pla"
+			printf "%-12s %4s %4s | %4s %4s | %5s %5s | %6s | %5s %4s | %4s %4s | %5s\n",
+				"ponto", "+ini", "ini", "fps", "fps", "polis", "polis", "RAMGPU", "COL", "COL", "arv", "arv", "grade"
+			printf "%-12s %4s %4s | %4s %4s | %5s %5s | %6s | %5s %4s | %4s %4s | %5s\n",
+				"", "", "", "min", "med", "max", "med", "max", "max", "med", "mod", "pla", "erros"
 		}' "$out"
 	c_ok "Resultado bruto: build-bench/bench.txt"
 }

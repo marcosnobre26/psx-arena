@@ -77,6 +77,7 @@
 /* vida, velocidade e pulo de cada personagem ficam em data.c (character_defs) */
 #define PLAYER_MAX_ENERGY   100
 #define PLAYER_RADIUS       70
+#define ENEMY_HOP           27  /* pulo do inimigo sobre tronco caído (sobe ~120) */
 #define PLAYER_INVULN       60  /* quadros invulnerável após levar dano */
 #define ENERGY_REGEN_DELAY  20  /* a cada N quadros recupera 1 de energia */
 

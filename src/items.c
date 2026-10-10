@@ -261,6 +261,8 @@ void prop_spawn(int def, int cx, int cz) {
 			if (x * x + z * z > r2) r2 = x * x + z * z;
 		}
 		p->radius = (SquareRoot0(r2) * prop_defs[def].scale) >> 12;
+		if (prop_defs[def].solid)            /* colisão pela grade espacial */
+			collide_add_obstacle(cx * TILE_SIZE + TILE_SIZE / 2, cz * TILE_SIZE + TILE_SIZE / 2, p->radius);
 		return;
 	}
 }

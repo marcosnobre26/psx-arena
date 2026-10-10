@@ -356,14 +356,20 @@ void level_add_tree(int type, int x, int z, int angle, int scale) {
 	t->rot = (angle & 4095) >> 4;
 	t->scale = scale >> 6;
 
-	/* colisão provisória: a célula do tronco fica sólida; deitado, também
-	 * as vizinhas ao longo do comprimento (eixo pelo ângulo arredondado) */
+	/* colisão: em pé = círculo do tronco na grade espacial (collision.c),
+	 * redondo para o jogador contornar suave; deitado = 3 células sólidas
+	 * BAIXAS ao longo do comprimento (eixo pelo ângulo arredondado): dá para
+	 * pular por cima, tiros param, a visão passa */
 	int cx = x / TILE_SIZE, cz = z / TILE_SIZE;
-	level_set_solid(cx, cz, 1);
 	if (tree_defs[type].cells == 3) {
 		int along_z = ((angle + 512) >> 10) & 1;   /* 1024/3072: comprido em Z */
-		level_set_solid(cx - !along_z, cz - along_z, 1);
-		level_set_solid(cx + !along_z, cz + along_z, 1);
+		for (int k = -1; k <= 1; k++) {
+			int lx = cx + (along_z ? 0 : k), lz = cz + (along_z ? k : 0);
+			if (lx >= 0 && lz >= 0 && lx < lw && lz < lh)
+				cells[lz][lx] |= CELL_SOLID | CELL_LOW;
+		}
+	} else {
+		collide_add_obstacle(x, z, (tree_defs[type].trunk_r * scale) >> 12);
 	}
 }
 
@@ -500,6 +506,7 @@ void level_load(int index) {
 	level_apply_look();               /* a luz entra na cor dos blocos */
 
 	num_trees = 0;
+	collide_reset();                  /* grade espacial vazia antes de criar objetos */
 	if (ld->map)
 		load_text_map(ld->map);
 	else if (ld->build)
@@ -566,10 +573,15 @@ int level_cell_solid(int cx, int cz) {
 	return cells[cz][cx] & CELL_SOLID;
 }
 
+int level_cell_low(int cx, int cz) {
+	if (cx < 0 || cz < 0 || cx >= lw || cz >= lh) return 0;
+	return cells[cz][cx] & CELL_LOW;
+}
+
 void level_set_solid(int cx, int cz, int s) {
 	if (cx < 0 || cz < 0 || cx >= lw || cz >= lh) return;
 	if (s) cells[cz][cx] |= CELL_SOLID;
-	else   cells[cz][cx] &= ~CELL_SOLID;
+	else   cells[cz][cx] &= ~(CELL_SOLID | CELL_LOW);
 }
 
 /* Um círculo de raio 'radius' em (x,z) encosta em algo sólido? */

@@ -82,6 +82,7 @@ void player_spawn(PLAYER *p, int x, int z) {
 	p->battery = BATTERY_MAX;
 	p->battery_tick = 0;
 	p->lantern_dying = 0;
+	collide_track(p);                     /* posição definida direto: entra na grade */
 }
 
 static void move(PLAYER *p, int dx, int dz) {
@@ -249,6 +250,7 @@ void player_damage(PLAYER *p, int amount, int from_x, int from_z) {
 
 	if (p->hp <= 0) {
 		p->hp = 0;
+		collide_track(p);                 /* caído: sai da grade (não bloqueia ninguém) */
 		effect_spawn(FX_BURST, p->pos.vx, p->pos.vz, 500, 30, 255, 80, 40);
 		if (players_alive() == 0) {
 			g.state = STATE_DEAD;

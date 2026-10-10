@@ -66,7 +66,7 @@ void bullets_update(void) {
 		/* bateu na parede, numa caixa ou num objeto de cenário? */
 		int cx = b->pos.vx / TILE_SIZE, cz = b->pos.vz / TILE_SIZE;
 		int wall = b->pos.vx < 0 || b->pos.vz < 0 || level_cell_solid(cx, cz);
-		if (wall || collide_prop_at(b->pos.vx, b->pos.vz, 24)) {
+		if (wall || collide_solid_at(b->pos.vx, b->pos.vz, 24)) {
 			if (wall)
 				crate_damage(cx, cz, b->damage);
 			sound_play_at(&sfx_acerto, b->pos.vx, b->pos.vz, VOL_PAREDE);
@@ -77,17 +77,11 @@ void bullets_update(void) {
 			continue;
 		}
 
-		/* acertou um inimigo? */
-		for (int j = 0; j < MAX_ENEMIES; j++) {
-			ENEMY *e = &g.enemies[j];
-			if (!e->active) continue;
-			int r = ((90 * enemy_defs[e->type].scale) >> 12) + 30;
-			int dx = e->pos.vx - b->pos.vx, dz = e->pos.vz - b->pos.vz;
-			if (abs(dx) < r && abs(dz) < r) {
-				enemy_damage(e, b->damage, b->vx / 3, b->vz / 3);
-				b->active = 0;
-				break;
-			}
+		/* acertou um inimigo? (só os das células perto, pela grade) */
+		ENEMY *e = collide_enemy_at(b->pos.vx, b->pos.vz, 30);
+		if (e) {
+			enemy_damage(e, b->damage, b->vx / 3, b->vz / 3);
+			b->active = 0;
 		}
 	}
 }

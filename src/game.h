@@ -136,6 +136,7 @@ enum {
 	CELL_THICKET,   /* mata densa (3 m), sólida */
 };
 #define CELL_TYPE_MASK  0x3f
+#define CELL_LOW        0x40   /* sólido BAIXO (tronco caído): pula-se por cima, não tapa a visão */
 #define CELL_SOLID      0x80
 
 /* Árvores e troncos caídos (data.c: tree_defs). Ficam guardados por bloco
@@ -146,7 +147,8 @@ typedef struct {
 	const TEXTURE *bb;          /* imagem plana de longe (NULL = some de longe) */
 	int            bb_w, bb_h;  /* tamanho da imagem no mundo, em escala ONE */
 	int            scale_min, scale_max;   /* variação de tamanho (ONE = 1.0) */
-	int            cells;       /* células sólidas: 1 (em pé) ou 3 (deitado) */
+	int            cells;       /* 1 = em pé (círculo do tronco); 3 = deitado (3 células baixas) */
+	int            trunk_r;     /* em pé: raio do tronco na escala ONE (colisão) */
 } TREE_DEF;
 extern const TREE_DEF tree_defs[];
 
@@ -218,6 +220,7 @@ typedef struct {
 	int     kx, kz;         /* empurrão (knockback) */
 	int     think;          /* contador para mudar de direção ao vagar */
 	int     hit_cooldown;
+	int     vy;             /* velocidade vertical (pulo por cima de tronco caído) */
 } ENEMY;
 
 typedef struct {
@@ -362,6 +365,7 @@ void level_tree_stats(int *total, int *models, int *billboards);
 void level_apply_look(void);            /* névoa e luz da fase atual */
 void level_draw(void);
 int  level_cell_solid(int cx, int cz);
+int  level_cell_low(int cx, int cz);    /* sólido baixo (tronco caído)? */
 int  level_blocked(int x, int z, int radius);
 void level_set_solid(int cx, int cz, int solid);
 int  level_width(void);
@@ -384,7 +388,15 @@ PLAYER *player_nearest(int x, int z, int *dist_out);   /* vivo mais próximo */
 int  collide_blocked(int x, int z, int y, int radius, const void *self, int mask,
                      int from_x, int from_z);
 int  collide_move(VECTOR *pos, int dx, int dz, int radius, const void *self, int mask);
-int  collide_prop_at(int x, int z, int radius);        /* objeto sólido ali? */
+int  collide_solid_at(int x, int z, int radius);       /* célula sólida ou obstáculo ali? */
+void collide_reset(void);               /* início do level_load */
+void collide_add_obstacle(int x, int z, int r);   /* tronco em pé / prop sólido */
+int  collide_cell_has_obstacle(int cx, int cz);
+void collide_track(const void *self);   /* posição mudou direto: atualiza a grade */
+ENEMY *collide_enemy_at(int x, int z, int pad);   /* tiro: inimigo atingido (ou NULL) */
+int  collide_line_of_sight(int x0, int z0, int x1, int z1);   /* 1 = visão livre */
+int  collide_check_grid(void);          /* depuração: entidades fora da célula certa */
+int  collide_cell_obstacle(int cx, int cz, int k, int *x, int *z, int *r);
 void collide_tick_begin(void);          /* depuração: zera o contador do passo */
 int  collide_stats(void);               /* testes de círculo no último passo */
 int  collide_tests_now(void);           /* testes do passo que acabou de rodar */

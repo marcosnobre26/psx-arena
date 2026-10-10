@@ -233,7 +233,8 @@ static void build_test_forest(void) {
 		for (int i = -2; i <= 2 && ok; i++) {              /* 3 células + folga de 1 */
 			int cx = x + (along_z ? 0 : i), cz = z + (along_z ? i : 0);
 			int near_trail = (cz >= TRAIL_Z - 2 && cz <= TRAIL_Z + 2) || (cx >= TRAIL_X - 2 && cx <= TRAIL_X + 2);
-			if (near_trail || in_clearing(cx, cz) || level_cell_solid(cx, cz))
+			if (near_trail || in_clearing(cx, cz) || level_cell_solid(cx, cz) ||
+			    collide_cell_has_obstacle(cx, cz))
 				ok = 0;
 		}
 		if (!ok)

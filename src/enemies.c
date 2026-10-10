@@ -48,7 +48,9 @@ void enemy_spawn(int type, int x, int z) {
 		e->flash = e->kx = e->kz = 0;
 		e->think = rand_range(30, 120);
 		e->hit_cooldown = 0;
+		e->vy = 0;
 		g.enemies_left++;
+		collide_track(e);                 /* posição definida direto: entra na grade */
 		return;
 	}
 }
@@ -66,6 +68,7 @@ void enemy_damage(ENEMY *e, int amount, int push_x, int push_z) {
 		const ENEMY_DEF *d = &enemy_defs[e->type];
 		sound_play_at(&sfx_morte, e->pos.vx, e->pos.vz, VOL_MORTE);
 		e->active = 0;
+		collide_track(e);                 /* morreu: sai da grade */
 		g.enemies_left--;
 		g.score += d->score;
 		effect_spawn(FX_BURST, e->pos.vx, e->pos.vz, (300 * d->scale) >> 12, 18,
@@ -109,6 +112,18 @@ void enemies_update(void) {
 		e->kx = e->kx * 3 / 4;     /* empurrão vai diminuindo */
 		e->kz = e->kz * 3 / 4;
 
+		/* tronco caído logo à frente e no chão? pula (mesma ideia do jogador:
+		 * acima de LOW_CLEAR a célula baixa não bloqueia) */
+		if (e->pos.vy == 0) {
+			int ax = e->pos.vx + ((isin(e->angle) * (rad + 48)) >> 12);
+			int az = e->pos.vz + ((icos(e->angle) * (rad + 48)) >> 12);
+			if (ax >= 0 && az >= 0 && level_cell_low(ax / TILE_SIZE, az / TILE_SIZE))
+				e->vy = -ENEMY_HOP;
+		}
+		e->vy += GRAVITY;
+		e->pos.vy += e->vy;
+		if (e->pos.vy >= 0) { e->pos.vy = 0; e->vy = 0; }
+
 		int blocked = collide_move(&e->pos, mx, mz, rad, e, COL_ALL);
 		if (blocked && !chasing)
 			e->angle = (e->angle + 1024 + (rng_next(&g.rng) & 1023)) & 4095;
@@ -144,7 +159,7 @@ void enemies_draw(void) {
 		/* pulinhos enquanto anda */
 		VECTOR pos = e->pos;
 		int hop = isin((g.frame * 128 + i * 700) & 4095);
-		pos.vy = -((hop < 0 ? -hop : hop) >> 8);
+		pos.vy = e->pos.vy - ((hop < 0 ? -hop : hop) >> 8);   /* + pulo real */
 
 		SVECTOR rot = { 0, e->angle, 0 };
 		render_mesh(d->mesh, &pos, &rot, d->scale, &opt);
