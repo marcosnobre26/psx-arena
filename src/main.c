@@ -266,6 +266,9 @@ static void draw_hud(void) {
 		int ct, cc;
 		camera_stats(&ct, &cc);
 		hud_print(12, 176, "SPU %dK  COL %d  CAM %d/%d", sound_spu_used() / 1024, collide_stats(), ct, cc);
+		int pc, pg, pv;
+		render_stats_time(&pc, &pg, &pv);
+		hud_print(12, 136, "CPU %d GPU %d FOLGA %d (linhas)", pc, pg, pv);
 		hud_print(12, 186, "SEED %08X  POLIS %d", (unsigned)g.seed, render_stats_polys());
 		hud_print(12, 196, "FPS %d  RAM GPU %d/%d", fps, render_stats_bytes(), PACKET_LEN);
 		hud_print(12, 206, "X %d Z %d ANG %d CAM %d", p->pos.vx, p->pos.vz, p->angle, g.cam_yaw);
@@ -675,12 +678,9 @@ static void debug_skip_level(void) {
 
 /* Leva os jogadores a um dos 4 pontos fixos da fase (LEVEL_DEF.debug_pts),
  * com a câmera numa direção fixa: medições de FPS/POLIS sempre iguais. */
-static void debug_teleport(int i) {
-	const DEBUG_POINT *pts = level_defs[g.level].debug_pts;
-	if (!pts || (g.state != STATE_PLAY && g.state != STATE_PAUSE))
-		return;
-	int x = pts[i].cx * TILE_SIZE + TILE_SIZE / 2;
-	int z = pts[i].cz * TILE_SIZE + TILE_SIZE / 2;
+static void teleport_to(const DEBUG_POINT *pt) {
+	int x = pt->cx * TILE_SIZE + TILE_SIZE / 2;
+	int z = pt->cz * TILE_SIZE + TILE_SIZE / 2;
 	int first = 1;
 	for (int k = 0; k < MAX_PLAYERS; k++) {
 		PLAYER *p = &g.players[k];
@@ -691,12 +691,19 @@ static void debug_teleport(int i) {
 		p->pos.vx = px; p->pos.vy = 0; p->pos.vz = pz;
 		p->vy = 0;
 		p->on_ground = 1;
-		p->angle = pts[i].yaw;
+		p->angle = pt->yaw;
 		collide_track(p);                        /* posição definida direto */
 		first = 0;
 	}
-	g.cam_yaw = pts[i].yaw;
+	g.cam_yaw = pt->yaw;
 	camera_snap();                               /* câmera direto no lugar */
+}
+
+static void debug_teleport(int i) {
+	const DEBUG_POINT *pts = level_defs[g.level].debug_pts;
+	if (!pts || (g.state != STATE_PLAY && g.state != STATE_PAUSE))
+		return;
+	teleport_to(&pts[i]);
 }
 
 /* Nascem até 8 inimigos num anel em volta do jogador 1 (só onde há chão
@@ -798,7 +805,38 @@ static void debug_input(INPUT *in) {
 #define BENCH_SETTLE_E 30     /* depois de criar os inimigos */
 #define BENCH_MEASURE  180    /* ~3 s a 60 quadros por segundo */
 
-static const char *const bench_names[4] = { "inicio", "cruzamento", "canto_denso", "clareira" };
+/* Os 4 primeiros são os pontos do teleporte (L2 + direcional) da fase 5;
+ * os outros só existem no benchmark. */
+#define BENCH_POINTS 6
+static const char *const bench_names[BENCH_POINTS] = {
+	"inicio", "cruzamento", "canto_denso", "clareira", "canto_tapado", "canto_2j" };
+static const DEBUG_POINT bench_extra[2] = {
+	{ 110, 24, 512 },       /* canto denso onde 2 árvores tapam o jogador (50%) */
+	{ 110, 24, 512 },       /* o mesmo, com o jogador 2 a ~5 células */
+};
+
+/* Jogador 2 entra/sai só para o ponto de 2 jogadores (posição definida
+ * direto: passa pela grade) */
+static void bench_player2(int on) {
+	PLAYER *p2 = &g.players[1];
+	if (!on) {
+		if (p2->active) { p2->active = 0; collide_track(p2); g.num_players = 1; }
+		return;
+	}
+	const PLAYER *p1 = &g.players[0];
+	p2->index = 1; p2->active = 1; p2->character = 1; p2->skin = 0;
+	for (int k = 0; k < 16; k++) {               /* ~5 células, primeiro lugar livre */
+		int a = (k * 256 + 1024) & 4095;
+		int x = p1->pos.vx + ((isin(a) * 5 * TILE_SIZE) >> 12);
+		int z = p1->pos.vz + ((icos(a) * 5 * TILE_SIZE) >> 12);
+		if (!collide_solid_at(x, z, PLAYER_RADIUS + 40)) {
+			player_spawn(p2, x, z);              /* chama collide_track */
+			break;
+		}
+	}
+	g.num_players = 2;
+	camera_snap();
+}
 
 enum { BENCH_TELEPORT, BENCH_WAIT, BENCH_MEASURING, BENCH_DONE };
 
@@ -812,6 +850,7 @@ static struct {
 	int      grid_err;              /* entidades fora da célula certa (deve ser 0) */
 	int      cam_max, cam_sum, cam_cells_max;   /* custo da câmera por quadro */
 	int      trans_max;                         /* árvores a 50% (tapando o jogador) */
+	int      cpu_max, cpu_sum, gpu_max, gpu_sum;  /* perfil do quadro, em linhas */
 } bench;
 
 static void bench_start(void) {
@@ -843,6 +882,7 @@ static void bench_reset_stats(void) {
 	bench.grid_err = 0;
 	bench.cam_max = bench.cam_sum = bench.cam_cells_max = 0;
 	bench.trans_max = 0;
+	bench.cpu_max = bench.cpu_sum = bench.gpu_max = bench.gpu_sum = 0;
 }
 
 /* Depois de cada passo de lógica: custo da colisão naquele passo */
@@ -859,13 +899,19 @@ static void bench_frame(int vs) {
 	switch (bench.phase) {
 	case BENCH_TELEPORT:
 		bench_remove_extras();
-		if (bench.point >= 4) {
+		bench_player2(0);
+		if (bench.point >= BENCH_POINTS) {
 			printf("BENCH FIM\n");
 			bench.phase = BENCH_DONE;
 			break;
 		}
 		g.state = STATE_PLAY;
-		debug_teleport(bench.point);
+		if (bench.point < 4)
+			debug_teleport(bench.point);
+		else
+			teleport_to(&bench_extra[bench.point - 4]);
+		if (bench.point == 5)
+			bench_player2(1);
 		bench.extras = 0;
 		bench.timer = BENCH_SETTLE;
 		bench.phase = BENCH_WAIT;
@@ -898,6 +944,12 @@ static void bench_frame(int vs) {
 		if (cc > bench.cam_cells_max) bench.cam_cells_max = cc;
 		bench.cam_sum += ct;
 		if (level_tree_transparent() > bench.trans_max) bench.trans_max = level_tree_transparent();
+		int pc, pg, pv;
+		render_stats_time(&pc, &pg, &pv);
+		if (pc > bench.cpu_max) bench.cpu_max = pc;
+		if (pg > bench.gpu_max) bench.gpu_max = pg;
+		bench.cpu_sum += pc;
+		bench.gpu_sum += pg;
 		int ge = collide_check_grid();
 		if (ge > bench.grid_err) bench.grid_err = ge;
 		if (--bench.timer > 0)
@@ -907,14 +959,17 @@ static void bench_frame(int vs) {
 		for (int i = 0; i < MAX_ENEMIES; i++) n += g.enemies[i].active;
 		printf("BENCH ponto=%s inimigos_extra=%d inimigos_total=%d fps_min=%d fps_med=%d "
 		       "polis_max=%d polis_med=%d ram_gpu_max=%d col_max=%d col_med=%d "
-		       "arvores_modelo=%d arvores_plana=%d grade_erros=%d cam_max=%d cam_med=%d cam_celulas_max=%d arvores_transp=%d\n",
+		       "arvores_modelo=%d arvores_plana=%d grade_erros=%d cam_max=%d cam_med=%d cam_celulas_max=%d arvores_transp=%d "
+		       "cpu_max=%d cpu_med=%d gpu_espera_max=%d gpu_espera_med=%d\n",
 		       bench_names[bench.point], bench.extras, n, bench.fps_min,
 		       bench.vsyncs ? bench.frames * 60 / bench.vsyncs : 0,
 		       bench.polis_max, bench.frames ? bench.polis_sum / bench.frames : 0, bench.ram_max,
 		       bench.col_max, bench.col_ticks ? bench.col_sum / bench.col_ticks : 0,
 		       bench.tree_m_max, bench.tree_b_max, bench.grid_err,
 		       bench.cam_max, bench.frames ? bench.cam_sum / bench.frames : 0, bench.cam_cells_max,
-		       bench.trans_max);
+		       bench.trans_max,
+		       bench.cpu_max, bench.frames ? bench.cpu_sum / bench.frames : 0,
+		       bench.gpu_max, bench.frames ? bench.gpu_sum / bench.frames : 0);
 
 		if (bench.extras == 0) {             /* agora com inimigos extras */
 			uint32_t before = 0, after = 0;

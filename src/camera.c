@@ -85,7 +85,11 @@ static void eye_at(int d, int want_dist, int s, int c, VECTOR *out) {
 static void update_base(int ticks, int snap) {
 	int dens = level_tree_density(cx, cz, 4 * TILE_SIZE);
 	if (dens > CAM_DENSE_FULL) dens = CAM_DENSE_FULL;
-	int target = CAM_DIST - (CAM_DIST - CAM_DENSE_DIST) * dens / CAM_DENSE_FULL;
+	/* 2 jogadores afastados: o ENQUADRAMENTO vence a aproximação da mata
+	 * (os dois precisam caber na tela). Com 'extra' >= CAM_FRAME_FULL a
+	 * densidade deixa de aproximar; as árvores que tapam ficam a 50%. */
+	int keep = extra >= CAM_FRAME_FULL ? 0 : CAM_FRAME_FULL - extra;
+	int target = CAM_DIST - (CAM_DIST - CAM_DENSE_DIST) * dens / CAM_DENSE_FULL * keep / CAM_FRAME_FULL;
 	if (snap) {
 		base_dist = target;
 		return;

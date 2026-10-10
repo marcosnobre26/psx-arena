@@ -20,6 +20,7 @@
 #include <stdio.h>
 #include <stdarg.h>
 #include <inline_c.h>
+#include <hwregs_c.h>
 #include "config.h"
 #include "render.h"
 
@@ -42,6 +43,8 @@ static uint8_t *nextpri;
 static int      last_bytes = 0;
 static int      polys = 0;         /* polígonos enviados à GPU neste quadro */
 static int      last_polys = 0;    /* total do quadro anterior (para o HUD) */
+static uint16_t prof_start;        /* perfil do quadro (ver render_end_frame) */
+static int      prof_cpu, prof_gpu, prof_vs;
 
 static MATRIX   view;          /* matriz da câmera (mundo -> câmera) */
 static VECTOR   cam_pos;
@@ -231,6 +234,8 @@ void render_init(void) {
 	InitGeom();
 	gte_SetGeomOffset(SCREEN_W / 2, SCREEN_H / 2);
 	gte_SetGeomScreen(FOV_H);
+	TIMER_CTRL(1) = 0x0100;    /* timer 1 conta linhas horizontais (perfil) */
+	prof_start = TIMER_VALUE(1);
 	render_set_light(72, 72, 88, ONE, ONE, ONE * 9 / 10);
 	render_set_fog(6000, 9000, CLEAR_R, CLEAR_G, CLEAR_B);   /* praticamente sem névoa */
 
@@ -830,13 +835,33 @@ void hud_print(int x, int y, const char *fmt, ...) {
 
 /* ------------------------------------------------------------------ */
 
+/* Perfil do quadro (depuração), em LINHAS horizontais (timer 1 do PS1,
+ * ~63,5 us cada; um quadro a 60 Hz tem ~262, a 30 FPS ~525):
+ *   cpu  = do começo do quadro até aqui (lógica + montar primitivas)
+ *   gpu  = espera no DrawSync: a GPU ainda desenhando o quadro ANTERIOR
+ *          (ela trabalha em paralelo com a CPU). Espera grande = GPU é o
+ *          gargalo (preenchimento); espera ~0 = a CPU é o gargalo.
+ *   vs   = espera pelo retraço vertical (folga) */
+void render_stats_time(int *cpu, int *gpu, int *vs) {
+	*cpu = prof_cpu;
+	*gpu = prof_gpu;
+	*vs  = prof_vs;
+}
+
 void render_end_frame(void) {
 	last_bytes = nextpri - fb[cur].pkt;
 	last_polys = polys;
 	polys = 0;
 
+	uint16_t t0 = TIMER_VALUE(1);
 	DrawSync(0);   /* espera a GPU terminar o quadro anterior */
+	uint16_t t1 = TIMER_VALUE(1);
 	VSync(0);      /* espera o retraço vertical (60 Hz NTSC) */
+	uint16_t t2 = TIMER_VALUE(1);
+	prof_cpu = (uint16_t)(t0 - prof_start);    /* uint16: o contador dá a volta */
+	prof_gpu = (uint16_t)(t1 - t0);
+	prof_vs  = (uint16_t)(t2 - t1);
+	prof_start = t2;
 
 	PutDispEnv(&fb[cur].disp);
 	PutDrawEnv(&fb[cur].draw);

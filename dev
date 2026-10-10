@@ -314,20 +314,21 @@ cmd_bench() {
 	awk '
 		/^BENCH ponto=/ {
 			for (i = 2; i <= NF; i++) { split($i, kv, "="); v[kv[1]] = kv[2] }
-			printf "%-12s %4s %4s | %4s %4s | %5s %5s | %6s | %5s %4s | %4s %4s | %5s | %4s %4s %5s | %3s\n",
+			printf "%-12s %4s %4s | %4s %4s | %5s %5s | %6s | %5s %4s | %4s %4s | %5s | %4s %4s %5s | %3s | %4s %4s\n",
 				v["ponto"], v["inimigos_extra"], v["inimigos_total"], v["fps_min"], v["fps_med"],
 				v["polis_max"], v["polis_med"], v["ram_gpu_max"], v["col_max"], v["col_med"],
 				v["arvores_modelo"], v["arvores_plana"], (v["grade_erros"] == "" ? "-" : v["grade_erros"]),
 				(v["cam_max"] == "" ? "-" : v["cam_max"]), (v["cam_med"] == "" ? "-" : v["cam_med"]),
 				(v["cam_celulas_max"] == "" ? "-" : v["cam_celulas_max"]),
-				(v["arvores_transp"] == "" ? "-" : v["arvores_transp"])
+				(v["arvores_transp"] == "" ? "-" : v["arvores_transp"]),
+				(v["cpu_med"] == "" ? "-" : v["cpu_med"]), (v["gpu_espera_med"] == "" ? "-" : v["gpu_espera_med"])
 			delete v
 		}
 		BEGIN {
-			printf "%-12s %4s %4s | %4s %4s | %5s %5s | %6s | %5s %4s | %4s %4s | %5s | %4s %4s %5s | %3s\n",
-				"ponto", "+ini", "ini", "fps", "fps", "polis", "polis", "RAMGPU", "COL", "COL", "arv", "arv", "grade", "CAM", "CAM", "CAM", "arv"
-			printf "%-12s %4s %4s | %4s %4s | %5s %5s | %6s | %5s %4s | %4s %4s | %5s | %4s %4s %5s | %3s\n",
-				"", "", "", "min", "med", "max", "med", "max", "max", "med", "mod", "pla", "erros", "max", "med", "cel", "50%"
+			printf "%-12s %4s %4s | %4s %4s | %5s %5s | %6s | %5s %4s | %4s %4s | %5s | %4s %4s %5s | %3s | %4s %4s\n",
+				"ponto", "+ini", "ini", "fps", "fps", "polis", "polis", "RAMGPU", "COL", "COL", "arv", "arv", "grade", "CAM", "CAM", "CAM", "arv", "CPU", "GPU"
+			printf "%-12s %4s %4s | %4s %4s | %5s %5s | %6s | %5s %4s | %4s %4s | %5s | %4s %4s %5s | %3s | %4s %4s\n",
+				"", "", "", "min", "med", "max", "med", "max", "max", "med", "mod", "pla", "erros", "max", "med", "cel", "50%", "lin", "esp"
 		}' "$out"
 	c_ok "Resultado bruto: build-bench/bench.txt"
 }

@@ -77,6 +77,7 @@
 #define CAM_STEP        64      /* passo ao aproximar/afastar por causa de troncos */
 #define CAM_DENSE_DIST  540     /* na mata densa a câmera chega até aqui (de CAM_DIST) */
 #define CAM_DENSE_FULL  8       /* "densidade" (árvores em ~4 células) = aproximação total */
+#define CAM_FRAME_FULL  600     /* 2 jogadores: recuo de enquadramento que anula a aproximação */
 #define CAM_TRUNK_MARGIN 32     /* folga entre a linha da câmera e um tronco */
 #define CAM_TURN_SPEED  40      /* giro com L1/R1 por quadro */
 
