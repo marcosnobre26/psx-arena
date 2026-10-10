@@ -349,6 +349,7 @@ void camera_view_update(int ticks);     /* visual: segue o grupo (uma vez por qu
 void camera_snap(void);                 /* visual: direto no lugar */
 void camera_apply(void);                /* envia para o motor 3D */
 const VECTOR *camera_eye(void);         /* olho da câmera (som posicional) */
+void camera_stats(int *tests, int *cells);   /* custo do quadro anterior (L2/bench) */
 
 /* objective.c */
 void objective_start(void);
@@ -403,6 +404,8 @@ int  collide_cell_has_obstacle(int cx, int cz);
 void collide_track(const void *self);   /* posição mudou direto: atualiza a grade */
 ENEMY *collide_enemy_at(int x, int z, int pad);   /* tiro: inimigo atingido (ou NULL) */
 int  collide_line_of_sight(int x0, int z0, int x1, int z1);   /* 1 = visão livre */
+int  collide_camera_clear(int x, int z, int ex, int ez);      /* câmera vê o jogador? */
+int  collide_seg_cells_take(void);      /* células percorridas pela câmera (custo) */
 int  collide_check_grid(void);          /* depuração: entidades fora da célula certa */
 int  collide_cell_obstacle(int cx, int cz, int k, int *x, int *z, int *r);
 void collide_tick_begin(void);          /* depuração: zera o contador do passo */

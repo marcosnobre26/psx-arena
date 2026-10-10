@@ -263,7 +263,9 @@ static void draw_hud(void) {
 		level_tree_stats(&tt, &tm, &tb);
 		if (tt)
 			hud_print(12, 146, "ARVORES %d  MODELO %d  PLANA %d", tt, tm, tb);
-		hud_print(12, 176, "SPU %dK/512K  COL %d", sound_spu_used() / 1024, collide_stats());
+		int ct, cc;
+		camera_stats(&ct, &cc);
+		hud_print(12, 176, "SPU %dK  COL %d  CAM %d/%d", sound_spu_used() / 1024, collide_stats(), ct, cc);
 		hud_print(12, 186, "SEED %08X  POLIS %d", (unsigned)g.seed, render_stats_polys());
 		hud_print(12, 196, "FPS %d  RAM GPU %d/%d", fps, render_stats_bytes(), PACKET_LEN);
 		hud_print(12, 206, "X %d Z %d ANG %d CAM %d", p->pos.vx, p->pos.vz, p->angle, g.cam_yaw);
@@ -808,6 +810,7 @@ static struct {
 	int      col_max, col_sum, col_ticks;
 	int      tree_m_max, tree_b_max;
 	int      grid_err;              /* entidades fora da célula certa (deve ser 0) */
+	int      cam_max, cam_sum, cam_cells_max;   /* custo da câmera por quadro */
 } bench;
 
 static void bench_start(void) {
@@ -837,6 +840,7 @@ static void bench_reset_stats(void) {
 	bench.col_max = bench.col_sum = bench.col_ticks = 0;
 	bench.tree_m_max = bench.tree_b_max = 0;
 	bench.grid_err = 0;
+	bench.cam_max = bench.cam_sum = bench.cam_cells_max = 0;
 }
 
 /* Depois de cada passo de lógica: custo da colisão naquele passo */
@@ -886,6 +890,11 @@ static void bench_frame(int vs) {
 		level_tree_stats(&tt, &tm, &tb);
 		if (tm > bench.tree_m_max) bench.tree_m_max = tm;
 		if (tb > bench.tree_b_max) bench.tree_b_max = tb;
+		int ct, cc;
+		camera_stats(&ct, &cc);
+		if (ct > bench.cam_max) bench.cam_max = ct;
+		if (cc > bench.cam_cells_max) bench.cam_cells_max = cc;
+		bench.cam_sum += ct;
 		int ge = collide_check_grid();
 		if (ge > bench.grid_err) bench.grid_err = ge;
 		if (--bench.timer > 0)
@@ -895,12 +904,13 @@ static void bench_frame(int vs) {
 		for (int i = 0; i < MAX_ENEMIES; i++) n += g.enemies[i].active;
 		printf("BENCH ponto=%s inimigos_extra=%d inimigos_total=%d fps_min=%d fps_med=%d "
 		       "polis_max=%d polis_med=%d ram_gpu_max=%d col_max=%d col_med=%d "
-		       "arvores_modelo=%d arvores_plana=%d grade_erros=%d\n",
+		       "arvores_modelo=%d arvores_plana=%d grade_erros=%d cam_max=%d cam_med=%d cam_celulas_max=%d\n",
 		       bench_names[bench.point], bench.extras, n, bench.fps_min,
 		       bench.vsyncs ? bench.frames * 60 / bench.vsyncs : 0,
 		       bench.polis_max, bench.frames ? bench.polis_sum / bench.frames : 0, bench.ram_max,
 		       bench.col_max, bench.col_ticks ? bench.col_sum / bench.col_ticks : 0,
-		       bench.tree_m_max, bench.tree_b_max, bench.grid_err);
+		       bench.tree_m_max, bench.tree_b_max, bench.grid_err,
+		       bench.cam_max, bench.frames ? bench.cam_sum / bench.frames : 0, bench.cam_cells_max);
 
 		if (bench.extras == 0) {             /* agora com inimigos extras */
 			uint32_t before = 0, after = 0;

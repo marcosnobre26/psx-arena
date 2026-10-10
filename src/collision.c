@@ -356,27 +356,43 @@ static int seg_hits_circle(int x0, int z0, int ux, int uz, int len, int ox, int 
 	return side < r && side > -r;
 }
 
-int collide_line_of_sight(int x0, int z0, int x1, int z1) {
+/* Modos do percurso de segmento */
+enum { SEG_SIGHT, SEG_CAMERA };
+
+static int seg_cell_blocks(int mode, int cx, int cz) {
+	if (mode == SEG_SIGHT)               /* parede, mata, caixa; tronco caído não */
+		return level_cell_solid(cx, cz) && !level_cell_low(cx, cz);
+	/* câmera: só o que é mais alto que ela (a mata de 3 m); parede baixa,
+	 * caixa e tronco caído ficam por baixo */
+	return level_cell_top(cx, cz) > CAM_HEIGHT;
+}
+
+static int seg_cells;                    /* células percorridas (custo, depuração) */
+
+/* Percorre exatamente as células que o segmento cruza (DDA em inteiros) e
+ * devolve 1 se nada bloqueia. Células de partida e de chegada não contam
+ * (quem olha / a câmera estão ali; a célula do olho é testada à parte). */
+static int segment_clear(int x0, int z0, int x1, int z1, int mode, int margin) {
 	int dx = x1 - x0, dz = z1 - z0;
 	int adx = abs(dx), adz = abs(dz);
 	/* direção unitária (4096): o comprimento cabe em 32 bits com >> 2 */
 	int len = SquareRoot0((adx >> 2) * (adx >> 2) + (adz >> 2) * (adz >> 2)) << 2;
 	int ux = len ? (dx * 4096) / len : 0, uz = len ? (dz * 4096) / len : 0;
 
-	int cx = x0 / TILE_SIZE, cz = z0 / TILE_SIZE;
+	int sx0 = x0 / TILE_SIZE, sz0 = z0 / TILE_SIZE;
+	int cx = sx0, cz = sz0;
 	int ex = x1 / TILE_SIZE, ez = z1 / TILE_SIZE;
 	int sx = dx > 0 ? 1 : -1, sz = dz > 0 ? 1 : -1;
 
 	for (int steps = 0; steps < 2 * (MAP_MAX_W + MAP_MAX_H); steps++) {
-		col_tests++;
-		/* esta célula bloqueia? (a de partida e a de chegada não contam
-		 * paredes: quem olha e quem é olhado estão ali) */
-		int endpoint = (cx == x0 / TILE_SIZE && cz == z0 / TILE_SIZE) || (cx == ex && cz == ez);
-		if (!endpoint && level_cell_solid(cx, cz) && !level_cell_low(cx, cz))
+		if (mode == SEG_SIGHT) col_tests++;  /* COL = custo da lógica */
+		else seg_cells++;                    /* câmera: contador próprio */
+		int endpoint = (cx == sx0 && cz == sz0) || (cx == ex && cz == ez);
+		if (!endpoint && seg_cell_blocks(mode, cx, cz))
 			return 0;
 		if (cx >= 0 && cz >= 0 && cx < MAP_MAX_W && cz < MAP_MAX_H)
 			for (int i = obst_head[cz][cx]; i >= 0; i = obst[i].next)
-				if (seg_hits_circle(x0, z0, ux, uz, len, obst[i].x, obst[i].z, obst[i].r))
+				if (seg_hits_circle(x0, z0, ux, uz, len, obst[i].x, obst[i].z, obst[i].r + margin))
 					return 0;
 		if (cx == ex && cz == ez)
 			return 1;
@@ -392,14 +408,36 @@ int collide_line_of_sight(int x0, int z0, int x1, int z1) {
 		else if (tz < tx)  cz += sz;
 		else {
 			/* passa exatamente pelo canto: fechado se as duas vizinhas fecham */
-			int a = level_cell_solid(cx + sx, cz) && !level_cell_low(cx + sx, cz);
-			int b = level_cell_solid(cx, cz + sz) && !level_cell_low(cx, cz + sz);
-			if (a && b) return 0;
+			if (seg_cell_blocks(mode, cx + sx, cz) && seg_cell_blocks(mode, cx, cz + sz))
+				return 0;
 			cx += sx;
 			cz += sz;
 		}
 	}
 	return 0;
+}
+
+int collide_line_of_sight(int x0, int z0, int x1, int z1) {
+	return segment_clear(x0, z0, x1, z1, SEG_SIGHT, 0);
+}
+
+/* A câmera em (ex, ez) enxerga o ponto (x, z) do jogador sem atravessar
+ * nada que ela não passe por cima? Bloqueiam só troncos em pé (com folga,
+ * para não "raspar") e células mais altas que a câmera; o próprio olho não
+ * pode estar dentro dessas coisas. Inimigos, troncos caídos, paredes baixas
+ * e caixas não empurram a câmera: ela passa por cima. */
+int collide_camera_clear(int x, int z, int ex, int ez) {
+	int ecx = ex / TILE_SIZE, ecz = ez / TILE_SIZE;
+	if (ex < 0 || ez < 0 || seg_cell_blocks(SEG_CAMERA, ecx, ecz))
+		return 0;
+	return segment_clear(x, z, ex, ez, SEG_CAMERA, CAM_TRUNK_MARGIN);
+}
+
+/* Custo do teste da câmera: células percorridas desde a última leitura */
+int collide_seg_cells_take(void) {
+	int n = seg_cells;
+	seg_cells = 0;
+	return n;
 }
 
 /* ------------------------------------------------------------------ */
