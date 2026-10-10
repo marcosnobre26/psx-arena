@@ -52,8 +52,6 @@ static int any_pressed(uint16_t mask) {
 /* Partida                                                             */
 /* ------------------------------------------------------------------ */
 
-static void camera_update(int snap);
-static VECTOR cam_look;
 
 /* Lugar livre ao lado de (x,z) para o segundo jogador nascer */
 static void free_spot_near(int *x, int *z) {
@@ -105,7 +103,7 @@ static void game_reset(int level, uint32_t seed) {
 	                     level_height() * TILE_SIZE / 2 - g.spawn_z);
 	for (int i = 0; i < MAX_PLAYERS; i++)
 		g.players[i].angle = g.cam_yaw;
-	camera_update(1);
+	camera_snap();                 /* câmera visual direto no lugar */
 	objective_start();
 }
 
@@ -182,69 +180,6 @@ static void start_new_game(void) {
 /* ------------------------------------------------------------------ */
 /* Câmera em terceira pessoa (segue o grupo)                            */
 /* ------------------------------------------------------------------ */
-
-static void camera_update(int snap) {
-	if (g.state == STATE_PLAY) {
-		for (int i = 0; i < MAX_PLAYERS; i++) {   /* qualquer jogador gira */
-			if (!g.players[i].active) continue;
-			if (g.in[i].held & PAD_L1) g.cam_yaw -= CAM_TURN_SPEED;
-			if (g.in[i].held & PAD_R1) g.cam_yaw += CAM_TURN_SPEED;
-			g.cam_yaw += g.in[i].rx / 3;
-		}
-		g.cam_yaw &= 4095;
-	}
-
-	/* centro dos jogadores vivos (se ninguém vivo, de todos) e o quanto
-	 * estão afastados: a câmera recua para mostrar os dois */
-	int n = 0, cx = 0, cy = 0, cz = 0;
-	int minx = 0x7fffffff, maxx = -0x7fffffff, minz = 0x7fffffff, maxz = -0x7fffffff;
-	int only_alive = players_alive() > 0;
-	for (int i = 0; i < MAX_PLAYERS; i++) {
-		PLAYER *p = &g.players[i];
-		if (!p->active || (only_alive && !player_alive(p))) continue;
-		cx += p->pos.vx; cy += p->pos.vy; cz += p->pos.vz; n++;
-		if (p->pos.vx < minx) minx = p->pos.vx;
-		if (p->pos.vx > maxx) maxx = p->pos.vx;
-		if (p->pos.vz < minz) minz = p->pos.vz;
-		if (p->pos.vz > maxz) maxz = p->pos.vz;
-	}
-	if (n == 0) return;
-	cx /= n; cy /= n; cz /= n;
-	int extra = (n > 1) ? dist2d(maxx - minx, maxz - minz) * 2 / 3 : 0;
-	if (extra > 1400) extra = 1400;
-
-	/* Recua a câmera atrás do grupo. Se ela cair dentro de uma parede,
-	 * aproxima e SOBE (fica mais "de cima"), assim ninguém some atrás de
-	 * uma parede. */
-	int s = isin(g.cam_yaw), c = icos(g.cam_yaw);
-	int want_dist = CAM_DIST + extra;
-	VECTOR want;
-	int dist;
-	for (dist = want_dist; dist > CAM_MIN_DIST; dist -= 40) {
-		want.vx = cx - ((s * dist) >> 12);
-		want.vz = cz - ((c * dist) >> 12);
-		if (!level_blocked(want.vx, want.vz, 64))
-			break;
-	}
-	want.vy = (cy >> 1) - CAM_HEIGHT - extra * 3 / 4 - (want_dist - dist) * 3 / 4;
-
-	if (snap) {
-		g.cam_pos = want;
-	} else {   /* suaviza o movimento: anda 1/4 do caminho por quadro */
-		g.cam_pos.vx += (want.vx - g.cam_pos.vx) >> 2;
-		g.cam_pos.vy += (want.vy - g.cam_pos.vy) >> 2;
-		g.cam_pos.vz += (want.vz - g.cam_pos.vz) >> 2;
-	}
-
-	cam_look.vx = cx;
-	cam_look.vy = (cy >> 1) - CAM_LOOK_UP;
-	cam_look.vz = cz;
-}
-
-/* Envia a câmera calculada para o renderizador (uma vez por quadro) */
-static void camera_apply(void) {
-	render_set_camera(&g.cam_pos, &cam_look);
-}
 
 /* Na tela de título a câmera gira em volta da arena */
 static void camera_title(void) {
@@ -584,7 +519,7 @@ static void game_tick(void) {
 		bullets_update();
 		pickups_update();
 		effects_update();
-		camera_update(0);
+		camera_turn();                   /* lógica: só o ângulo (g.cam_yaw) */
 		g.play_frames++;
 		if (objective_update() && g.state == STATE_PLAY) {
 			g.state = STATE_WIN;
@@ -602,7 +537,6 @@ static void game_tick(void) {
 
 	case STATE_INTRO:                             /* nome da fase e objetivo */
 		effects_update();
-		camera_update(0);
 		if (--g.state_timer <= 0 || any_pressed(PAD_START | PAD_CROSS) >= 0)
 			g.state = STATE_PLAY;
 		break;
@@ -611,7 +545,6 @@ static void game_tick(void) {
 	case STATE_DEAD:
 		enemies_update();
 		effects_update();
-		camera_update(0);
 		if (any_pressed(PAD_START) >= 0) {
 			if (g.state == STATE_DEAD) {              /* recomeça a fase (semente nova) */
 				start_level(g.level, g.frame);
@@ -629,7 +562,6 @@ static void game_tick(void) {
 
 	case STATE_END:
 		effects_update();
-		camera_update(0);
 		if (any_pressed(PAD_START | PAD_CROSS) >= 0) {
 			game_reset(0, 12345);                 /* fundo do título, como no boot */
 			g.state = STATE_TITLE;
@@ -762,7 +694,7 @@ static void debug_teleport(int i) {
 		first = 0;
 	}
 	g.cam_yaw = pts[i].yaw;
-	camera_update(1);                            /* câmera direto no lugar */
+	camera_snap();                               /* câmera direto no lugar */
 }
 
 /* Nascem até 8 inimigos num anel em volta do jogador 1 (só onde há chão
@@ -1050,6 +982,9 @@ int main(void) {
 				g.in[i].pressed = 0;    /* "apertou agora" vale só 1 passo */
 		}
 
+		/* câmera visual: segue o grupo depois da lógica (fora de g) */
+		if (g.state != STATE_TITLE && g.state != STATE_SELECT)
+			camera_view_update(ticks);
 		ambience_update();
 		game_draw();
 		render_end_frame();

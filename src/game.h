@@ -310,8 +310,9 @@ typedef struct {
 	EFFECT  effects[MAX_EFFECTS];
 	PROP    props[MAX_PROPS];
 
-	int     cam_yaw;        /* ângulo da câmera ao redor dos jogadores */
-	VECTOR  cam_pos;        /* posição suavizada da câmera */
+	int     cam_yaw;        /* ângulo da câmera ao redor dos jogadores (LÓGICA:
+	                           o direcional do jogador gira com ele). A posição
+	                           da câmera é visual e fica em camera.c */
 
 	char    message[40];    /* mensagem temporária no centro da tela */
 	int     message_timer;
@@ -341,6 +342,13 @@ int      fx_range(int lo, int hi);            /* só efeitos visuais */
 
 /* player.c (lanterna) */
 int  lantern_lit(const PLAYER *p);      /* acesa neste quadro? (só para o desenho) */
+
+/* camera.c */
+void camera_turn(void);                 /* lógica: gira g.cam_yaw pelos controles */
+void camera_view_update(int ticks);     /* visual: segue o grupo (uma vez por quadro) */
+void camera_snap(void);                 /* visual: direto no lugar */
+void camera_apply(void);                /* envia para o motor 3D */
+const VECTOR *camera_eye(void);         /* olho da câmera (som posicional) */
 
 /* objective.c */
 void objective_start(void);

@@ -157,7 +157,8 @@ void sound_play(const SOUND *s, int vol) {
 /* Som com posição no mundo: mais baixo com a distância até a câmera e
  * puxado para o lado em que está em relação à direção da câmera. */
 void sound_play_at(const SOUND *s, int x, int z, int vol) {
-	int dx = x - g.cam_pos.vx, dz = z - g.cam_pos.vz;
+	const VECTOR *cam = camera_eye();    /* câmera visual (som não muda g) */
+	int dx = x - cam->vx, dz = z - cam->vz;
 	int d  = dist2d(dx, dz);
 	if (d >= SOUND_FAR)
 		return;                              /* longe demais: inaudível */

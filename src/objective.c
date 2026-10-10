@@ -61,10 +61,21 @@ static int spawn_ok(int x, int z) {
 		if (player_alive(p) && dist2d(p->pos.vx - x, p->pos.vz - z) < REINFORCE_MIN_DIST)
 			return 0;
 	}
-	int dx = x - g.cam_pos.vx, dz = z - g.cam_pos.vz;
-	int rel = angle_diff(g.cam_yaw, angle_of(dx, dz));
-	if (rel > -700 && rel < 700 && dist2d(dx, dz) < render_fog_far())
-		return 0;                                   /* a câmera veria nascer */
+	/* "a câmera veria nascer": cone à frente do GRUPO na direção g.cam_yaw.
+	 * Só dados de g (centro dos jogadores, ângulo, névoa da TABELA da fase):
+	 * a posição suavizada da câmera é visual e não pode decidir a lógica
+	 * (no modo link os dois consoles precisam chegar ao mesmo resultado). */
+	int n = 0, gx = 0, gz = 0;
+	for (int i = 0; i < MAX_PLAYERS; i++)
+		if (player_alive(&g.players[i])) {
+			gx += g.players[i].pos.vx; gz += g.players[i].pos.vz; n++;
+		}
+	if (n) {
+		int dx = x - gx / n, dz = z - gz / n;
+		int rel = angle_diff(g.cam_yaw, angle_of(dx, dz));
+		if (rel > -700 && rel < 700 && dist2d(dx, dz) < level_defs[g.level].fog_far)
+			return 0;
+	}
 	for (int i = 0; i < MAX_ENEMIES; i++) {
 		const ENEMY *e = &g.enemies[i];
 		if (e->active && dist2d(e->pos.vx - x, e->pos.vz - z) < 200)

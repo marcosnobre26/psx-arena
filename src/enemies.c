@@ -20,7 +20,8 @@ static int growl_wait = 0;
 /* Inimigo perto e fora do campo de visão da câmera rosna de vez em quando:
  * o jogador ouve o que não vê (pilar "ver pouco, ouvir muito"). */
 static void enemy_growl(const ENEMY *e) {
-	int dx = e->pos.vx - g.cam_pos.vx, dz = e->pos.vz - g.cam_pos.vz;
+	const VECTOR *cam = camera_eye();    /* só decide o SOM (não muda g) */
+	int dx = e->pos.vx - cam->vx, dz = e->pos.vz - cam->vz;
 	if (dist2d(dx, dz) > GROWL_DIST)
 		return;
 	int rel = angle_diff(g.cam_yaw, angle_of(dx, dz));
