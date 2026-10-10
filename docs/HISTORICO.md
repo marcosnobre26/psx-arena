@@ -330,9 +330,17 @@ automatizar testes visuais.
   | canto denso | 0 / 7 | 30/30 / **30/30** | 610 / 769 | 27 228 / 30 572 | 410 / **504** | 35 / 64 | 0 | 0 |
   | clareira | 0 / 8 | 30/30 / 30/30 | 410 / 593 | 19 572 / 23 420 | 283 / 394 | 38 / 75 | 0 | 0 |
   | canto tapado | 0 / 3 | 30/30 / 30/30 | 463 / 533 | 21 692 / 23 160 | 335 / 373 | 35 / 45 | 1 | 0 |
-  | canto 2 jogadores (sep. 941) | 0 / 3 | **30/30** / **30/30** | 626 / 697 | 27 424 / 28 920 | 408 / 443 | 37 / 47 | 1 | 0 |
+  | canto 2 jogadores (sep. 859) | 0 / 3 | **30/30** / **30/30** | 623 / 696 | 27 172 / 28 704 | 411 / 446 | 37 / 44 | 1 | 0 |
 
   Atenção: o canto denso com inimigos fica em 504 de ~525 linhas. Perto do
   limite o jogo "trava" em 20 FPS (um quadro longo faz o próximo rodar 3
   passos de lógica em vez de 2); a **etapa 10 precisa abrir folga na CPU**
   (blocos ~203, árvores ~118 linhas).
+- 2026-10-10 — 04d, conferência antes do merge: a separação de 941 (> 896)
+  na tabela era o **bench furando a regra** (colocava o jogador 2 direto,
+  num círculo exato, e a regra mede com `dist2d`, que dá até ~6% a mais);
+  corrigido: o bench usa a mesma medida (agora 859). No jogo normal todo
+  movimento passa por `move()` → `keep_together()`, então quem está dentro
+  do limite não sai. O limite só vale entre jogadores vivos e ativos
+  (`player_alive`); o começo da fase (`free_spot_near`, ≤ ~362) e o
+  renascimento (ao lado do parceiro, ~283) já ficam dentro do limite.

@@ -842,6 +842,9 @@ static void bench_player2(int on) {
 			int a = (k * 256 + BENCH_P2_ANGLE) & 4095;
 			int x = p1->pos.vx + ((isin(a) * r) >> 12);
 			int z = p1->pos.vz + ((icos(a) * r) >> 12);
+			/* mesma medida da regra (dist2d): o bench não pode furar o limite */
+			if (dist2d(x - p1->pos.vx, z - p1->pos.vz) > MAX_PLAYER_SEPARATION)
+				continue;
 			if (!collide_solid_at(x, z, PLAYER_RADIUS + 40)) {
 				player_spawn(p2, x, z);          /* chama collide_track */
 				placed = 1;
