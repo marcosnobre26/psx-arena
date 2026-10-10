@@ -12,6 +12,7 @@
 #include <string.h>
 #include <psxapi.h>
 #include <psxpad.h>
+#include <hwregs_c.h>
 #include "game.h"
 #include "models.h"
 
@@ -478,6 +479,7 @@ static void lanterns_draw(int with_players) {
 static void draw_world(int with_players) {
 	lanterns_draw(with_players);   /* antes dos modelos: eles consultam as lanternas */
 	level_draw();
+	prof_begin(PROF_OTHER);
 	props_draw();
 	exit_draw();
 	crates_draw();
@@ -488,6 +490,7 @@ static void draw_world(int with_players) {
 	if (with_players)
 		for (int i = 0; i < MAX_PLAYERS; i++)
 			player_draw(&g.players[i]);
+	prof_end(PROF_OTHER);
 	if (show_debug && show_collision)
 		collision_markers_draw();
 }
@@ -851,6 +854,8 @@ static struct {
 	int      cam_max, cam_sum, cam_cells_max;   /* custo da câmera por quadro */
 	int      trans_max;                         /* árvores a 50% (tapando o jogador) */
 	int      cpu_max, cpu_sum, gpu_max, gpu_sum;  /* perfil do quadro, em linhas */
+	int      logic_sum, logic_last;               /* parte da CPU gasta na lógica */
+	int      p_chunks, p_trees, p_other;          /* desenho por categoria (soma) */
 } bench;
 
 static void bench_start(void) {
@@ -883,6 +888,8 @@ static void bench_reset_stats(void) {
 	bench.cam_max = bench.cam_sum = bench.cam_cells_max = 0;
 	bench.trans_max = 0;
 	bench.cpu_max = bench.cpu_sum = bench.gpu_max = bench.gpu_sum = 0;
+	bench.logic_sum = 0;
+	bench.p_chunks = bench.p_trees = bench.p_other = 0;
 }
 
 /* Depois de cada passo de lógica: custo da colisão naquele passo */
@@ -950,6 +957,10 @@ static void bench_frame(int vs) {
 		if (pg > bench.gpu_max) bench.gpu_max = pg;
 		bench.cpu_sum += pc;
 		bench.gpu_sum += pg;
+		bench.logic_sum += bench.logic_last;
+		bench.p_chunks += prof_get(PROF_CHUNKS);
+		bench.p_trees  += prof_get(PROF_TREES);
+		bench.p_other  += prof_get(PROF_OTHER);
 		int ge = collide_check_grid();
 		if (ge > bench.grid_err) bench.grid_err = ge;
 		if (--bench.timer > 0)
@@ -960,7 +971,8 @@ static void bench_frame(int vs) {
 		printf("BENCH ponto=%s inimigos_extra=%d inimigos_total=%d fps_min=%d fps_med=%d "
 		       "polis_max=%d polis_med=%d ram_gpu_max=%d col_max=%d col_med=%d "
 		       "arvores_modelo=%d arvores_plana=%d grade_erros=%d cam_max=%d cam_med=%d cam_celulas_max=%d arvores_transp=%d "
-		       "cpu_max=%d cpu_med=%d gpu_espera_max=%d gpu_espera_med=%d\n",
+		       "cpu_max=%d cpu_med=%d gpu_espera_max=%d gpu_espera_med=%d logica_med=%d "
+		       "desenho_blocos=%d desenho_arvores=%d desenho_resto=%d\n",
 		       bench_names[bench.point], bench.extras, n, bench.fps_min,
 		       bench.vsyncs ? bench.frames * 60 / bench.vsyncs : 0,
 		       bench.polis_max, bench.frames ? bench.polis_sum / bench.frames : 0, bench.ram_max,
@@ -969,7 +981,11 @@ static void bench_frame(int vs) {
 		       bench.cam_max, bench.frames ? bench.cam_sum / bench.frames : 0, bench.cam_cells_max,
 		       bench.trans_max,
 		       bench.cpu_max, bench.frames ? bench.cpu_sum / bench.frames : 0,
-		       bench.gpu_max, bench.frames ? bench.gpu_sum / bench.frames : 0);
+		       bench.gpu_max, bench.frames ? bench.gpu_sum / bench.frames : 0,
+		       bench.frames ? bench.logic_sum / bench.frames : 0,
+		       bench.frames ? bench.p_chunks / bench.frames : 0,
+		       bench.frames ? bench.p_trees / bench.frames : 0,
+		       bench.frames ? bench.p_other / bench.frames : 0);
 
 		if (bench.extras == 0) {             /* agora com inimigos extras */
 			uint32_t before = 0, after = 0;
@@ -1042,6 +1058,9 @@ int main(void) {
 		input_update(g.in);
 		debug_input(&g.in[0]);         /* L2: overlay e atalhos (controle 1) */
 
+#ifdef DEBUG_BENCHMARK
+		uint16_t t_logic = TIMER_VALUE(1);     /* perfil: tempo da lógica do quadro */
+#endif
 		for (int t = 0; t < ticks; t++) {
 			game_tick();
 #ifdef DEBUG_BENCHMARK
@@ -1051,6 +1070,9 @@ int main(void) {
 				g.in[i].pressed = 0;    /* "apertou agora" vale só 1 passo */
 		}
 
+#ifdef DEBUG_BENCHMARK
+		bench.logic_last = (uint16_t)(TIMER_VALUE(1) - t_logic);
+#endif
 		/* câmera visual: segue o grupo depois da lógica (fora de g) */
 		if (g.state != STATE_TITLE && g.state != STATE_SELECT)
 			camera_view_update(ticks);

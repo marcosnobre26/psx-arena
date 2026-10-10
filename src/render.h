@@ -117,6 +117,11 @@ void render_set_clear_color(int r, int g, int b);
 /* Quantos bytes de primitivas foram usados no último quadro (debug) */
 int render_stats_bytes(void);
 int render_stats_polys(void);
+/* Perfil por categoria (linhas no último quadro): só para depuração */
+enum { PROF_CHUNKS, PROF_TREES, PROF_OTHER, PROF_SLOTS };
+void prof_begin(int slot);
+void prof_end(int slot);
+int  prof_get(int slot);
 /* Perfil do último quadro em linhas (~63,5 us): CPU, espera da GPU, folga */
 void render_stats_time(int *cpu, int *gpu, int *vs);
 

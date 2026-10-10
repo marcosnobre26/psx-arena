@@ -10,3 +10,5 @@ CLAUDE.local.md
 *:Zone.Identifier
 build-bench/
 build-bench-config.log
+build-bench-var/
+build-bench-var-config.log

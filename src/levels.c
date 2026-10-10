@@ -146,6 +146,18 @@ static const char *const map_cerco[] = {
  * da lógica) nem nada local (tempo, VSync). */
 #define FOREST_TEST_SEED 0x5eed04b1u
 
+/* Ajustes da fase de teste que o ./dev bench -D pode trocar (ex.:
+ * ./dev bench -D FOREST_FOG_FAR=2800) para comparar desempenho */
+#ifndef FOREST_FOG_FAR
+#define FOREST_FOG_FAR    3200      /* névoa: além disso nada é desenhado */
+#endif
+#ifndef FOREST_DENSE
+#define FOREST_DENSE      50        /* árvores por mil células no interior */
+#endif
+#ifndef FOREST_DENSE_NE
+#define FOREST_DENSE_NE   160       /* ... no canto nordeste (o pior caso) */
+#endif
+
 static uint32_t fhash(uint32_t seed, int x, int z) {
 	uint32_t h = seed ^ ((uint32_t)x * 374761393u + (uint32_t)z * 668265263u);
 	h = (h ^ (h >> 13)) * 1274126177u;
@@ -216,7 +228,7 @@ static void build_test_forest(void) {
 			continue;
 		int edge = x == FOREST_BORDER || z == FOREST_BORDER ||
 		           x == FOREST_W - FOREST_BORDER - 1 || z == FOREST_H - FOREST_BORDER - 1;
-		int dense = (x >= 96 && z < 32) ? 160 : 50;     /* por mil */
+		int dense = (x >= 96 && z < 32) ? FOREST_DENSE_NE : FOREST_DENSE;   /* por mil */
 		if (edge ? ((x + z) & 1) == 0                   /* fileira na frente da borda */
 		         : fhash(seed, x, z) % 1000 < (uint32_t)dense)
 			forest_tree(seed, x, z);
@@ -295,7 +307,7 @@ const LEVEL_DEF level_defs[] = {
 	  OBJ_SURVIVE,    60,        8,             "SOBREVIVA 60 SEGUNDOS" },
 	/* teste do mundo grande (04a): mapa por código, sem texto */
 	{ "FLORESTA (TESTE)", NULL,
-	  &tex_terra_t, &tex_mata_t,    8, 12, 10,        1300, 3200,     36, 40, 36,   0,
+	  &tex_terra_t, &tex_mata_t,    8, 12, 10,        1300, FOREST_FOG_FAR, 36, 40, 36,   0,
 	  OBJ_REACH_EXIT, 0,         0,             "ATRAVESSE A FLORESTA",
 	  build_test_forest, forest_debug_pts },
 };

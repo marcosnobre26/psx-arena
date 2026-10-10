@@ -257,13 +257,24 @@ cmd_doctor() {
 # ---------------------------------------------------------------------------
 cmd_bench() {
 	local t; t="$(target_triple)"
-	c_info "Compilando com DEBUG_BENCHMARK em build-bench/ ..."
+	# ./dev bench -D NOME=VALOR ...: variante com definições extras (ex.:
+	# TREE_LOD_DIST=1300), compilada em build-bench-var/ sem mexer no config.h
+	local defs="" bdir="build-bench"
+	while [[ $# -gt 0 ]]; do
+		case "$1" in
+			-D) defs="${defs:+$defs;}$2"; shift 2 ;;
+			-D*) defs="${defs:+$defs;}${1#-D}"; shift ;;
+			*) c_err "Uso: ./dev bench [-D NOME=VALOR ...]"; return 1 ;;
+		esac
+	done
+	[[ -n "$defs" ]] && bdir="build-bench-var"
+	c_info "Compilando com DEBUG_BENCHMARK em $bdir/ ${defs:+(com $defs)}..."
 	sdk sh -c "
-		if [ ! -f build-bench/build.ninja ]; then
-			cmake --preset default -B build-bench -DPSN00BSDK_TARGET=$t -DARENA_BENCHMARK=ON > build-bench-config.log 2>&1 || { cat build-bench-config.log; exit 1; }
-			rm -f build-bench-config.log
+		if [ ! -f $bdir/build.ninja ] || [ -n '$defs' ]; then
+			cmake --preset default -B $bdir -DPSN00BSDK_TARGET=$t -DARENA_BENCHMARK=ON -DARENA_BENCH_DEFS='$defs' > $bdir-config.log 2>&1 || { cat $bdir-config.log; exit 1; }
+			rm -f $bdir-config.log
 		fi
-		cmake --build ./build-bench
+		cmake --build ./$bdir
 	" 2>&1 | quiet_filter || { c_err "A compilação do benchmark falhou."; return 1; }
 
 	if [[ ! -x "$DUCKSTATION_LINUX" ]]; then
@@ -277,7 +288,7 @@ cmd_bench() {
 	# instalação e a sua pasta de dados não são tocadas (conferido no fim).
 	# Cópia real (não hardlink): se o emulador gravasse num arquivo da própria
 	# pasta, um hardlink mudaria também o original.
-	local ds="$ROOT/build-bench/duckstation" log="$ROOT/build-bench/bench.log" out="$ROOT/build-bench/bench.txt"
+	local ds="$ROOT/build-bench/duckstation" log="$ROOT/$bdir/bench.log" out="$ROOT/$bdir/bench.txt"
 	local src_dir; src_dir="$(dirname "$DUCKSTATION_LINUX")"
 	if [[ ! -e "$ds/AppRun" ]]; then
 		c_info "Copiando o DuckStation para build-bench/duckstation (só na primeira vez)..."
@@ -291,7 +302,7 @@ cmd_bench() {
 	local before; before="$(ls -laR --time-style=full-iso "$DUCKSTATION_DATA" 2>/dev/null | md5sum)"
 
 	c_info "Rodando no DuckStation (até ${BENCH_TIMEOUT}s)..."
-	"$ds/AppRun" -earlyconsole -batch -fastboot -nogui -- "$ROOT/build-bench/arena.cue" > "$log" 2>&1 &
+	"$ds/AppRun" -earlyconsole -batch -fastboot -nogui -- "$ROOT/$bdir/arena.cue" > "$log" 2>&1 &
 	local pid=$! waited=0
 	while (( waited < BENCH_TIMEOUT )); do
 		grep -q "BENCH FIM" "$log" 2>/dev/null && break
@@ -314,23 +325,24 @@ cmd_bench() {
 	awk '
 		/^BENCH ponto=/ {
 			for (i = 2; i <= NF; i++) { split($i, kv, "="); v[kv[1]] = kv[2] }
-			printf "%-12s %4s %4s | %4s %4s | %5s %5s | %6s | %5s %4s | %4s %4s | %5s | %4s %4s %5s | %3s | %4s %4s\n",
+			printf "%-12s %4s %4s | %4s %4s | %5s %5s | %6s | %5s %4s | %4s %4s | %5s | %4s %4s %5s | %3s | %4s %4s %4s\n",
 				v["ponto"], v["inimigos_extra"], v["inimigos_total"], v["fps_min"], v["fps_med"],
 				v["polis_max"], v["polis_med"], v["ram_gpu_max"], v["col_max"], v["col_med"],
 				v["arvores_modelo"], v["arvores_plana"], (v["grade_erros"] == "" ? "-" : v["grade_erros"]),
 				(v["cam_max"] == "" ? "-" : v["cam_max"]), (v["cam_med"] == "" ? "-" : v["cam_med"]),
 				(v["cam_celulas_max"] == "" ? "-" : v["cam_celulas_max"]),
 				(v["arvores_transp"] == "" ? "-" : v["arvores_transp"]),
-				(v["cpu_med"] == "" ? "-" : v["cpu_med"]), (v["gpu_espera_med"] == "" ? "-" : v["gpu_espera_med"])
+				(v["cpu_med"] == "" ? "-" : v["cpu_med"]), (v["gpu_espera_med"] == "" ? "-" : v["gpu_espera_med"]),
+				(v["logica_med"] == "" ? "-" : v["logica_med"])
 			delete v
 		}
 		BEGIN {
-			printf "%-12s %4s %4s | %4s %4s | %5s %5s | %6s | %5s %4s | %4s %4s | %5s | %4s %4s %5s | %3s | %4s %4s\n",
-				"ponto", "+ini", "ini", "fps", "fps", "polis", "polis", "RAMGPU", "COL", "COL", "arv", "arv", "grade", "CAM", "CAM", "CAM", "arv", "CPU", "GPU"
-			printf "%-12s %4s %4s | %4s %4s | %5s %5s | %6s | %5s %4s | %4s %4s | %5s | %4s %4s %5s | %3s | %4s %4s\n",
-				"", "", "", "min", "med", "max", "med", "max", "max", "med", "mod", "pla", "erros", "max", "med", "cel", "50%", "lin", "esp"
+			printf "%-12s %4s %4s | %4s %4s | %5s %5s | %6s | %5s %4s | %4s %4s | %5s | %4s %4s %5s | %3s | %4s %4s %4s\n",
+				"ponto", "+ini", "ini", "fps", "fps", "polis", "polis", "RAMGPU", "COL", "COL", "arv", "arv", "grade", "CAM", "CAM", "CAM", "arv", "CPU", "GPU", "LOG"
+			printf "%-12s %4s %4s | %4s %4s | %5s %5s | %6s | %5s %4s | %4s %4s | %5s | %4s %4s %5s | %3s | %4s %4s %4s\n",
+				"", "", "", "min", "med", "max", "med", "max", "max", "med", "mod", "pla", "erros", "max", "med", "cel", "50%", "lin", "esp", "lin"
 		}' "$out"
-	c_ok "Resultado bruto: build-bench/bench.txt"
+	c_ok "Resultado bruto: $bdir/bench.txt"
 }
 
 case "${1:-build}" in
@@ -343,6 +355,6 @@ case "${1:-build}" in
 	image)  cmd_image ;;
 	vram)   cmd_vram ;;
 	doctor) cmd_doctor ;;
-	bench)  cmd_bench ;;
+	bench)  shift; cmd_bench "$@" ;;
 	*)      sed -n '3,19p' "$0" | sed 's/^#//' ;;
 esac

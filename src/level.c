@@ -647,11 +647,15 @@ void level_apply_look(void) {
 }
 
 void level_draw(void) {
+	prof_begin(PROF_CHUNKS);
 	stream_update();
 	for (int i = 0; i < CHUNK_SLOTS; i++)
 		if (slot_cx[i] >= 0)
 			render_chunk(&slot_geom[i]);
+	prof_end(PROF_CHUNKS);
+	prof_begin(PROF_TREES);
 	trees_draw();
+	prof_end(PROF_TREES);
 }
 
 /* ------------------------------------------------------------------ */

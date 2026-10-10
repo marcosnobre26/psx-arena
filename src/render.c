@@ -842,6 +842,15 @@ void hud_print(int x, int y, const char *fmt, ...) {
  *          (ela trabalha em paralelo com a CPU). Espera grande = GPU é o
  *          gargalo (preenchimento); espera ~0 = a CPU é o gargalo.
  *   vs   = espera pelo retraço vertical (folga) */
+/* Perfil por categoria do desenho (depuração): prof_begin/prof_end somam
+ * linhas em cada "gaveta" no quadro; render_end_frame guarda e zera. */
+static int prof_acc[PROF_SLOTS], prof_last[PROF_SLOTS];
+static uint16_t prof_t0[PROF_SLOTS];
+
+void prof_begin(int slot) { prof_t0[slot] = TIMER_VALUE(1); }
+void prof_end(int slot)   { prof_acc[slot] += (uint16_t)(TIMER_VALUE(1) - prof_t0[slot]); }
+int  prof_get(int slot)   { return prof_last[slot]; }
+
 void render_stats_time(int *cpu, int *gpu, int *vs) {
 	*cpu = prof_cpu;
 	*gpu = prof_gpu;
@@ -858,6 +867,10 @@ void render_end_frame(void) {
 	uint16_t t1 = TIMER_VALUE(1);
 	VSync(0);      /* espera o retraço vertical (60 Hz NTSC) */
 	uint16_t t2 = TIMER_VALUE(1);
+	for (int k = 0; k < PROF_SLOTS; k++) {
+		prof_last[k] = prof_acc[k];
+		prof_acc[k] = 0;
+	}
 	prof_cpu = (uint16_t)(t0 - prof_start);    /* uint16: o contador dá a volta */
 	prof_gpu = (uint16_t)(t1 - t0);
 	prof_vs  = (uint16_t)(t2 - t1);
