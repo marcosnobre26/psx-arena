@@ -371,6 +371,7 @@ int  level_cell_top(int cx, int cz);    /* altura do topo da célula (0, 384, 76
  * ângulo perto de 0/1024/2048/3072 (a colisão é por célula). */
 void level_add_tree(int type, int x, int z, int angle, int scale);
 void level_tree_stats(int *total, int *models, int *billboards);
+int  level_tree_density(int x, int z, int radius);   /* árvores (+mata) perto: para a câmera */
 void level_apply_look(void);            /* névoa e luz da fase atual */
 void level_draw(void);
 int  level_cell_solid(int cx, int cz);

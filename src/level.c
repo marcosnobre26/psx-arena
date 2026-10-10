@@ -417,6 +417,31 @@ static void trees_draw(void) {
 		}
 }
 
+/* Quantas árvores em pé há a até 'radius' de (x, z), mais 1 a cada 4
+ * células de mata alta: a câmera se aproxima onde a floresta fecha.
+ * Percorre só os blocos que o círculo toca (visual: não muda g). */
+int level_tree_density(int x, int z, int radius) {
+	int n = 0, r2 = radius * radius;
+	int bx0 = (x - radius) / CHUNK_SIZE, bx1 = (x + radius) / CHUNK_SIZE;
+	int bz0 = (z - radius) / CHUNK_SIZE, bz1 = (z + radius) / CHUNK_SIZE;
+	for (int bz = bz0; bz <= bz1; bz++)
+		for (int bx = bx0; bx <= bx1; bx++) {
+			if (bx < 0 || bz < 0 || bx >= ncx || bz >= ncz) continue;
+			const TREE *t = &trees[tree_start[bz][bx]];
+			for (int k = tree_count[bz][bx]; k > 0; k--, t++) {
+				int dx = t->x - x, dz = t->z - z;
+				if (tree_defs[t->type].cells == 1 && dx * dx + dz * dz < r2)
+					n++;
+			}
+		}
+	int thicket = 0, rc = radius / TILE_SIZE;
+	for (int cz = z / TILE_SIZE - rc; cz <= z / TILE_SIZE + rc; cz++)
+		for (int cx = x / TILE_SIZE - rc; cx <= x / TILE_SIZE + rc; cx++)
+			if (cell_type(cx, cz) == CELL_THICKET)
+				thicket++;
+	return n + thicket / 4;
+}
+
 void level_tree_stats(int *total, int *models, int *billboards) {
 	*total = num_trees;
 	*models = trees_drawn_mesh;

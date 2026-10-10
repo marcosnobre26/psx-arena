@@ -41,6 +41,7 @@ static int grp_n, grp_x[MAX_PLAYERS], grp_z[MAX_PLAYERS];
 static int cx, cy, cz;             /* centro do grupo */
 static int extra;                  /* recuo para caber os dois jogadores */
 static int clear_dist = CAM_DIST;  /* última distância sem tronco no caminho */
+static int base_dist = CAM_DIST;   /* distância "normal" (menor na mata densa), suavizada */
 static int cam_tests, cam_tests_last, cam_cells_last;
 
 static int collect_group(void) {
@@ -75,7 +76,22 @@ static int collect_group(void) {
 static void eye_at(int d, int want_dist, int s, int c, VECTOR *out) {
 	out->vx = cx - ((s * d) >> 12);
 	out->vz = cz - ((c * d) >> 12);
-	out->vy = (cy >> 1) - CAM_HEIGHT - extra * 3 / 4 - (want_dist - d) * 3 / 4;
+	/* altura proporcional à distância-base (mesmo ângulo na mata densa) */
+	out->vy = (cy >> 1) - CAM_HEIGHT * base_dist / CAM_DIST - extra * 3 / 4 - (want_dist - d) * 3 / 4;
+}
+
+/* Distância-base pela densidade da mata em volta do grupo: de CAM_DIST
+ * (aberto) até CAM_DENSE_DIST (fechado), em 'ticks' passos suaves */
+static void update_base(int ticks, int snap) {
+	int dens = level_tree_density(cx, cz, 4 * TILE_SIZE);
+	if (dens > CAM_DENSE_FULL) dens = CAM_DENSE_FULL;
+	int target = CAM_DIST - (CAM_DIST - CAM_DENSE_DIST) * dens / CAM_DENSE_FULL;
+	if (snap) {
+		base_dist = target;
+		return;
+	}
+	for (int t = 0; t < ticks; t++)          /* ~1/16 por passo: ~1 s de transição */
+		base_dist += (target - base_dist + (target > base_dist ? 15 : -15)) / 16;
 }
 
 /* Todos os jogadores visíveis daquele ponto (só troncos em pé e o que é
@@ -116,7 +132,7 @@ static int find_clear(int want_dist, int s, int c, VECTOR *want) {
 }
 
 static int want_distance(void) {
-	return CAM_DIST + extra;
+	return base_dist + extra;
 }
 
 /* Visual: uma vez por quadro; 'ticks' = passos de lógica deste quadro */
@@ -129,6 +145,7 @@ void camera_view_update(int ticks) {
 
 	int s = isin(g.cam_yaw), c = icos(g.cam_yaw);
 	VECTOR want;
+	update_base(ticks, 0);
 	find_clear(want_distance(), s, c, &want);
 
 	for (int t = 0; t < ticks; t++) {      /* anda 1/4 do caminho por passo */
@@ -162,6 +179,7 @@ void camera_snap(void) {
 	if (!collect_group())
 		return;
 	int s = isin(g.cam_yaw), c = icos(g.cam_yaw);
+	update_base(0, 1);
 	clear_dist = CAM_MIN_DIST;           /* sobe de baixo até onde der livre */
 	VECTOR want = { 0 };
 	for (int k = 0; k < 16 && clear_dist < want_distance(); k++) {

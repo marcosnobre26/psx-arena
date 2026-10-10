@@ -72,6 +72,8 @@
 #define CAM_HEIGHT      600     /* altura acima do jogador */
 #define CAM_LOOK_UP     120     /* ponto que a câmera mira (acima do pé) */
 #define CAM_STEP        64      /* passo ao aproximar/afastar por causa de troncos */
+#define CAM_DENSE_DIST  540     /* na mata densa a câmera chega até aqui (de CAM_DIST) */
+#define CAM_DENSE_FULL  8       /* "densidade" (árvores em ~4 células) = aproximação total */
 #define CAM_TRUNK_MARGIN 32     /* folga entre a linha da câmera e um tronco */
 #define CAM_TURN_SPEED  40      /* giro com L1/R1 por quadro */
 
