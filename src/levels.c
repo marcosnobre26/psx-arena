@@ -266,6 +266,12 @@ static const DEBUG_POINT f3_pts[4] = { { 31, 56, 2048 }, { 31, 31, 0 }, { 49, 49
 /* Fase 4: CERCO (sobreviver), 64x64. Começa no meio de uma clareira grande;
  * os reforços (S) ficam em células LIVRES perto da borda da clareira (não na
  * mata alta, que é sólida); objective.c escolhe o S fora do cone de visão. */
+#ifndef F4_FOG_FAR
+#define F4_FOG_FAR     3400     /* névoa do CERCO (etapa 03); ./dev bench -D compara */
+#endif
+#ifndef F4_MAX_ENEMIES
+#define F4_MAX_ENEMIES 8        /* reforços: inimigos vivos no máximo */
+#endif
 static const CLEARING f4_clear[] = { { 31, 31, 11 } };
 static const FOREST_PARAMS f4_forest = { 64, 64, 0xf0e57004u, 50, 0, 31, 31, f4_clear, NCLEAR(f4_clear), 6 };
 static void build_f4(void) {
@@ -314,8 +320,8 @@ const LEVEL_DEF level_defs[] = {
 	  OBJ_COLLECT,    4,         0,             "PEGUE 4 RELIQUIAS E SAIA",
 	  build_f3, f3_pts },
 	{ "CERCO",      NULL,
-	  &tex_terra_t, &tex_mata_t,   20,  8,  8,        1400, 3400,     48, 32, 32,   0,
-	  OBJ_SURVIVE,    60,        8,             "SOBREVIVA 60 SEGUNDOS",
+	  &tex_terra_t, &tex_mata_t,   20,  8,  8,        1400, F4_FOG_FAR, 48, 32, 32,   0,
+	  OBJ_SURVIVE,    60,        F4_MAX_ENEMIES, "SOBREVIVA 60 SEGUNDOS",
 	  build_f4, f4_pts },
 	/* SÓ TESTE (fora da sequência normal): DEBUG_START_LEVEL 5 e ./dev bench */
 	{ "FLORESTA (TESTE)", NULL,
