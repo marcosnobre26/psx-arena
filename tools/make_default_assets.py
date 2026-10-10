@@ -347,8 +347,11 @@ def make_textures():
     rnd = random.Random(1234)
     out = os.path.join(ROOT, "assets", "textures")
     os.makedirs(out, exist_ok=True)
-    write_png(os.path.join(out, "floor.png"), 64, 64, tex_floor(rnd))
-    write_png(os.path.join(out, "wall.png"), 64, 64, tex_wall(rnd))
+    # floor.png e wall.png eram da arena antiga (removidos na etapa 04e). As
+    # funções ainda rodam só para consumir o gerador na mesma ordem: assim o
+    # crate.png gerado continua idêntico ao do repositório.
+    tex_floor(rnd)
+    tex_wall(rnd)
     write_png(os.path.join(out, "crate.png"), 64, 64, tex_crate(rnd))
 
 

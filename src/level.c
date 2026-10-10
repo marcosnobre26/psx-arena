@@ -42,7 +42,6 @@ static int cell_type(int cx, int cz) {
  * assim não se monta a face de trás das paredes da borda. */
 static int type_slices(int t) {
 	switch (t) {
-	case CELL_WALL:    return WALL_HEIGHT / WALL_SLICE;
 	case CELL_THICKET: return THICKET_HEIGHT / WALL_SLICE;
 	case CELL_OUTSIDE: return 99;
 	}
@@ -50,26 +49,24 @@ static int type_slices(int t) {
 }
 
 static int type_has_floor(int t) {
-	return t == CELL_FLOOR || t == CELL_DIRT || t == CELL_LEAVES || t == CELL_ROOTS;
+	return t == CELL_DIRT || t == CELL_LEAVES || t == CELL_ROOTS;
 }
 
 static int type_solid(int t) {
-	return t == CELL_VOID || t == CELL_WALL || t == CELL_THICKET;
+	return t == CELL_VOID || t == CELL_THICKET;
 }
 
 /* Textura de cada tipo (índice na tabela world_tex) */
-enum { WT_FLOOR, WT_WALL, WT_DIRT, WT_LEAVES, WT_ROOTS, WT_THICKET, NUM_WT };
+enum { WT_DIRT, WT_LEAVES, WT_ROOTS, WT_THICKET, NUM_WT };
 static const TEXTURE *world_tex[NUM_WT];
 
 static int type_tex(int t) {
 	switch (t) {
-	case CELL_WALL:    return WT_WALL;
-	case CELL_DIRT:    return WT_DIRT;
 	case CELL_LEAVES:  return WT_LEAVES;
 	case CELL_ROOTS:   return WT_ROOTS;
 	case CELL_THICKET: return WT_THICKET;
 	}
-	return WT_FLOOR;
+	return WT_DIRT;
 }
 
 /* ------------------------------------------------------------------ */
@@ -165,12 +162,8 @@ static void build_chunk(CHUNK_GEOM *c, int ccx, int ccz) {
 		/* chão */
 		if (type_has_floor(t)) {
 			int corner[4][3] = { { lx, lz, 0 }, { lx, lz + 1, 0 }, { lx + 1, lz + 1, 0 }, { lx + 1, lz, 0 } };
-			int shade = 128, rot = 0;
-			if (t == CELL_FLOOR)
-				shade = ((cx + cz) & 1) ? 128 : 116;           /* leve xadrez (mapas de texto) */
-			else
-				rot = hash3(cx, 7, cz) & 3;                     /* textura girada: menos repetição */
-			add_quad(c, corner, 0, 0, type_tex(t), rot, 6, shade, shade, shade, gx0, gz0);
+			int rot = hash3(cx, 7, cz) & 3;                     /* textura girada: menos repetição */
+			add_quad(c, corner, 0, 0, type_tex(t), rot, 6, 128, 128, 128, gx0, gz0);
 		}
 
 		/* paredes e mata: topo + laterais onde o vizinho é mais baixo */
@@ -654,28 +647,6 @@ int level_placed(int i, char *ch, int *cx, int *cz) {
 	return num_placed;
 }
 
-/* Mapa em texto -> grade + objetos */
-static void load_text_map(const char *const *map) {
-	int w = 0, h = 0;
-	for (h = 0; h < MAP_MAX_H && map[h]; h++) {
-		int len = strlen(map[h]);
-		if (len > w) w = len;
-	}
-	level_begin(w, h);
-	for (int z = 0; z < lh; z++) {
-		int len = strlen(map[z]);
-		for (int x = 0; x < len && x < lw; x++) {
-			char ch = map[z][x];
-			if (ch == '#')      level_set_cell(x, z, CELL_WALL);
-			else if (ch == ' ') level_set_cell(x, z, CELL_VOID);
-			else {
-				level_set_cell(x, z, CELL_FLOOR);
-				level_place(ch, x, z);
-			}
-		}
-	}
-}
-
 void level_load(int index) {
 	const LEVEL_DEF *ld = &level_defs[index];
 	cur_level = index;
@@ -684,16 +655,10 @@ void level_load(int index) {
 	num_trees = 0;
 	num_placed = num_failed = 0;
 	collide_reset();                  /* grade espacial vazia antes de criar objetos */
-	if (ld->map)
-		load_text_map(ld->map);
-	else if (ld->build)
-		ld->build();                  /* mapa feito por código (levels.c) */
+	ld->build();                      /* a fase monta a grade e os objetos (levels.c) */
 	trees_finish();
 
-	/* texturas do mundo: as da fase para chão/parede de texto, e as da
-	 * floresta para os tipos de terreno */
-	world_tex[WT_FLOOR]   = ld->floor;
-	world_tex[WT_WALL]    = ld->wall;
+	/* textura de cada tipo de terreno */
 	world_tex[WT_DIRT]    = &tex_terra_t;
 	world_tex[WT_LEAVES]  = &tex_folhas_t;
 	world_tex[WT_ROOTS]   = &tex_raizes_t;

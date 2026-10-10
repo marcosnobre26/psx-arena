@@ -1,18 +1,19 @@
 /*
- * levels.c - TABELA DE FASES: mapa, aparência e objetivo de cada fase
+ * levels.c - TABELA DE FASES: gerador do mapa, aparência e objetivo
  *
- * Para criar uma fase: desenhe o mapa (vetor de strings terminado em NULL)
- * e acrescente uma linha em level_defs. A ordem da tabela é a ordem do jogo.
+ * Para criar uma fase: escreva uma função que monta a floresta
+ * (build_forest com os parâmetros dela) e coloca as coisas com
+ * level_place_safe; depois acrescente uma linha em level_defs. A ordem da
+ * tabela é a ordem do jogo (a fase de teste fica depois de num_levels).
  *
- * Legenda do mapa (cada caractere = 1 bloco de 256x256, 1 metro):
- *   #  parede            .  chão vazio         (espaço) = nada/vazio
+ * Letras do level_place_safe (cada célula = 256x256, 1 metro):
  *   P  início do jogador C  caixa (quebra)     G  gema (pontos)
  *   H  vida              N  energia            W  arma nova
  *   X  saída da fase     Q  item de missão     S  ponto de reforço (SURVIVE)
  *   L  pilha da lanterna
  *   Letras de inimigos e dígitos de cenário: data.c (enemy_defs, prop_defs)
  *
- * Letras reservadas (não use em enemy_defs/prop_defs): # . P C G H N W X Q S L
+ * Letras reservadas (não use em enemy_defs/prop_defs): P C G H N W X Q S L
  * e A (ATIRADOR, registrado no histórico, ainda não está no código).
  *
  * Objetivos (ver objective.c): OBJ_KILL_ALL, OBJ_REACH_EXIT (precisa de X),
@@ -20,9 +21,8 @@
  * segundos; "máx. inimigos" limita os reforços que chegam pelos S).
  * Com X no mapa, cumprir o objetivo abre a saída e vence-se ao chegar nela.
  *
- * Em cima do texto fica o "norte" (Z menor). Todas as linhas com o mesmo
- * tamanho; máximo 128x128 (MAP_MAX_W/H). Mapas grandes podem ser feitos
- * por código: map = NULL e uma função em LEVEL_DEF.build (ver fase 5).
+ * "Norte" = Z menor. Tamanho até 128x128 (MAP_MAX_W/H); as fases 1, 3 e
+ * 4 têm 64x64.
  */
 #include "game.h"
 
@@ -298,8 +298,8 @@ static const DEBUG_POINT forest_debug_pts[4] = {
 };
 
 const LEVEL_DEF level_defs[] = {
-	/* nome        mapa
-	 *   chão          parede        céu=névoa (R,G,B)  névoa near/far  luz ambiente  música
+	/* nome
+	 *   céu=névoa (R,G,B)  névoa near/far  luz ambiente  música
 	 *   objetivo        parâmetro  máx. inimigos  texto do objetivo
 	 *   gerador  pontos de teleporte (L2 + direcional; o 3o = pior ponto do bench)
 	 *
@@ -307,25 +307,25 @@ const LEVEL_DEF level_defs[] = {
 	 * enevoa o próprio jogador. Lanterna: objetos no cone usam near/far
 	 * x LANTERN_FOG_MUL. Céu/névoa escuros (texturas só escurecem).
 	 * Névoa e luz de cada fase = etapa 03. */
-	{ "CACADA",     NULL,
-	  &tex_terra_t, &tex_mata_t,   10, 12, 24,        1300, 3200,     40, 40, 56,   0,
+	{ "CACADA",
+	  10, 12, 24,        1300, 3200,     40, 40, 56,   0,
 	  OBJ_KILL_ALL,   0,         0,             "DERROTE TODOS OS INIMIGOS",
 	  build_f1, f1_pts },
-	{ "TRAVESSIA",  NULL,
-	  &tex_terra_t, &tex_mata_t,    6, 14, 10,        1200, 2800,     30, 40, 34,   0,
+	{ "TRAVESSIA",
+	  6, 14, 10,        1200, 2800,     30, 40, 34,   0,
 	  OBJ_REACH_EXIT, 0,         0,             "ATRAVESSE A FLORESTA",
 	  build_f2, f2_pts },
-	{ "RELIQUIAS",  NULL,
-	  &tex_terra_t, &tex_mata_t,   16,  8, 20,        1300, 3000,     40, 30, 48,   0,
+	{ "RELIQUIAS",
+	  16,  8, 20,        1300, 3000,     40, 30, 48,   0,
 	  OBJ_COLLECT,    4,         0,             "PEGUE 4 RELIQUIAS E SAIA",
 	  build_f3, f3_pts },
-	{ "CERCO",      NULL,
-	  &tex_terra_t, &tex_mata_t,   20,  8,  8,        1400, F4_FOG_FAR, 48, 32, 32,   0,
+	{ "CERCO",
+	  20,  8,  8,        1400, F4_FOG_FAR, 48, 32, 32,   0,
 	  OBJ_SURVIVE,    60,        F4_MAX_ENEMIES, "SOBREVIVA 60 SEGUNDOS",
 	  build_f4, f4_pts },
 	/* SÓ TESTE (fora da sequência normal): DEBUG_START_LEVEL 5 e ./dev bench */
-	{ "FLORESTA (TESTE)", NULL,
-	  &tex_terra_t, &tex_mata_t,    8, 12, 10,        1300, FOREST_FOG_FAR, 36, 40, 36,   0,
+	{ "FLORESTA (TESTE)",
+	  8, 12, 10,        1300, FOREST_FOG_FAR, 36, 40, 36,   0,
 	  OBJ_REACH_EXIT, 0,         0,             "ATRAVESSE A FLORESTA",
 	  build_test_forest, forest_debug_pts },
 };

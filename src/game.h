@@ -128,8 +128,6 @@ extern const SOUND_DEF  sound_defs[];
 /* Tipo de cada célula da grade (level.c). Bit 7 = sólido. */
 enum {
 	CELL_VOID,      /* nada (sem chão), sólido */
-	CELL_FLOOR,     /* chão dos mapas de texto (textura da fase) */
-	CELL_WALL,      /* parede dos mapas de texto (1,5 m) */
 	CELL_DIRT,      /* trilha de terra */
 	CELL_LEAVES,    /* chão de folhas */
 	CELL_ROOTS,     /* terra com raízes */
@@ -162,12 +160,9 @@ typedef struct {
 /* Objetivo de uma fase (ver objective.c) */
 enum { OBJ_KILL_ALL, OBJ_REACH_EXIT, OBJ_COLLECT, OBJ_SURVIVE };
 
-/* Uma fase (levels.c): mapa em texto + aparência + objetivo */
+/* Uma fase (levels.c): gerador do mapa + aparência + objetivo */
 typedef struct {
 	const char        *name;
-	const char *const *map;          /* linhas do mapa, terminadas em NULL */
-	const TEXTURE     *floor;        /* textura do chão */
-	const TEXTURE     *wall;         /* textura das paredes */
 	uint8_t            sky_r, sky_g, sky_b;   /* cor do céu = cor da névoa */
 	int                fog_near, fog_far;     /* névoa: começa / esconde tudo (z) */
 	uint8_t            amb_r, amb_g, amb_b;   /* luz ambiente (0..255) */
@@ -176,7 +171,7 @@ typedef struct {
 	int                obj_param;    /* COLLECT: itens (0 = todos os Q); SURVIVE: segundos */
 	int                max_enemies;  /* SURVIVE: inimigos vivos no máximo (reforços) */
 	const char        *obj_text;     /* frase da introdução (ASCII, sem acentos) */
-	void             (*build)(void); /* mapa por código (quando map == NULL) */
+	void             (*build)(void); /* monta a grade e os objetos (por código) */
 	const DEBUG_POINT *debug_pts;    /* 4 pontos de teleporte (L2 + direcional) */
 } LEVEL_DEF;
 extern const LEVEL_DEF  level_defs[];

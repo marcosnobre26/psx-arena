@@ -76,7 +76,6 @@
 #endif
 #define TREE_OCCLUDE_TICKS 18   /* árvore que tapou o jogador fica 50% por ~0,3 s */
 #define WALL_SLICE      192     /* paredes são montadas em fatias desta altura */
-#define WALL_HEIGHT     384     /* parede dos mapas de texto (2 fatias) */
 #define THICKET_HEIGHT  768     /* mata densa: 3 m (4 fatias) */
 #define GRAVITY         3       /* aceleração para baixo por quadro */
 
