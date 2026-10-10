@@ -364,6 +364,9 @@ void level_begin(int w, int h);         /* mapa por código: tamanho (tudo vazio
 void level_set_cell(int cx, int cz, int type);   /* CELL_* (solidez automática) */
 int  level_cell_type(int cx, int cz);
 void level_place(char ch, int cx, int cz);       /* cria o que a letra representa */
+int  level_place_safe(char ch, int cx, int cz);  /* idem, na célula livre mais próxima */
+int  level_place_failures(int i, char *ch, int *cx, int *cz);   /* teste: falhas */
+int  level_placed(int i, char *ch, int *cx, int *cz);           /* teste: colocados */
 void level_invalidate(int cx, int cz);  /* célula mudou: remonta o bloco */
 void level_stats(int *loaded, int *slots, int *built, int *overflow);
 int  level_cell_top(int cx, int cz);    /* altura do topo da célula (0, 384, 768) */

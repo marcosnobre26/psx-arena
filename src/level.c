@@ -588,6 +588,72 @@ void level_place(char ch, int cx, int cz) {
 	}
 }
 
+/* ------------------------------------------------------------------ */
+/* Posicionamento seguro (mapas por código)                            */
+/* ------------------------------------------------------------------ */
+/* Raio de quem a letra cria: inimigo (pelo tipo), jogador ou item */
+static int place_radius(char ch) {
+	for (int t = 0; t < num_enemy_types; t++)
+		if (enemy_defs[t].map_char == ch)
+			return (90 * enemy_defs[t].scale) >> 12;
+	if (ch == 'P') return PLAYER_RADIUS + 16;
+	return 80;                           /* itens, saída, ponto de reforço */
+}
+
+static int place_ok(int cx, int cz, int r) {
+	if (cx < 0 || cz < 0 || cx >= lw || cz >= lh) return 0;
+	if (level_cell_solid(cx, cz)) return 0;          /* mata, tronco caído, vazio */
+	return !collide_solid_at(cx * TILE_SIZE + TILE_SIZE / 2, cz * TILE_SIZE + TILE_SIZE / 2, r);
+}
+
+/* Lista de tudo que foi colocado e das falhas (o teste do PC confere:
+ * nenhuma falha e tudo alcançável a partir do início) */
+#define MAX_PLACED 96
+static struct { char ch; int16_t cx, cz; } placed[MAX_PLACED], failed[8];
+static int num_placed, num_failed;
+
+/* Coloca a letra na célula livre mais próxima de (cx, cz), procurando em
+ * anéis de até PLACE_SEARCH células. Nada nasce dentro de tronco, mata ou
+ * tronco caído. Se não achar, NÃO coloca (registra a falha) e devolve 0. */
+int level_place_safe(char ch, int cx, int cz) {
+	int r = place_radius(ch);
+	for (int ring = 0; ring <= PLACE_SEARCH; ring++)
+		for (int dz = -ring; dz <= ring; dz++)
+			for (int dx = -ring; dx <= ring; dx++) {
+				if (dx != -ring && dx != ring && dz != -ring && dz != ring)
+					continue;                /* só a borda do anel */
+				if (!place_ok(cx + dx, cz + dz, r))
+					continue;
+				level_place(ch, cx + dx, cz + dz);
+				if (num_placed < MAX_PLACED) {
+					placed[num_placed].ch = ch;
+					placed[num_placed].cx = cx + dx;
+					placed[num_placed].cz = cz + dz;
+					num_placed++;
+				}
+				return 1;
+			}
+	if (num_failed < 8) {
+		failed[num_failed].ch = ch;
+		failed[num_failed].cx = cx;
+		failed[num_failed].cz = cz;
+	}
+	num_failed++;
+	return 0;
+}
+
+int level_place_failures(int i, char *ch, int *cx, int *cz) {
+	if (i >= num_failed || i >= 8) return num_failed;
+	*ch = failed[i].ch; *cx = failed[i].cx; *cz = failed[i].cz;
+	return num_failed;
+}
+
+int level_placed(int i, char *ch, int *cx, int *cz) {
+	if (i >= num_placed) return num_placed;
+	*ch = placed[i].ch; *cx = placed[i].cx; *cz = placed[i].cz;
+	return num_placed;
+}
+
 /* Mapa em texto -> grade + objetos */
 static void load_text_map(const char *const *map) {
 	int w = 0, h = 0;
@@ -616,6 +682,7 @@ void level_load(int index) {
 	level_apply_look();               /* a luz entra na cor dos blocos */
 
 	num_trees = 0;
+	num_placed = num_failed = 0;
 	collide_reset();                  /* grade espacial vazia antes de criar objetos */
 	if (ld->map)
 		load_text_map(ld->map);

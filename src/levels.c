@@ -132,18 +132,14 @@ static const char *const map_cerco[] = {
  * nordeste mais fechado (o pior caso de desempenho). Nada aleatório: a
  * "variedade" vem de um hash da posição, então o mapa é sempre igual. */
 
-#define FOREST_W     128
-#define FOREST_H     128
 #define FOREST_BORDER  4
-#define TRAIL_Z      63      /* trilha leste-oeste (3 células: 62..64) */
-#define TRAIL_X      63      /* trilha norte-sul */
 
-/* Hash de posição COM SEMENTE. A fase de teste usa uma semente fixa
- * (FOREST_TEST_SEED: medições sempre no mesmo cenário). Na etapa 05 o
- * gerador deve passar uma semente derivada de g.seed (já definida antes
- * do level_load): mapas diferentes a cada partida, iguais nos dois
- * consoles. Nunca use g.rng aqui (o mapa não deve consumir o gerador
- * da lógica) nem nada local (tempo, VSync). */
+/* Hash de posição COM SEMENTE. Cada fase usa uma semente fixa própria
+ * (florestas diferentes, sempre iguais). Na etapa 05 o gerador deve passar
+ * uma semente derivada de g.seed (já definida antes do level_load): mapas
+ * diferentes a cada partida, iguais nos dois consoles. Nunca use g.rng
+ * aqui (o mapa não deve consumir o gerador da lógica) nem nada local
+ * (tempo, VSync). */
 #define FOREST_TEST_SEED 0x5eed04b1u
 
 /* Ajustes da fase de teste que o ./dev bench -D pode trocar (ex.:
@@ -164,19 +160,35 @@ static uint32_t fhash(uint32_t seed, int x, int z) {
 	return h ^ (h >> 16);
 }
 
-static const struct { int x, z, r; } clearings[] = {
-	{ 32, 32, 7 }, { 96, 96, 9 }, { 96, 30, 6 }, { 30, 96, 7 },
-	{ 108, 16, 2 },          /* respiro no canto denso (ponto de medição) */
-};
-#define NUM_CLEARINGS ((int)(sizeof(clearings) / sizeof(clearings[0])))
+/* Parâmetros de uma floresta. A estrutura é sempre a mesma: borda de mata
+ * alta, duas trilhas que se cruzam, clareiras, árvores por hash, troncos
+ * caídos. O que muda é o tamanho, a semente, a densidade e as clareiras. */
+typedef struct { int x, z, r; } CLEARING;
+typedef struct {
+	int             w, h;             /* tamanho em células (até 128) */
+	uint32_t        seed;
+	int             dense;            /* árvores por mil células no interior */
+	int             dense_ne;         /* por mil no canto nordeste (0 = igual) */
+	int             trail_x, trail_z; /* colunas/linhas centrais das trilhas */
+	const CLEARING *clear;
+	int             nclear;
+	int             logs;             /* troncos caídos */
+} FOREST_PARAMS;
+
+static const FOREST_PARAMS *fp_cur;     /* floresta sendo montada */
 
 static int in_clearing(int x, int z) {
-	for (int i = 0; i < NUM_CLEARINGS; i++) {
-		int dx = x - clearings[i].x, dz = z - clearings[i].z;
-		if (dx * dx + dz * dz <= clearings[i].r * clearings[i].r)
+	for (int i = 0; i < fp_cur->nclear; i++) {
+		int dx = x - fp_cur->clear[i].x, dz = z - fp_cur->clear[i].z;
+		if (dx * dx + dz * dz <= fp_cur->clear[i].r * fp_cur->clear[i].r)
 			return 1;
 	}
 	return 0;
+}
+
+static int near_trail(int x, int z, int w) {
+	return (z >= fp_cur->trail_z - w && z <= fp_cur->trail_z + w) ||
+	       (x >= fp_cur->trail_x - w && x <= fp_cur->trail_x + w);
 }
 
 /* Árvore com variação por hash: tipo (pinheiro 65%/seca 35%), deslocamento
@@ -191,16 +203,18 @@ static void forest_tree(uint32_t seed, int x, int z) {
 	level_add_tree(type, wx, wz, (h >> 20) & 4095, scale);
 }
 
-static void build_test_forest(void) {
-	const uint32_t seed = FOREST_TEST_SEED;
-	level_begin(FOREST_W, FOREST_H);
+static void build_forest(const FOREST_PARAMS *fp) {
+	const uint32_t seed = fp->seed;
+	const int W = fp->w, H = fp->h;
+	fp_cur = fp;
+	level_begin(W, H);
 
-	for (int z = 0; z < FOREST_H; z++)
-	for (int x = 0; x < FOREST_W; x++) {
+	for (int z = 0; z < H; z++)
+	for (int x = 0; x < W; x++) {
 		uint32_t h = fhash(seed, x, z), patch = fhash(seed, x >> 2, z >> 2);
-		int trail = (z >= TRAIL_Z - 1 && z <= TRAIL_Z + 1) || (x >= TRAIL_X - 1 && x <= TRAIL_X + 1);
+		int trail = near_trail(x, z, 1);
 		int border = x < FOREST_BORDER || z < FOREST_BORDER ||
-		             x >= FOREST_W - FOREST_BORDER || z >= FOREST_H - FOREST_BORDER;
+		             x >= W - FOREST_BORDER || z >= H - FOREST_BORDER;
 		int type;
 
 		/* chão: manchas de 4x4 células de folhas/raízes/terra */
@@ -219,33 +233,30 @@ static void build_test_forest(void) {
 	}
 
 	/* ÁRVORES (depois das células: level_set_cell zeraria a solidez).
-	 * Interior: ~5% das células, ~16% no canto nordeste (o pior caso);
-	 * nunca nas trilhas, perto delas ou nas clareiras. */
-	for (int z = FOREST_BORDER; z < FOREST_H - FOREST_BORDER; z++)
-	for (int x = FOREST_BORDER; x < FOREST_W - FOREST_BORDER; x++) {
-		int near_trail = (z >= TRAIL_Z - 2 && z <= TRAIL_Z + 2) || (x >= TRAIL_X - 2 && x <= TRAIL_X + 2);
-		if (near_trail || in_clearing(x, z))
+	 * Nunca nas trilhas, perto delas ou nas clareiras. */
+	for (int z = FOREST_BORDER; z < H - FOREST_BORDER; z++)
+	for (int x = FOREST_BORDER; x < W - FOREST_BORDER; x++) {
+		if (near_trail(x, z, 2) || in_clearing(x, z))
 			continue;
 		int edge = x == FOREST_BORDER || z == FOREST_BORDER ||
-		           x == FOREST_W - FOREST_BORDER - 1 || z == FOREST_H - FOREST_BORDER - 1;
-		int dense = (x >= 96 && z < 32) ? FOREST_DENSE_NE : FOREST_DENSE;   /* por mil */
+		           x == W - FOREST_BORDER - 1 || z == H - FOREST_BORDER - 1;
+		int dense = (fp->dense_ne && x >= W * 3 / 4 && z < H / 4) ? fp->dense_ne : fp->dense;
 		if (edge ? ((x + z) & 1) == 0                   /* fileira na frente da borda */
 		         : fhash(seed, x, z) % 1000 < (uint32_t)dense)
 			forest_tree(seed, x, z);
 	}
 
-	/* TRONCOS CAÍDOS: ~15, deitados em X ou em Z (a colisão é por célula),
-	 * em 3 células livres longe das trilhas. */
-	for (int k = 0, placed = 0; k < 400 && placed < 15; k++) {
+	/* TRONCOS CAÍDOS: deitados em X ou em Z (a colisão é por célula), em 3
+	 * células livres longe das trilhas */
+	for (int k = 0, placed = 0; k < 400 && placed < fp->logs; k++) {
 		uint32_t h = fhash(seed ^ 0x1061u, k, 77);
-		int x = FOREST_BORDER + 2 + (int)(h % (FOREST_W - 2 * FOREST_BORDER - 4));
-		int z = FOREST_BORDER + 2 + (int)((h >> 12) % (FOREST_H - 2 * FOREST_BORDER - 4));
+		int x = FOREST_BORDER + 2 + (int)(h % (W - 2 * FOREST_BORDER - 4));
+		int z = FOREST_BORDER + 2 + (int)((h >> 12) % (H - 2 * FOREST_BORDER - 4));
 		int along_z = (h >> 24) & 1;
 		int ok = 1;
 		for (int i = -2; i <= 2 && ok; i++) {              /* 3 células + folga de 1 */
 			int cx = x + (along_z ? 0 : i), cz = z + (along_z ? i : 0);
-			int near_trail = (cz >= TRAIL_Z - 2 && cz <= TRAIL_Z + 2) || (cx >= TRAIL_X - 2 && cx <= TRAIL_X + 2);
-			if (near_trail || in_clearing(cx, cz) || level_cell_solid(cx, cz) ||
+			if (near_trail(cx, cz, 2) || in_clearing(cx, cz) || level_cell_solid(cx, cz) ||
 			    collide_cell_has_obstacle(cx, cz))
 				ok = 0;
 		}
@@ -257,13 +268,36 @@ static void build_test_forest(void) {
 		               tree_defs[TREE_LOG].scale_min + (int)((h >> 8) % 400));
 		placed++;
 	}
+}
 
-	/* início a oeste, saída a leste, na trilha */
-	level_place('P', 8, TRAIL_Z);
-	level_place('X', FOREST_W - 9, TRAIL_Z);
+/* Coloca uma lista de coisas, cada uma na célula livre mais próxima */
+typedef struct { char ch; int x, z; } THING;
 
-	/* inimigos nas clareiras e ao longo das trilhas */
-	static const struct { char ch; int x, z; } things[] = {
+static void place_all(const THING *t, int n) {
+	for (int i = 0; i < n; i++)
+		level_place_safe(t[i].ch, t[i].x, t[i].z);
+}
+#define PLACE_ALL(list) place_all(list, (int)(sizeof(list) / sizeof(list[0])))
+
+/* ------------------------------------------------------------------ */
+/* Fase 5 (só teste: DEBUG_START_LEVEL 5 e ./dev bench)                 */
+/* ------------------------------------------------------------------ */
+#define TRAIL_Z      63      /* trilha leste-oeste (3 células: 62..64) */
+#define TRAIL_X      63      /* trilha norte-sul */
+
+static const CLEARING test_clearings[] = {
+	{ 32, 32, 7 }, { 96, 96, 9 }, { 96, 30, 6 }, { 30, 96, 7 },
+	{ 108, 16, 2 },          /* respiro no canto denso (ponto de medição) */
+};
+static const FOREST_PARAMS test_forest = {
+	128, 128, FOREST_TEST_SEED, FOREST_DENSE, FOREST_DENSE_NE, TRAIL_X, TRAIL_Z,
+	test_clearings, sizeof(test_clearings) / sizeof(test_clearings[0]), 15,
+};
+
+static void build_test_forest(void) {
+	build_forest(&test_forest);
+	static const THING things[] = {
+		{ 'P', 8, TRAIL_Z }, { 'X', 128 - 9, TRAIL_Z },      /* início a oeste, saída a leste */
 		{ 'E', 30, 30 }, { 'E', 34, 33 }, { 'F', 28, 97 }, { 'E', 32, 95 },
 		{ 'B', 96, 96 }, { 'E', 93, 99 }, { 'F', 96, 29 }, { 'E', 63, 40 },
 		{ 'E', 63, 90 }, { 'F', 85, 63 }, { 'E', 45, 63 },
@@ -271,8 +305,7 @@ static void build_test_forest(void) {
 		{ 'H', 31, 97 }, { 'H', 75, 63 }, { 'N', 95, 31 }, { 'W', 63, 63 },
 		{ 'G', 108, 16 }, { 'G', 20, 63 }, { 'G', 63, 110 },
 	};
-	for (int i = 0; i < (int)(sizeof(things) / sizeof(things[0])); i++)
-		level_place(things[i].ch, things[i].x, things[i].z);
+	PLACE_ALL(things);
 }
 
 /* Teleporte de depuração (L2 + direcional com o overlay aberto): sempre

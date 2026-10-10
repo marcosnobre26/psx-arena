@@ -69,6 +69,7 @@
 #define CHUNK_LOAD_RADIUS 2     /* monta o 5x5 de blocos em volta do grupo */
 #define CHUNK_BUILDS_PER_FRAME 1 /* fila: blocos distantes montados por quadro */
 #define MAX_TREES       1024    /* árvores e troncos no mapa (8 bytes cada) */
+#define PLACE_SEARCH    6       /* level_place_safe: procura célula livre até aqui */
 #ifndef TREE_LOD_DIST                   /* (./dev bench -D TREE_LOD_DIST=... testa outros) */
 #define TREE_LOD_DIST   1300    /* profundidade em que a árvore vira imagem plana
                                    (1800 -> 1300 na 04d: canto denso a 30 FPS) */
