@@ -215,3 +215,33 @@ automatizar testes visuais.
   Com 8 inimigos perto o FPS cai para 20 em 3 dos 4 pontos, com POLIS baixo
   (< 900): o gargalo é CPU (colisão + IA + desenho), não a GPU. No canto
   denso só 5 dos 8 nasceram (o resto cairia em árvore).
+- 2026-10-10 — Etapa 04c (colisão em grade espacial): `collision.c` deixa de
+  percorrer todos os objetos — obstáculos fixos (troncos em pé, props) e
+  entidades (2 jogadores + 24 inimigos) em listas por célula da grade do mapa
+  (32 KB + 16 KB, sem malloc), `collide_track()` em toda posição definida
+  direto. Mesmas regras (só bloqueia se aproxima, desliza, pulo passa por
+  cima de pessoas). Árvore em pé = círculo do tronco; tronco caído = células
+  baixas (`CELL_LOW`): pula-se por cima (jogador e inimigos, `ENEMY_HOP`),
+  tiros param, visão passa. Tiros pela grade (menor índice, como antes).
+  `collide_line_of_sight()` (DDA em inteiros) pronta para a IA da 07.
+  Testes no PC (`collision.c` + `level.c` compilados no host): 27 casos de
+  visão, bloqueio, tronco redondo, pulo sobre tronco, tiros e grade, todos
+  ok. Corrigido o README, que descrevia `BULLET.owner` e atiradores
+  inexistentes. RAM: 799 KB (818 634 bytes); sobram ~430 KB do orçamento de
+  1,2 MB. `./dev bench` **depois da 04c** (determinístico):
+
+  | Ponto | Inimigos extra/total | FPS mín/méd | POLIS máx | COL máx/méd (antes) | Grade erros |
+  |---|---|---|---|---|---|
+  | início | 0 / 11 | 30 / 30 | 506 | 2 / 0 (220 / 204) | 0 |
+  | início | 8 / 19 | **30** / 30 (antes 20) | 692 | 57 / 32 (605 / 525) | 0 |
+  | cruzamento | 0 / 11 | 30 / 50 | 430 | 6 / 2 (232 / 210) | 0 |
+  | cruzamento | 8 / 19 | 30 / 30 | 615 | 81 / 53 (574 / 478) | 0 |
+  | canto denso | 0 / 11 | 30 / 30 | 760 | 4 / 2 (242 / 224) | 0 |
+  | canto denso | 7 / 18 | 20 / 20 | 925 | 54 / 33 (428 / 384, com 5) | 0 |
+  | clareira | 0 / 11 | 30 / 30 | 498 | 10 / 2 (242 / 217) | 0 |
+  | clareira | 8 / 19 | **30** / 30 (antes 20) | 682 | 75 / 44 (537 / 474) | 0 |
+
+  A colisão caiu ~10x. O canto denso com inimigos continua em 20 FPS, mas
+  agora o gargalo é o desenho (27 árvores-modelo + 45 imagens planas + 7
+  inimigos extras; antes nasciam só 5 porque a árvore ocupava a célula
+  inteira) — primeira alavanca: `TREE_LOD_DIST`.

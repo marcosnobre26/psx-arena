@@ -56,7 +56,7 @@ VERBOSE=1 ./dev build
 | `objective.c` | objetivo da fase (`objective_update/text`), saída `X`, reforços `S` |
 | `player.c` | até 2 jogadores (`g.players[2]`, `g.in[2]`), respawn |
 | `enemies.c` / `weapons.c` / `powers.c` / `items.c` | inimigos, tiros, poderes, itens/caixas/efeitos/cenário |
-| `collision.c` | colisão por círculos: `collide_move()`, `collide_blocked()` |
+| `collision.c` | **grade espacial**: obstáculos fixos e entidades por célula; `collide_move()`, `collide_track()`, `collide_solid_at()`, `collide_line_of_sight()` |
 | `render.c` | motor 3D: GTE, Ordering Table, `render_mesh()`, HUD |
 | `input.c` | controles das portas 1 e 2 |
 | `sound.c` | efeitos no SPU: `sound_play`, `sound_play_at` (posicional), loops de ambiente nas vozes 0–1 |
@@ -136,8 +136,12 @@ uma branch. As regras do ROADMAP (determinismo, orçamentos de desempenho,
 - Mapa grande: coordenadas do mundo vão a 32 768 → **nunca** guarde posição
   de mundo em `SVECTOR` (16 bits); use `VECTOR` ou vértices relativos a uma
   origem (`load_translation` em `render.c`).
+- **Grade de colisão:** toda posição definida direto (sem `collide_move`) —
+  nascer, morrer, respawn, teleporte — precisa de `collide_track(ent)` logo
+  depois, senão a colisão fica desencontrada (`./dev bench` mostra
+  `grade_erros`). Nada de percorrer `g.enemies`/`g.props` para colidir.
 - Árvores: `level_add_tree` (fora de `g`, por bloco), **depois** das células;
-  colisão provisória pela célula. Posição por hash **com semente** (fase de
+  em pé = círculo na grade, tronco caído = células baixas (`CELL_LOW`). Posição por hash **com semente** (fase de
   teste: fixa; etapa 05: derivada de `g.seed`, nunca `g.rng`). Nomes fixos
   dos modelos: `pinheiro`, `arvore_seca`, `tronco` (+ `*_bb-4bit.png`).
 - Blocos: o 3×3 em volta de cada jogador é montado no mesmo quadro (sem

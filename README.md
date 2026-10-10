@@ -454,22 +454,35 @@ de UV — por isso a posição pode mudar a cada build sem quebrar nada.
 - **Cabeçalho big-endian:** convertido com `be32()` byte a byte. `__builtin_bswap32` chamaria uma
   rotina da libgcc compilada com outro ABI e o jogo trava no boot.
 
-### Colisão (`collision.c`)
+### Colisão (`collision.c`) — grade espacial
 
-Tudo que ocupa espaço no chão é um **círculo** no plano X/Z: jogadores (`PLAYER_RADIUS`),
-inimigos (raio × escala do tipo) e objetos de cenário (raio calculado dos vértices do modelo na
-carga). Paredes e caixas são células sólidas do mapa (`level_blocked`).
+Tudo que ocupa espaço no chão é um **círculo** no plano X/Z ou uma **célula sólida** do mapa:
 
-`collide_move()` testa X e Z separadamente (deslizar em paredes) e aplica três regras para
-nunca travar: ignora o próprio objeto; quando dois círculos já estão sobrepostos, só bloqueia o
-movimento que os **aproxima**; e entidades com diferença de altura maior que `JUMP_CLEAR`
-(alguém no alto de um pulo) não colidem. Projéteis testam paredes, caixas, cenário e o "outro
-lado": cada `BULLET` tem um `owner` (`OWNER_PLAYER`/`OWNER_ENEMY`) — tiro de jogador só acerta
-inimigos, tiro de inimigo só acerta jogadores (e passa por baixo de quem pula alto). Os dois
-dividem o pool `g.bullets` (`MAX_BULLETS`). Atiradores checam linha de visão (amostras a cada
-64 unidades contra o mapa e objetos sólidos) só a cada 8 passos, escalonado por inimigo.
-Custo: O(jogadores + inimigos + objetos) por movimento — trivial para os limites atuais
-(2 + 24 + 64).
+| O quê | Como colide | Onde fica |
+|---|---|---|
+| paredes, mata, caixas | célula sólida (`CELL_SOLID`) | `level.c` |
+| tronco caído | 3 células sólidas **baixas** (`CELL_LOW`) | `level.c` |
+| tronco de árvore em pé, props sólidos | círculo **fixo** | listas por célula (`obst_head`, 32 KB) |
+| jogadores e inimigos | círculo que anda | listas por célula (`ent_head`, 16 KB) |
+
+A grade espacial é a própria grade do mapa (256 unidades). Um obstáculo fixo sempre cabe inteiro
+na célula do seu centro (o raio é limitado ao registrar), então a busca olha só as células que o
+círculo consultado toca; para entidades, amplia pelo maior raio de entidade. Nada percorre listas
+inteiras. Tudo em vetores estáticos, fora de `g`, mas derivado só das posições em `g`:
+`collide_reset()` no começo do `level_load`, `collide_move()` atualiza a célula de quem andou e
+**`collide_track()` deve ser chamado sempre que uma posição é definida direto** (nascer, morrer,
+respawn, teleporte). `collide_check_grid()` confere a consistência (o `./dev bench` mostra).
+
+Regras (as mesmas de antes): X e Z testados separados (deslizar em paredes); o próprio objeto é
+ignorado; dois círculos já sobrepostos só bloqueiam o movimento que os **aproxima**; diferença de
+altura maior que `JUMP_CLEAR` (alguém no alto de um pulo) não colide. Células baixas não bloqueiam
+quem está acima de `LOW_CLEAR` nem quem já está sobre elas (pulou e caiu em cima); inimigos pulam
+o tronco caído (`ENEMY_HOP`).
+
+Tiros: `collide_solid_at` (células sólidas, inclusive baixas, e obstáculos fixos) e
+`collide_enemy_at` (inimigos das células perto; entre vários, o de menor índice).
+`collide_line_of_sight()` percorre as células do segmento (DDA em inteiros): parede, mata, caixa e
+tronco em pé bloqueiam; tronco caído e chão vazio não; pessoas não. A IA ainda não usa (etapa 07).
 
 ### Fases, objetivos e progressão
 

@@ -206,9 +206,11 @@ MODELO n PLANA n`.
 - Um mapa por código coloca árvores com `level_add_tree(TREE_PINE, x, z,
   ângulo, escala)` (posição no mundo, ângulo 0–4095, escala `ONE` = 1,0),
   **depois** de preencher as células (`level_set_cell` zera a solidez).
-- **Colisão provisória (até a 04c):** o tronco marca a célula como sólida;
-  o tronco caído marca 3 células ao longo do comprimento — por isso ele só
-  pode ficar deitado em X ou em Z (ângulo perto de 0/1024/2048/3072).
+- **Colisão:** árvore em pé = **círculo do tronco** (`trunk_r` em
+  `tree_defs` × escala), na grade espacial: o jogador contorna suave. Tronco
+  caído = 3 células sólidas **baixas** ao longo do comprimento (por isso só
+  deitado em X ou Z, ângulo perto de 0/1024/2048/3072): dá para **pular por
+  cima** (jogador e inimigos), os tiros param nele e a visão passa.
 - **Semente:** a posição das árvores vem de um hash **com semente**. A fase
   de teste usa `FOREST_TEST_SEED` (fixa, para medir sempre no mesmo cenário);
   a geração da etapa 05 deve usar uma semente derivada de `g.seed`.
@@ -246,11 +248,27 @@ Respeite:
   **Não rode mais** `tools/make_tree_models.py` depois disso: ele sobrescreve
   os cinco arquivos.
 
-**Conferir a colisão:** com o overlay aberto, **L2 + Select** desenha um
-quadrado em cima de cada célula sólida em volta do jogador 1 (raio
-`COLMARK_RADIUS`), na altura do topo: vermelho = parede/mata, laranja =
-caixa ou árvore, roxo = vazio. Desenho e colisão batem quando cada parede tem o seu
-quadrado vermelho exatamente no topo.
+**Colisão (grade espacial).** Cada célula sabe quais obstáculos fixos
+(troncos, pilares) e quais entidades (jogadores, inimigos) estão nela; os
+testes olham só as células vizinhas. Ao escrever código que muda a posição
+de alguém **direto** (sem `collide_move`), chame `collide_track(p)` logo
+depois — nascer, morrer, teleporte. Para objetos sólidos novos num mapa por
+código: `collide_add_obstacle(x, z, raio)` (o raio é limitado para caber
+na célula). Linha de visão: `collide_line_of_sight(x0, z0, x1, z1)`.
+
+**Conferir a colisão:** com o overlay aberto, **L2 + Select** mostra, em
+volta do jogador 1 (raio `COLMARK_RADIUS`):
+
+| Cor | O quê |
+|---|---|
+| vermelho (no topo) | parede/mata |
+| laranja | caixa (célula) ou tronco em pé (quadrado do tamanho do raio do círculo) |
+| amarelo (baixo) | tronco caído (célula baixa) |
+| roxo (no chão) | vazio |
+| verde/vermelho sobre um inimigo | linha de visão do jogador 1 até ele livre/bloqueada |
+
+Desenho e colisão batem quando cada parede tem o seu quadrado vermelho
+exatamente no topo e cada tronco tem o seu quadrado laranja no pé.
 
 **Benchmark automático (`./dev bench`).** Mede sem ninguém abrir o jogo:
 
