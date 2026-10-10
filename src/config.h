@@ -79,6 +79,7 @@
 #define CAM_DENSE_DIST  540     /* na mata densa a câmera chega até aqui (de CAM_DIST) */
 #define CAM_DENSE_FULL  8       /* "densidade" (árvores em ~4 células) = aproximação total */
 #define CAM_FRAME_FULL  600     /* 2 jogadores: recuo de enquadramento que anula a aproximação */
+#define CAM_BLOCK_RAISE 120     /* quanto a câmera sobe, no máximo, ao aproximar por tronco */
 #define CAM_TRUNK_MARGIN 32     /* folga entre a linha da câmera e um tronco */
 #define CAM_TURN_SPEED  40      /* giro com L1/R1 por quadro */
 
@@ -86,6 +87,10 @@
 /* vida, velocidade e pulo de cada personagem ficam em data.c (character_defs) */
 #define PLAYER_MAX_ENERGY   100
 #define PLAYER_RADIUS       70
+#ifndef MAX_PLAYER_SEPARATION       /* (./dev bench -D testa outros valores) */
+#define MAX_PLAYER_SEPARATION 896   /* 2 jogadores: distância máxima entre eles
+                                       (escolhido pelo ./dev bench: 30 FPS nas 8 direções) */
+#endif
 #define ENEMY_HOP           27  /* pulo do inimigo sobre tronco caído (sobe ~120) */
 #define PLAYER_INVULN       60  /* quadros invulnerável após levar dano */
 #define ENERGY_REGEN_DELAY  20  /* a cada N quadros recupera 1 de energia */

@@ -76,8 +76,18 @@ static int collect_group(void) {
 static void eye_at(int d, int want_dist, int s, int c, VECTOR *out) {
 	out->vx = cx - ((s * d) >> 12);
 	out->vz = cz - ((c * d) >> 12);
-	/* altura proporcional à distância-base (mesmo ângulo na mata densa) */
-	out->vy = (cy >> 1) - CAM_HEIGHT * base_dist / CAM_DIST - extra * 3 / 4 - (want_dist - d) * 3 / 4;
+	/* altura proporcional à distância-base (mesmo ângulo na mata densa).
+	 * Aproximou por causa de tronco: sobe um pouco, mas no máximo
+	 * CAM_BLOCK_RAISE. Sem esse limite, com 2 jogadores a câmera chegava a
+	 * ~1 800 de altura (quase vista de cima, enxergando chão demais: 15 FPS);
+	 * na mata quem tapa já fica a 50%, então não precisa subir tanto. */
+	int raise = (want_dist - d) * 3 / 4;
+	if (raise > CAM_BLOCK_RAISE) raise = CAM_BLOCK_RAISE;
+	/* Ao aproximar, desliza sobre a própria linha de visão (mesmo ângulo): a
+	 * altura cai na proporção da distância. Antes só a distância diminuía e
+	 * a câmera ficava quase vertical, vendo chão demais. */
+	int height = (CAM_HEIGHT * base_dist / CAM_DIST + extra * 3 / 4) * d / want_dist;
+	out->vy = (cy >> 1) - height - raise;
 }
 
 /* Distância-base pela densidade da mata em volta do grupo: de CAM_DIST

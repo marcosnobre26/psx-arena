@@ -811,11 +811,14 @@ static void debug_input(INPUT *in) {
 /* Os 4 primeiros são os pontos do teleporte (L2 + direcional) da fase 5;
  * os outros só existem no benchmark. */
 #define BENCH_POINTS 6
+#ifndef BENCH_P2_ANGLE
+#define BENCH_P2_ANGLE 1024     /* direção em que o jogador 2 é colocado (-D testa outras) */
+#endif
 static const char *const bench_names[BENCH_POINTS] = {
 	"inicio", "cruzamento", "canto_denso", "clareira", "canto_tapado", "canto_2j" };
 static const DEBUG_POINT bench_extra[2] = {
 	{ 110, 24, 512 },       /* canto denso onde 2 árvores tapam o jogador (50%) */
-	{ 110, 24, 512 },       /* o mesmo, com o jogador 2 a ~5 células */
+	{ 110, 24, 512 },       /* o mesmo, com o jogador 2 no limite de distância */
 };
 
 /* Jogador 2 entra/sai só para o ponto de 2 jogadores (posição definida
@@ -828,15 +831,20 @@ static void bench_player2(int on) {
 	}
 	const PLAYER *p1 = &g.players[0];
 	p2->index = 1; p2->active = 1; p2->character = 1; p2->skin = 0;
-	for (int k = 0; k < 16; k++) {               /* ~5 células, primeiro lugar livre */
-		int a = (k * 256 + 1024) & 4095;
-		int x = p1->pos.vx + ((isin(a) * 5 * TILE_SIZE) >> 12);
-		int z = p1->pos.vz + ((icos(a) * 5 * TILE_SIZE) >> 12);
-		if (!collide_solid_at(x, z, PLAYER_RADIUS + 40)) {
-			player_spawn(p2, x, z);              /* chama collide_track */
-			break;
+	/* pior caso: o jogador 2 no LIMITE de distância (MAX_PLAYER_SEPARATION),
+	 * no primeiro lugar livre do anel (ou um pouco mais perto) */
+	int placed = 0;
+	for (int r = MAX_PLAYER_SEPARATION - 16; r > 256 && !placed; r -= 64)
+		for (int k = 0; k < 16; k++) {
+			int a = (k * 256 + BENCH_P2_ANGLE) & 4095;
+			int x = p1->pos.vx + ((isin(a) * r) >> 12);
+			int z = p1->pos.vz + ((icos(a) * r) >> 12);
+			if (!collide_solid_at(x, z, PLAYER_RADIUS + 40)) {
+				player_spawn(p2, x, z);          /* chama collide_track */
+				placed = 1;
+				break;
+			}
 		}
-	}
 	g.num_players = 2;
 	camera_snap();
 }
@@ -972,7 +980,7 @@ static void bench_frame(int vs) {
 		       "polis_max=%d polis_med=%d ram_gpu_max=%d col_max=%d col_med=%d "
 		       "arvores_modelo=%d arvores_plana=%d grade_erros=%d cam_max=%d cam_med=%d cam_celulas_max=%d arvores_transp=%d "
 		       "cpu_max=%d cpu_med=%d gpu_espera_max=%d gpu_espera_med=%d logica_med=%d "
-		       "desenho_blocos=%d desenho_arvores=%d desenho_resto=%d\n",
+		       "desenho_blocos=%d desenho_arvores=%d desenho_resto=%d separacao=%d\n",
 		       bench_names[bench.point], bench.extras, n, bench.fps_min,
 		       bench.vsyncs ? bench.frames * 60 / bench.vsyncs : 0,
 		       bench.polis_max, bench.frames ? bench.polis_sum / bench.frames : 0, bench.ram_max,
@@ -985,7 +993,9 @@ static void bench_frame(int vs) {
 		       bench.frames ? bench.logic_sum / bench.frames : 0,
 		       bench.frames ? bench.p_chunks / bench.frames : 0,
 		       bench.frames ? bench.p_trees / bench.frames : 0,
-		       bench.frames ? bench.p_other / bench.frames : 0);
+		       bench.frames ? bench.p_other / bench.frames : 0,
+		       g.players[1].active ? dist2d(g.players[1].pos.vx - g.players[0].pos.vx,
+		                                    g.players[1].pos.vz - g.players[0].pos.vz) : 0);
 
 		if (bench.extras == 0) {             /* agora com inimigos extras */
 			uint32_t before = 0, after = 0;

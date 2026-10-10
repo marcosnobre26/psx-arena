@@ -85,7 +85,30 @@ void player_spawn(PLAYER *p, int x, int z) {
 	collide_track(p);                     /* posição definida direto: entra na grade */
 }
 
+/* Distância máxima entre os jogadores (LÓGICA de jogo: só posições em g,
+ * nunca a câmera). Testa eixo por eixo, como a colisão: o eixo que deixaria
+ * o jogador além do limite E mais longe do outro não anda; andar de lado ou
+ * voltar continua livre. Assim a câmera nunca precisa recuar demais. */
+static void keep_together(const PLAYER *p, int *dx, int *dz) {
+	for (int i = 0; i < MAX_PLAYERS; i++) {
+		const PLAYER *o = &g.players[i];
+		if (o == p || !player_alive(o)) continue;
+		int ox = p->pos.vx - o->pos.vx, oz = p->pos.vz - o->pos.vz;
+		int cur = dist2d(ox, oz);
+		if (*dx) {
+			int nd = dist2d(ox + *dx, oz);
+			if (nd > MAX_PLAYER_SEPARATION && nd > cur) *dx = 0;
+		}
+		if (*dz) {
+			int nd = dist2d(ox + *dx, oz + *dz);
+			int was = dist2d(ox + *dx, oz);
+			if (nd > MAX_PLAYER_SEPARATION && nd > was) *dz = 0;
+		}
+	}
+}
+
 static void move(PLAYER *p, int dx, int dz) {
+	keep_together(p, &dx, &dz);
 	collide_move(&p->pos, dx, dz, PLAYER_RADIUS, p, COL_ALL);
 }
 
