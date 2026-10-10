@@ -149,7 +149,7 @@ static const char *const map_cerco[] = {
 /* Ajustes da fase de teste que o ./dev bench -D pode trocar (ex.:
  * ./dev bench -D FOREST_FOG_FAR=2800) para comparar desempenho */
 #ifndef FOREST_FOG_FAR
-#define FOREST_FOG_FAR    3200      /* névoa: além disso nada é desenhado */
+#define FOREST_FOG_FAR    2800      /* névoa: além disso nada é desenhado (3200 -> 2800 na 04d) */
 #endif
 #ifndef FOREST_DENSE
 #define FOREST_DENSE      50        /* árvores por mil células no interior */

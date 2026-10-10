@@ -302,3 +302,8 @@ automatizar testes visuais.
   | 1500 + névoa 2800 | 20 | 552 | 22 / 41 |
 
   Padrões **não** alterados nesta etapa (decisão do Marcos).
+- 2026-10-10 — Decisão (04d): `TREE_LOD_DIST` 1800 → **1300** e névoa da
+  fase 5 3200 → **2800** como padrão; densidade do mapa de teste mantida.
+  **Folga pequena:** o canto denso com inimigos fica em ~498 de ~525
+  linhas de CPU. A **etapa 10 precisa otimizar a CPU**, principalmente o
+  desenho dos blocos (~214 linhas) e das árvores (~160).

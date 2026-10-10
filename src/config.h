@@ -61,7 +61,8 @@
 #define CHUNK_BUILDS_PER_FRAME 1 /* fila: blocos distantes montados por quadro */
 #define MAX_TREES       1024    /* árvores e troncos no mapa (8 bytes cada) */
 #ifndef TREE_LOD_DIST                   /* (./dev bench -D TREE_LOD_DIST=... testa outros) */
-#define TREE_LOD_DIST   1800    /* profundidade em que a árvore vira imagem plana */
+#define TREE_LOD_DIST   1300    /* profundidade em que a árvore vira imagem plana
+                                   (1800 -> 1300 na 04d: canto denso a 30 FPS) */
 #endif
 #define TREE_OCCLUDE_TICKS 18   /* árvore que tapou o jogador fica 50% por ~0,3 s */
 #define WALL_SLICE      192     /* paredes são montadas em fatias desta altura */
