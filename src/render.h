@@ -89,6 +89,7 @@ void render_rect(int x, int y, int w, int h, int r, int g, int b, int semitrans)
 void hud_print(int x, int y, const char *fmt, ...);
 
 void render_end_frame(void);
+void render_set_shake(int dx, int dy);   /* tremor 2D da imagem (pixels) */
 
 /* Névoa por profundidade: some no fundo entre near e far (z da câmera).
  * A cor da névoa também vira a cor de fundo. */

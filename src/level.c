@@ -541,18 +541,35 @@ int level_chunk_standing(int bx, int bz) {
 	return n;
 }
 
-/* Tira a árvore i (e o obstáculo dela) e reordena por bloco */
+/* Tira a árvore i (e o obstáculo dela). Operação LOCAL: o vetor está
+ * ordenado por bloco; desloca o resto uma posição e acerta o início dos
+ * blocos seguintes (reordenar ~1000 árvores custava ~80 linhas). */
 void level_remove_tree(int i) {
 	if (i < 0 || i >= num_trees) return;
 	if (tree_defs[trees[i].type].cells == 1)
 		collide_remove_obstacle(trees[i].x, trees[i].z);
-	trees[i] = trees[--num_trees];
-	trees_finish();
+	int bx = trees[i].x / CHUNK_SIZE, bz = trees[i].z / CHUNK_SIZE;
+	memmove(&trees[i], &trees[i + 1], (num_trees - i - 1) * sizeof(TREE));
+	num_trees--;
+	tree_count[bz][bx]--;
+	for (int z = bz; z < MAX_CCZ; z++)
+		for (int x = (z == bz ? bx + 1 : 0); x < MAX_CCX; x++)
+			tree_start[z][x]--;
 }
 
-/* Depois de level_add_tree em tempo de jogo: reordena por bloco */
+/* Depois de level_add_tree em tempo de jogo: a árvore nova (a última do
+ * vetor) vai para o lugar do bloco dela, sem reordenar tudo */
 void level_trees_changed(void) {
-	trees_finish();
+	if (num_trees == 0) return;
+	TREE t = trees[num_trees - 1];
+	int bx = t.x / CHUNK_SIZE, bz = t.z / CHUNK_SIZE;
+	int pos = tree_start[bz][bx] + tree_count[bz][bx];   /* fim do bloco dela */
+	memmove(&trees[pos + 1], &trees[pos], (num_trees - 1 - pos) * sizeof(TREE));
+	trees[pos] = t;
+	tree_count[bz][bx]++;
+	for (int z = bz; z < MAX_CCZ; z++)
+		for (int x = (z == bz ? bx + 1 : 0); x < MAX_CCX; x++)
+			tree_start[z][x]++;
 }
 
 /* Árvores do bloco (bx, bz): índice da primeira e quantas */
@@ -954,6 +971,18 @@ void level_draw(void) {
 /* ------------------------------------------------------------------ */
 /* Colisão                                                             */
 /* ------------------------------------------------------------------ */
+
+/* Byte cru da célula (tipo | CELL_LOW | CELL_SOLID); fora do mapa: sólido.
+ * Uma chamada só, para a checagem de alcance (reach.c) ser barata. */
+/* A grade inteira, só para LEITURA rápida (checagem de alcance) */
+const uint8_t (*level_cells(void))[MAP_MAX_W] {
+	return (const uint8_t (*)[MAP_MAX_W])cells;
+}
+
+int level_cell_raw(int cx, int cz) {
+	if (cx < 0 || cz < 0 || cx >= lw || cz >= lh) return CELL_SOLID;
+	return cells[cz][cx];
+}
 
 int level_cell_solid(int cx, int cz) {
 	if (cx < 0 || cz < 0 || cx >= lw || cz >= lh) return 1;

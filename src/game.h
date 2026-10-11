@@ -390,9 +390,10 @@ typedef struct {
 		int      shake;           /* passos de tremor (a câmera visual só lê) */
 		int      last;            /* última ação aplicada (EV_*), para o overlay */
 		int      barrier_open;    /* a barreira de raízes já foi aberta */
+		int      enemy_cap;       /* onda: inimigos vivos no máximo (os do começo) */
 		/* busca de lugar em andamento (árvore cai / mata fecha): no máximo 1
 		 * checagem de alcance por passo, para não pesar num quadro só */
-		struct { int action, arg, k, j, tries, placed, dir0, start; } job;
+		struct { int action, arg, k, j, tries, placed, dir0, start, checking, cand; } job;
 		/* árvore caindo: aviso (estalo), tombo, impacto */
 		struct {
 			int      timer;           /* 0 = nenhuma */
@@ -471,6 +472,9 @@ int  level_chunk_standing(int bx, int bz);
 void level_remove_tree(int i);
 void level_trees_changed(void);                   /* depois de level_add_tree no jogo */
 int  level_tree_room(void);
+int  level_cell_raw(int cx, int cz);
+const uint8_t (*level_cells(void))[MAP_MAX_W];         /* leitura rápida */
+const int16_t (*collide_obst_heads(void))[MAP_MAX_W];  /* leitura rápida */
 int  level_chunk_trees(int bx, int bz, int *start);
 void level_set_flags(int cx, int cz, int flags);  /* só bits (sólido/baixo): não remonta */
 void level_rebuild_chunk(int cx, int cz);         /* remonta em fatias (tipo mudou) */
@@ -570,12 +574,15 @@ void props_draw(void);
 void show_message(const char *text, int frames);
 
 /* reach.c: alcance durante a partida (mapa de bits + checagem local) */
-enum { REACH_OK, REACH_CUT, REACH_WINDOW, REACH_LIMIT };   /* LIMIT: só nas estatísticas */
+enum { REACH_OK, REACH_CUT, REACH_WINDOW, REACH_LIMIT,     /* LIMIT: só nas estatísticas */
+       REACH_PENDING };
 void reach_clear(void);
 void reach_set(int cx, int cz, int on);
 int  reach_get(int cx, int cz);
 int  reach_walkable(int cx, int cz);
-int  reach_local_ok(int cx, int cz, const uint16_t *blk, int n);
+int  reach_local_ok(int cx, int cz, const uint16_t *blk, int n);   /* tudo de uma vez */
+int  reach_begin(int cx, int cz, const uint16_t *blk, int n);      /* ... ou em passos */
+int  reach_step(int budget);
 void reach_stats(int *ok, int *cut, int *window, int *limit);
 int  reach_last_visits(void);
 
@@ -585,6 +592,8 @@ void events_update(void);             /* um passo de lógica (STATE_PLAY) */
 void events_debug(int action);        /* atalho de depuração: na hora, sem regras */
 void events_enemy_killed(void);
 void events_draw(void);               /* árvore caindo (só desenho: lê g) */
+void events_prof(int *job, int *impact);   /* só no bench */
+int  events_prof_check(void);
 int  ev_fall_footprint(int x, int z, int dir, int scale, uint16_t *cells, uint8_t *crown);
 const char *event_name(int action);
 

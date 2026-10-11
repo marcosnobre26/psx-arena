@@ -620,6 +620,7 @@ static void game_tick(void) {
 
 /* Desenha o quadro atual */
 static void game_draw(void) {
+	render_set_shake(0, 0);              /* camera_apply liga se houver tremor */
 #ifndef DEBUG_FOG_TUNING
 	if (g.ev.fog_far > 0 && render_fog_far() != g.ev.fog_far)
 		level_apply_fog();               /* névoa do evento (lê g) */
@@ -897,6 +898,11 @@ static const BENCH_PT bench_fixed[] = {
  * centro da janela mais densa), e o CERCO com 2 jogadores na pior delas */
 #define BENCH_POINTS (BENCH_NFIXED + 4 * 5 + 1 + 4 * 5 + 4 * 2)
 #define BENCH_SEED_FIXED 0xffffffffu      /* "semente" que carrega a floresta fixa da 04e */
+/* eventos medidos em cada ponto, depois da multidão e da remontagem */
+/* -1 = controle: a mesma janela sem evento (o quadro pesa sozinho com o tempo) */
+static const int  bench_events[] = { -1, EV_TREE_FALL, EV_CLOSE_BEHIND, EV_OPEN_PATH, EV_WAVE };
+static const char *const bench_event_names[] = { "ev_controle", "ev_queda", "ev_mata", "ev_raizes", "ev_onda" };
+#define BENCH_NEVENTS ((int)(sizeof(bench_events) / sizeof(bench_events[0])))
 
 /* Monta o ponto i (os gerados não cabem numa tabela fixa) */
 static BENCH_PT bench_point(int i, uint32_t *seed, char *name) {
@@ -988,6 +994,9 @@ static struct {
 	int      logic_sum, logic_last;               /* parte da CPU gasta na lógica */
 	int      p_chunks, p_trees, p_other;          /* desenho por categoria (soma) */
 	int      build_max;                           /* pior montagem de bloco (linhas) */
+	int      dirty;                               /* eventos mexeram no mapa: recarregar */
+	int      logic_max;                           /* pior quadro de lógica (linhas) */
+	int      ev_job, ev_impact, ev_check;         /* eventos: pior passo da busca / impacto / checagem */
 	int      cut_max;                             /* blocos+árvores cortados (buffer) */
 } bench;
 
@@ -1072,6 +1081,8 @@ static void bench_reset_stats(void) {
 	bench.logic_sum = 0;
 	bench.p_chunks = bench.p_trees = bench.p_other = 0;
 	bench.build_max = 0;
+	bench.logic_max = 0;
+	bench.ev_job = bench.ev_impact = bench.ev_check = 0;
 	{ int d; level_build_stats(&d); }         /* zera o pior */
 	bench.cut_max = 0;
 }
@@ -1099,7 +1110,8 @@ static void bench_frame(int vs) {
 		{
 			bench.cur = bench_point(bench.point, &bench.seed, bench.name);
 			const BENCH_PT *bp = &bench.cur;
-			if (g.level != bp->level || g.seed != bench.seed) {   /* outro mapa: carrega */
+			if (g.level != bp->level || g.seed != bench.seed || bench.dirty) {   /* outro mapa (ou mexido): carrega */
+				bench.dirty = 0;
 				bench_force_fixed = bench.seed == BENCH_SEED_FIXED;
 				start_level(bp->level, bench.seed);
 				const MAPGEN_STATS *ms = mapgen_stats();
@@ -1131,6 +1143,12 @@ static void bench_frame(int vs) {
 		if (--bench.timer <= 0) {
 			bench_reset_stats();
 			bench.timer = BENCH_MEASURE;
+			if (bench.stage >= 3) {          /* um evento na hora (etapa 06) */
+				if (bench_events[bench.stage - 3] >= 0)
+					events_debug(bench_events[bench.stage - 3]);
+				bench.dirty = 1;
+				bench.timer = 180;           /* busca + aviso + tombo + ~60 quadros */
+			}
 			if (bench.stage == 2) {          /* remonta EM FATIAS o bloco do jogador */
 				const PLAYER *p0 = &g.players[0];  /* (como a barreira que se abre) */
 #ifndef BENCH_NO_REBUILD                     /* controle: a mesma janela sem remontar */
@@ -1170,6 +1188,15 @@ static void bench_frame(int vs) {
 		bench.cpu_sum += pc;
 		bench.gpu_sum += pg;
 		bench.logic_sum += bench.logic_last;
+		if (bench.logic_last > bench.logic_max) bench.logic_max = bench.logic_last;
+		{
+			int j, im;
+			events_prof(&j, &im);
+			if (j > bench.ev_job) bench.ev_job = j;
+			if (im > bench.ev_impact) bench.ev_impact = im;
+			int c = events_prof_check();
+			if (c > bench.ev_check) bench.ev_check = c;
+		}
 		bench.p_chunks += prof_get(PROF_CHUNKS);
 		{
 			int b;
@@ -1191,7 +1218,7 @@ static void bench_frame(int vs) {
 		       "arvores_modelo=%d arvores_plana=%d grade_erros=%d cam_max=%d cam_med=%d cam_celulas_max=%d arvores_transp=%d "
 		       "cpu_max=%d cpu_med=%d gpu_espera_max=%d gpu_espera_med=%d logica_med=%d "
 		       "desenho_blocos=%d desenho_arvores=%d desenho_resto=%d separacao=%d corte=%d "
-		       "medida=%s montagem_max=%d\n",
+		       "medida=%s montagem_max=%d evento_ok=%d logica_max=%d busca_max=%d impacto=%d checagem=%d\n",
 		       bench.name, bench.extras, n, bench.fps_min,
 		       bench.vsyncs ? bench.frames * 60 / bench.vsyncs : 0,
 		       bench.polis_max, bench.frames ? bench.polis_sum / bench.frames : 0, bench.ram_max,
@@ -1208,8 +1235,11 @@ static void bench_frame(int vs) {
 		       g.players[1].active ? dist2d(g.players[1].pos.vx - g.players[0].pos.vx,
 		                                    g.players[1].pos.vz - g.players[0].pos.vz) : 0,
 		       bench.cut_max,
-		       bench.stage == 0 ? "natural" : bench.stage == 1 ? "multidao" : "remontagem",
-		       bench.build_max);
+		       bench.stage == 0 ? "natural" : bench.stage == 1 ? "multidao" :
+		       bench.stage == 2 ? "remontagem" : bench_event_names[bench.stage - 3],
+		       bench.build_max,
+		       bench.stage >= 3 ? g.ev.last == bench_events[bench.stage - 3] : -1,
+		       bench.logic_max, bench.ev_job, bench.ev_impact, bench.ev_check);
 
 		if (bench.stage == 0) {              /* agora a "multidão" */
 			uint32_t before = 0, after = 0;
@@ -1228,6 +1258,10 @@ static void bench_frame(int vs) {
 			}
 			bench.stage = 1;
 			bench.timer = BENCH_SETTLE_E;
+			bench.phase = BENCH_WAIT;
+		} else if (bench.stage >= 2 && bench.stage < 2 + BENCH_NEVENTS) {   /* próximo evento */
+			bench.stage++;
+			bench.timer = 10;                /* espera o printf (lento) sair do quadro */
 			bench.phase = BENCH_WAIT;
 		} else if (bench.stage == 1) {       /* remontagem: o bloco do jogador */
 			bench.stage = 2;                 /* (custo de um evento que muda o mapa); */

@@ -857,6 +857,17 @@ void render_stats_time(int *cpu, int *gpu, int *vs) {
 	*vs  = prof_vs;
 }
 
+/* Tremor da tela (evento): desloca o DESENHO alguns pixels (offset de
+ * desenho da GPU, DRAWENV.ofs), sem mexer na câmera 3D nem na saída de
+ * vídeo: não muda a geometria nem o custo do quadro. (Mexer na câmera
+ * enquadrava ~100 polígonos a mais; mexer na saída de vídeo, DISPENV,
+ * reprograma a temporização e perdia um quadro.) */
+static int shake_dx, shake_dy;
+void render_set_shake(int dx, int dy) {
+	shake_dx = dx;
+	shake_dy = dy;
+}
+
 void render_end_frame(void) {
 	last_bytes = nextpri - fb[cur].pkt;
 	last_polys = polys;
@@ -876,6 +887,8 @@ void render_end_frame(void) {
 	prof_vs  = (uint16_t)(t2 - t1);
 	prof_start = t2;
 
+	fb[cur].draw.ofs[0] = shake_dx;
+	fb[cur].draw.ofs[1] = shake_dy;
 	PutDispEnv(&fb[cur].disp);
 	PutDrawEnv(&fb[cur].draw);
 	SetDispMask(1);

@@ -109,7 +109,23 @@ static int behind_barrier(int cx, int cz) {
 	return (cx - bx) * (cx - bx) + (cz - bz) * (cz - bz) <= (br + 1) * (br + 1);
 }
 static const char *fail_what;
+/* O vetor de árvores continua ordenado por bloco (inserção/remoção locais) */
+static int trees_index_ok(void) {
+	int x, z, expect = 0;
+	for (int bz = 0; bz < MAP_MAX_H / CHUNK_CELLS; bz++)
+		for (int bx = 0; bx < MAP_MAX_W / CHUNK_CELLS; bx++) {
+			int start, n = level_chunk_trees(bx, bz, &start);
+			if (start != expect) return 0;
+			for (int i = start; i < start + n; i++) {
+				if (level_tree_get(i, &x, &z) < 0) return 0;
+				if (x / (CHUNK_CELLS * TILE_SIZE) != bx || z / (CHUNK_CELLS * TILE_SIZE) != bz) return 0;
+			}
+			expect += n;
+		}
+	return level_tree_get(expect, &x, &z) < 0;     /* nenhuma sobrando */
+}
 static int check_all(void) {
+	if (!trees_index_ok()) { fail_what = "indice das arvores"; return 0; }
 	const PLAYER *p = &g.players[0];
 	int px = p->pos.vx / TILE_SIZE, pz = p->pos.vz / TILE_SIZE;
 	if (!walk(px, pz)) { fail_what = "jogador em solido/arvore"; return 0; }
@@ -186,6 +202,14 @@ static void load(int lv, uint32_t seed) {
 static int run_action(int a) {
 	int last = g.ev.last;
 	g.ev.last = -1;
+	if (a == EV_WAVE)                            /* a onda repõe: "mata" 2 antes */
+		for (int i = 0, k = 0; i < MAX_ENEMIES && k < 2; i++)
+			if (g.enemies[i].active) {
+				g.enemies[i].active = 0;
+				collide_track(&g.enemies[i]);
+				g.enemies_left--;
+				k++;
+			}
 	events_debug(a);
 	for (int t = 0; t < 400; t++) {
 		events_update();

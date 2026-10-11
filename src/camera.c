@@ -215,16 +215,10 @@ void camera_stats(int *tests, int *cells) {
 }
 
 void camera_apply(void) {
-	if (g.ev.shake > 0) {
-		/* tremor do impacto (evento): só desenho, gerador VISUAL (fx_range);
-		 * lê g.ev.shake, não muda g. A posição guardada não muda. */
-		int a = g.ev.shake * 6;
-		VECTOR e = eye, l = look;
-		e.vx += fx_range(-a, a); e.vy += fx_range(-a, a); e.vz += fx_range(-a, a);
-		l.vy += fx_range(-a / 2, a / 2);
-		render_set_camera(&e, &l);
-		return;
-	}
+	/* tremor do impacto (evento): só desenho, gerador VISUAL (fx_range); lê
+	 * g.ev.shake, não muda g. Desloca a imagem, não a câmera (custo zero). */
+	int a = g.ev.shake / 4;
+	render_set_shake(a ? fx_range(-a, a) : 0, a ? fx_range(-a, a) : 0);
 	render_set_camera(&eye, &look);
 }
 

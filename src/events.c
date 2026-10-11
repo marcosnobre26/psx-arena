@@ -20,6 +20,23 @@
 #include <string.h>
 #include "game.h"
 
+#ifdef DEBUG_BENCHMARK
+#include <hwregs_c.h>
+static int prof_job, prof_impact, prof_check;   /* perfil (bench): pior, em linhas */
+void events_prof(int *job, int *impact) {
+	*job = prof_job; *impact = prof_impact;
+	prof_job = prof_impact = 0;
+}
+int events_prof_check(void) { int c = prof_check; prof_check = 0; return c; }
+#define EVP_BEGIN() uint16_t evp_t0 = TIMER_VALUE(1)
+#define EVP_END(v)  do { int d = (uint16_t)(TIMER_VALUE(1) - evp_t0); if (d > (v)) (v) = d; } while (0)
+#define EVP_CHECK(call) ({ uint16_t t_ = TIMER_VALUE(1); int r_ = (call); int d_ = (uint16_t)(TIMER_VALUE(1) - t_); if (d_ > prof_check) prof_check = d_; r_; })
+#else
+#define EVP_BEGIN()
+#define EVP_END(v)
+#define EVP_CHECK(call) (call)
+#endif
+
 static const LEVEL_DEF *cur(void) {
 	return &level_defs[g.level];
 }
@@ -36,6 +53,7 @@ void events_start(void) {
 	g.ev.next_random = -1;                     /* sorteado no primeiro passo */
 	g.ev.last = -1;
 	g.ev.job.action = -1;
+	g.ev.enemy_cap = g.enemies_left;           /* a onda repõe até aqui */
 }
 
 void events_enemy_killed(void) {
@@ -123,10 +141,8 @@ static int cell_busy(int cx, int cz) {
 		if (g.enemies[i].active && INSIDE(g.enemies[i].pos.vx, g.enemies[i].pos.vz)) return 1;
 	for (int i = 0; i < MAX_PICKUPS; i++)
 		if (g.pickups[i].active && INSIDE(g.pickups[i].pos.vx, g.pickups[i].pos.vz)) return 1;
-	for (int i = 0; i < MAX_CRATES; i++)
-		if (g.crates[i].active && g.crates[i].cx == cx && g.crates[i].cz == cz) return 1;
-	for (int i = 0; i < MAX_PROPS; i++)
-		if (g.props[i].active && g.props[i].cx == cx && g.props[i].cz == cz) return 1;
+	/* caixas e props: as células deles já são sólidas / têm obstáculo, e
+	 * quem chama testa reach_walkable antes (mais barato) */
 	for (int i = 0; i < g.num_spawn_pts; i++)
 		if (g.spawn_pts[i].x / TILE_SIZE == cx && g.spawn_pts[i].z / TILE_SIZE == cz) return 1;
 #undef INSIDE
@@ -202,24 +218,51 @@ static int fall_fits(int x, int z, int dir, int scale, uint16_t *cells, uint8_t 
 		if (cx < FOREST_EDGE || cz < FOREST_EDGE ||
 		    cx >= level_width() - FOREST_EDGE || cz >= level_height() - FOREST_EDGE)
 			return 0;
-		/* cai em chão aberto e alcançável (trilha, clareira), sem nada em cima */
-		if (!reach_get(cx, cz) || !reach_walkable(cx, cz) || cell_busy(cx, cz))
+		/* cai em chão aberto e alcançável (trilha, clareira) */
+		if (!reach_get(cx, cz) || !reach_walkable(cx, cz))
 			return 0;
 	}
+	for (int i = 0; i < *n; i++)                    /* ... e sem nada em cima */
+		if (cell_busy(cells[i] & 0xff, cells[i] >> 8))
+			return 0;
 	return 1;
 }
 
-/* Um passo da busca: um candidato (árvore, direção). Só a copa entra na
- * checagem de alcance (o tronco é baixo: passa-se pulando). */
+/* Checagem passou: confere de novo o que pode ter mudado enquanto ela
+ * andava (alguém entrou nas células) e começa o aviso (estalo) */
+static int fall_commit(void) {
+	for (int i = 0; i < g.ev.fall.n; i++)
+		if (cell_busy(g.ev.fall.cells[i] & 0xff, g.ev.fall.cells[i] >> 8))
+			return 0;                              /* procura outro */
+	int x = g.ev.fall.x, z = g.ev.fall.z;
+	level_remove_tree(g.ev.job.cand);
+	int bxc = x / TILE_SIZE, bzc = z / TILE_SIZE;
+	if (reach_get(bxc + 1, bzc) || reach_get(bxc - 1, bzc) || reach_get(bxc, bzc + 1) || reach_get(bxc, bzc - 1))
+		reach_set(bxc, bzc, 1);                    /* a base fica livre */
+	g.ev.fall.timer = EV_FALL_WARN + EV_FALL_TIME;
+	sound_play_at(&sfx_estalo, x, z, VOL_ESTALO);
+	return 1;
+}
+
+/* Um passo da busca: um candidato (árvore, direção) ou um pedaço da
+ * checagem de alcance dele. Só a copa entra na checagem (o tronco é
+ * baixo: passa-se pulando). */
 static int job_fall_step(void) {
 	int gx, gz;
 	if (!group_cell(&gx, &gz)) return -1;
+	if (g.ev.job.checking) {                       /* checagem em andamento */
+		int r = EVP_CHECK(reach_step(EV_CHECK_VISITS));
+		if (r == REACH_PENDING) return 0;
+		g.ev.job.checking = 0;
+		return r == REACH_OK ? fall_commit() : 0;
+	}
 	int bx0 = gx / CHUNK_CELLS - 2, bz0 = gz / CHUNK_CELLS - 2, total = 0, start;
 	for (int bz = bz0; bz < bz0 + 5; bz++)
 		for (int bx = bx0; bx < bx0 + 5; bx++)
 			total += level_chunk_trees(bx, bz, &start);
 	if (total == 0) return -1;
-	for (int scans = 0; scans < 40; scans++) {      /* candidatos baratos por passo */
+	int fits = 0;
+	for (int scans = 0; scans < 40 && fits < EV_FITS_PER_TICK; scans++) {   /* orçamento por passo */
 		if (g.ev.job.k >= total || g.ev.job.k >= 48) return -1;
 		int want = (g.ev.job.start + g.ev.job.k) % total, idx = -1;
 		for (int bz = bz0; bz < bz0 + 5 && idx < 0; bz++)
@@ -242,24 +285,19 @@ static int job_fall_step(void) {
 		uint16_t cells[REACH_MAX_BLOCK], blk[REACH_MAX_BLOCK];
 		uint8_t  crown[REACH_MAX_BLOCK];
 		int n, nb = 0;
+		fits++;
 		if (!fall_fits(x, z, dir, scale, cells, crown, &n)) continue;
 		for (int i = 0; i < n; i++)
 			if (crown[i]) blk[nb++] = cells[i];
-		/* 1 checagem por passo: o resto da busca fica para o próximo */
-		if (reach_local_ok(x / TILE_SIZE, z / TILE_SIZE, blk, nb) != REACH_OK)
-			return 0;
-		/* achou: tira a árvore em pé e começa o aviso (estalo) */
-		level_remove_tree(idx);
-		int bxc = x / TILE_SIZE, bzc = z / TILE_SIZE;
-		if (reach_get(bxc + 1, bzc) || reach_get(bxc - 1, bzc) || reach_get(bxc, bzc + 1) || reach_get(bxc, bzc - 1))
-			reach_set(bxc, bzc, 1);            /* a base fica livre */
-		g.ev.fall.timer = EV_FALL_WARN + EV_FALL_TIME;
+		/* candidato: guarda e começa a checagem (anda nos próximos passos) */
 		g.ev.fall.x = x; g.ev.fall.z = z; g.ev.fall.dir = dir; g.ev.fall.scale = scale;
 		g.ev.fall.n = n;
 		memcpy(g.ev.fall.cells, cells, sizeof(cells));
 		memcpy(g.ev.fall.crown, crown, sizeof(crown));
-		sound_play_at(&sfx_estalo, x, z, VOL_ESTALO);
-		return 1;
+		g.ev.job.cand = idx;
+		int r = EVP_CHECK(reach_begin(x / TILE_SIZE, z / TILE_SIZE, blk, nb));
+		if (r == REACH_PENDING) { g.ev.job.checking = 1; return 0; }
+		return r == REACH_OK ? fall_commit() : 0;
 	}
 	return 0;
 }
@@ -291,21 +329,40 @@ static void fall_impact(void) {
 
 /* ---------- a mata se fecha atrás ---------- */
 
-/* Tetos da 05 para árvores novas: por bloco e por janela 3x3 blocos */
+/* Tetos da 05 para árvores novas: por bloco e por janela 3x3 blocos.
+ * Conta as árvores em pé dos 5x5 blocos em volta UMA vez e soma as janelas. */
 static int tree_caps_ok(int cx, int cz) {
 	const GEN_PARAMS *gp = cur()->gen;
 	int chunk_cap = gp ? gp->chunk_cap : 5, win_cap = gp ? gp->window_trees : 16;
-	int bx = cx / CHUNK_CELLS, bz = cz / CHUNK_CELLS;
-	if (level_chunk_standing(bx, bz) >= chunk_cap) return 0;
-	for (int wz = bz - 1; wz <= bz + 1; wz++)        /* toda janela que contém o bloco */
-		for (int wx = bx - 1; wx <= bx + 1; wx++) {
+	int bx = cx / CHUNK_CELLS, bz = cz / CHUNK_CELLS, cnt[5][5];
+	for (int z = 0; z < 5; z++)
+		for (int x = 0; x < 5; x++)
+			cnt[z][x] = level_chunk_standing(bx + x - 2, bz + z - 2);
+	if (cnt[2][2] >= chunk_cap) return 0;
+	for (int wz = 1; wz <= 3; wz++)                  /* toda janela que contém o bloco */
+		for (int wx = 1; wx <= 3; wx++) {
 			int t = 0;
 			for (int z = wz - 1; z <= wz + 1; z++)
 				for (int x = wx - 1; x <= wx + 1; x++)
-					t += level_chunk_standing(x, z);
+					t += cnt[z][x];
 			if (t >= win_cap) return 0;
 		}
 	return 1;
+}
+
+/* Checagem passou: confere de novo (alguém entrou, a câmera virou, os
+ * tetos) e planta o pinheiro */
+static int close_commit(int target) {
+	int cx = g.ev.job.cand & 0xff, cz = g.ev.job.cand >> 8;
+	int x = cx * TILE_SIZE + TILE_SIZE / 2, z = cz * TILE_SIZE + TILE_SIZE / 2;
+	if (cell_busy(cx, cz) || seen_by_camera(x, z) || !tree_caps_ok(cx, cz))
+		return 0;
+	int scale = rng_range(&g.rng, tree_defs[TREE_PINE].scale_min, tree_defs[TREE_PINE].scale_max);
+	level_add_tree(TREE_PINE, x, z, rng_next(&g.rng) & 4095, scale);
+	level_trees_changed();
+	reach_set(cx, cz, 0);
+	g.ev.job.placed++;
+	return g.ev.job.placed >= target ? 1 : 0;
 }
 
 static int job_close_step(void) {
@@ -313,7 +370,13 @@ static int job_close_step(void) {
 	if (!group_cell(&gx, &gz)) return -1;
 	int target = g.ev.job.arg ? g.ev.job.arg : EV_PLANT_COUNT;
 	if (g.ev.job.placed >= target || level_tree_room() < 1) return 1;
-	for (int scans = 0; scans < 8; scans++) {
+	if (g.ev.job.checking) {                       /* checagem em andamento */
+		int r = EVP_CHECK(reach_step(EV_CHECK_VISITS));
+		if (r == REACH_PENDING) return 0;
+		g.ev.job.checking = 0;
+		return r == REACH_OK ? close_commit(target) : 0;
+	}
+	for (int scans = 0; scans < EV_FITS_PER_TICK; scans++) {   /* orçamento por passo */
 		if (++g.ev.job.tries > EV_JOB_TRIES) return g.ev.job.placed ? 1 : -1;
 		/* atrás do grupo (oposto à câmera), a 7..14 células */
 		int a = (g.cam_yaw + 2048 + rng_range(&g.rng, -900, 900)) & 4095;
@@ -330,14 +393,10 @@ static int job_close_step(void) {
 		    seen_by_camera(x, z) || !tree_caps_ok(cx, cz))
 			continue;
 		uint16_t blk = (uint16_t)(cx | (cz << 8));
-		if (reach_local_ok(cx, cz, &blk, 1) != REACH_OK)
-			return 0;                              /* 1 checagem por passo */
-		int scale = rng_range(&g.rng, tree_defs[TREE_PINE].scale_min, tree_defs[TREE_PINE].scale_max);
-		level_add_tree(TREE_PINE, x, z, rng_next(&g.rng) & 4095, scale);
-		level_trees_changed();
-		reach_set(cx, cz, 0);
-		g.ev.job.placed++;
-		return g.ev.job.placed >= target ? 1 : 0;
+		g.ev.job.cand = blk;
+		int r = EVP_CHECK(reach_begin(cx, cz, &blk, 1));
+		if (r == REACH_PENDING) { g.ev.job.checking = 1; return 0; }
+		return r == REACH_OK ? close_commit(target) : 0;
 	}
 	return 0;
 }
@@ -347,8 +406,11 @@ static int job_close_step(void) {
 static int act_wave(int arg) {
 	int gx, gz, n = arg ? arg : EV_WAVE_COUNT, made = 0;
 	if (!group_cell(&gx, &gz)) return 0;
+	/* repõe até o número de inimigos do começo da fase (cerco: o máximo da
+	 * fase): a onda assusta sem passar do orçamento de desempenho */
+	int cap = cur()->objective == OBJ_SURVIVE ? cur()->max_enemies : g.ev.enemy_cap;
 	for (int k = 0; k < n; k++) {
-		if (cur()->objective == OBJ_SURVIVE && g.enemies_left >= cur()->max_enemies) break;
+		if (g.enemies_left >= cap) break;
 		for (int t = 0; t < 40; t++) {
 			int a = rng_next(&g.rng) & 4095;
 			int d = rng_range(&g.rng, REINFORCE_MIN_DIST, REINFORCE_MIN_DIST + 10 * TILE_SIZE);
@@ -423,6 +485,7 @@ static int apply(int action, int arg, int force) {
 		g.ev.job.action = action;
 		g.ev.job.arg = arg;
 		g.ev.job.k = g.ev.job.j = g.ev.job.tries = g.ev.job.placed = 0;
+		g.ev.job.checking = 0;
 		g.ev.job.dir0 = rng_range(&g.rng, 0, 7) * 512;
 		g.ev.job.start = rng_next(&g.rng) & 0xffff;
 		return 2;
@@ -440,12 +503,18 @@ static void job_done(int ok) {
 	g.ev.job.action = -1;
 }
 
+
 /* Busca em andamento e árvore caindo: um passo */
 static void tick_map_work(void) {
-	if (g.ev.fall.timer > 0 && --g.ev.fall.timer == 0)
+	if (g.ev.fall.timer > 0 && --g.ev.fall.timer == 0) {
+		EVP_BEGIN();
 		fall_impact();
+		EVP_END(prof_impact);
+	}
 	if (g.ev.job.action < 0) return;
+	EVP_BEGIN();
 	int r = g.ev.job.action == EV_TREE_FALL ? job_fall_step() : job_close_step();
+	EVP_END(prof_job);
 	if (r != 0) job_done(r > 0);
 }
 

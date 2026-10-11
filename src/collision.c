@@ -197,6 +197,11 @@ void collide_remove_obstacle(int x, int z) {
 	}
 }
 
+/* Cabeças das listas de obstáculos por célula, só para LEITURA rápida */
+const int16_t (*collide_obst_heads(void))[MAP_MAX_W] {
+	return (const int16_t (*)[MAP_MAX_W])obst_head;
+}
+
 int collide_cell_has_obstacle(int cx, int cz) {
 	if (cx < 0 || cz < 0 || cx >= MAP_MAX_W || cz >= MAP_MAX_H) return 0;
 	return obst_head[cz][cx] >= 0;

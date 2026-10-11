@@ -81,7 +81,9 @@
 #define EV_FALL_WARN     50          /* árvore: estalo antes de cair (passos) */
 #define EV_FALL_TIME     36          /* ... e o tombo */
 #define EV_FALL_LEN      1024        /* comprimento do pinheiro deitado (escala ONE) */
+#ifndef EV_SHAKE_TIME
 #define EV_SHAKE_TIME    24          /* tremor da câmera no impacto */
+#endif
 #define EV_JOB_TRIES     90          /* busca de lugar: passos no máximo */
 #define EV_PLANT_COUNT   5           /* mata fecha: árvores novas */
 #define EV_WAVE_COUNT    4           /* onda: inimigos */
@@ -90,7 +92,11 @@
 #define REBUILD_CPU_CAP  500         /* ... e só se o quadro anterior deixou folga até aqui */
 #define REACH_WIN        33          /* janela da checagem local (células) */
 #define REACH_MAX_BLOCK  12          /* células bloqueadas por evento, no máximo */
-#define REACH_MAX_VISIT  600         /* checagem local: visitas no máximo (custo limitado) */
+#ifndef REACH_MAX_VISIT
+#define REACH_MAX_VISIT  600         /* checagem local: visitas no máximo (em passos de EV_CHECK_VISITS) */
+#endif
+#define EV_FITS_PER_TICK 3           /* busca de lugar: testes de pegada por passo */
+#define EV_CHECK_VISITS  40          /* ... e visitas da checagem de alcance por passo */
 #ifndef MAPGEN_TRIES
 #define MAPGEN_TRIES    16      /* mapa gerado inválido: tenta semente + 1 até aqui */
 #endif
