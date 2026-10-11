@@ -166,6 +166,7 @@ static void draw_loading(void) {
 
 /* Começa a fase pela tela de introdução, com o progresso guardado */
 static void start_level(int level, uint32_t seed) {
+	PL(pl_end("pulou"));               /* trocou de fase sem vencer/morrer (antes do reset) */
 	draw_loading();
 	game_reset(level, seed);
 	g.score = progress.score;
@@ -184,6 +185,7 @@ static void start_level(int level, uint32_t seed) {
 	}
 	g.state = STATE_INTRO;
 	g.state_timer = INTRO_TIME;
+	PL(pl_begin());
 }
 
 /* Jogo novo (saindo da seleção): zera o progresso */
@@ -1689,6 +1691,7 @@ int main(void) {
 			bench_input();
 #endif
 			game_tick();
+			PL(pl_tick());
 #ifdef BENCH_REPLAY
 			replay_after_tick();
 #endif

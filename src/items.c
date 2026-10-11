@@ -38,6 +38,9 @@ void pickup_spawn(int type, int x, int z) {
 }
 
 static void collect(PICKUP *it, PLAYER *p) {
+#ifdef DEBUG_PLAYLOG
+	int before_a = p->arrows, before_b = p->bullets, before_m = p->energy;
+#endif
 	switch (it->type) {
 	case PICK_GEM:
 		g.gems++;
@@ -46,6 +49,7 @@ static void collect(PICKUP *it, PLAYER *p) {
 		show_message("GEMA!", 40);
 		break;
 	case PICK_HEALTH:
+		PL(pl_heal(0));
 		p->hp += 30;
 		show_message("+30 VIDA", 40);
 		break;
@@ -64,6 +68,7 @@ static void collect(PICKUP *it, PLAYER *p) {
 		show_message("+BALAS", 40);
 		break;
 	case PICK_BATTERY:
+		PL(pl_battery(p));
 		p->battery += BATTERY_PICKUP;
 		if (p->battery > BATTERY_MAX) p->battery = BATTERY_MAX;
 		p->lantern_dying = 0;
@@ -100,6 +105,9 @@ static void collect(PICKUP *it, PLAYER *p) {
 	}
 	if (p->hp > p->max_hp) p->hp = p->max_hp;
 	if (p->energy > PLAYER_MAX_ENERGY) p->energy = PLAYER_MAX_ENERGY;
+	PL(pl_found(p, AMMO_ARROW, p->arrows - before_a));      /* o que entrou de fato */
+	PL(pl_found(p, AMMO_BULLET, p->bullets - before_b));
+	PL(pl_found(p, AMMO_MANA, p->energy - before_m));
 	sound_play_at(&sfx_item, it->pos.vx, it->pos.vz, VOL_ITEM);
 	effect_spawn(FX_HEAL, it->pos.vx, it->pos.vz, 160, 14,
 	             pickup_colors[it->type].r, pickup_colors[it->type].g, pickup_colors[it->type].b);

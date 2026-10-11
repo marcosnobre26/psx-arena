@@ -259,6 +259,7 @@ void player_damage(PLAYER *p, int amount, int from_x, int from_z) {
 	if (!player_alive(p) || p->invuln > 0 || g.state != STATE_PLAY)
 		return;
 	p->hp -= amount;
+	PL(pl_damage(p, amount));
 	p->invuln = PLAYER_INVULN;
 	sound_play_at(&sfx_dor, p->pos.vx, p->pos.vz, VOL_DOR);
 

@@ -12,3 +12,7 @@ build-bench/
 build-bench-config.log
 build-bench-var/
 build-bench-var-config.log
+build-debug/
+build-debug-config.log
+logs/
+build-replay.log

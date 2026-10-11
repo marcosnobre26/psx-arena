@@ -3,7 +3,10 @@
 #  ./dev — atalho para tudo no projeto (feito para WSL/Ubuntu + Docker)
 #
 #   ./dev build          compila (padrão se rodar só ./dev)
-#   ./dev run [exe|cue]  compila e abre no emulador do Windows (configure em dev.conf)
+#   ./dev run [exe|cue]  compila COM o registro de partida e abre na cópia portátil do
+#                        DuckStation Linux; o TTY vai para logs/partida-AAAAMMDD-HHMM.txt
+#   ./dev run --sem-registro [exe|cue]  build normal no emulador do dev.conf
+#   ./dev analisar-partida [arquivo]   resumo legível do último registro de partida
 #   ./dev models         exporta os .blend de assets/blender/ para models/ (Blender do Windows)
 #   ./dev watch          recompila sozinho sempre que você salvar um arquivo
 #   ./dev clean          apaga a pasta build/
@@ -12,6 +15,8 @@
 #   ./dev vram           mostra onde cada textura ficou na VRAM
 #   ./dev bench          mede FPS/POLIS/COL sozinho no DuckStation Linux (build-bench/)
 #   ./dev mapgen-test [N] testa o gerador de florestas no PC (N sementes por fase)
+#   ./dev events-test [N] testa os eventos no PC
+#   ./dev replay-test     partida roteirizada: a lógica mudou? (hash de g)
 #   ./dev doctor         confere se está tudo instalado
 #
 #  Por padrão usa Docker. Se você instalou o SDK direto no Ubuntu
@@ -143,22 +148,91 @@ win_path() {
 	if is_wsl; then wslpath -w "$1"; else echo "$1"; fi
 }
 
+# Cópia PORTÁTIL do DuckStation Linux (build-bench/duckstation): a sua
+# instalação e a sua pasta de dados nunca são tocadas; da sua configuração
+# (controles, BIOS) só LEMOS o settings.ini. mode = bench | jogar.
+portable_ds() {
+	local mode="$1"
+	if [[ ! -x "$DUCKSTATION_LINUX" ]]; then
+		c_err "DuckStation Linux não encontrado em $DUCKSTATION_LINUX (mude DUCKSTATION_LINUX no dev.conf)."
+		return 1
+	fi
+	local ds="$ROOT/build-bench/duckstation"
+	local src_dir; src_dir="$(dirname "$DUCKSTATION_LINUX")"
+	if [[ ! -e "$ds/AppRun" ]]; then
+		c_info "Copiando o DuckStation para build-bench/duckstation (só na primeira vez)..."
+		mkdir -p "$ROOT/build-bench"
+		cp -a "$src_dir" "$ds" || return 1
+	fi
+	local exe_dir; exe_dir="$(dirname "$(readlink -f "$ds/AppRun")")"
+	touch "$exe_dir/portable.txt"
+	local flag=""
+	[[ "$mode" == "jogar" ]] && flag="--jogar"
+	python3 "$ROOT/tools/bench_settings.py" $flag "$DUCKSTATION_DATA/settings.ini" \
+		"$exe_dir/settings.ini" "$DUCKSTATION_DATA/bios" || return 1
+	echo "$ds"
+}
+
+# Build com o registro de partida (DEBUG_PLAYLOG) em build-debug/
+cmd_build_debug() {
+	local t bdir="build-debug"
+	t="$(target_triple)"
+	c_info "Compilando com o registro de partida em $bdir/..."
+	sdk sh -c "
+		if [ ! -f $bdir/build.ninja ]; then
+			cmake --preset default -B $bdir -DPSN00BSDK_TARGET=$t -DARENA_PLAYLOG=ON > $bdir-config.log 2>&1 || { cat $bdir-config.log; exit 1; }
+			rm -f $bdir-config.log
+		fi
+		cmake --build ./$bdir
+	" 2>&1 | quiet_filter || { c_err "A compilação com registro falhou."; return 1; }
+	c_ok "OK: $bdir/arena.exe  $bdir/arena.cue"
+}
+
 cmd_run() {
-	local what="${1:-$RUN_FILE}"
-	cmd_build
-	local file="$ROOT/build/arena.$what"
-	if [[ -z "$EMULATOR" ]]; then
-		c_err "Emulador não configurado. Edite o arquivo dev.conf e preencha EMULATOR."
-		c_info "Enquanto isso, abra no emulador:  $(win_path "$file")"
-		exit 1
+	local registro=1 what="$RUN_FILE"
+	for a in "$@"; do
+		case "$a" in
+			--sem-registro) registro=0 ;;
+			exe|cue) what="$a" ;;
+			*) c_err "Uso: ./dev run [--sem-registro] [exe|cue]"; return 1 ;;
+		esac
+	done
+
+	if (( ! registro )); then                     # build normal, emulador do dev.conf
+		cmd_build
+		local file="$ROOT/build/arena.$what"
+		if [[ -z "$EMULATOR" ]]; then
+			c_err "Emulador não configurado. Edite o arquivo dev.conf e preencha EMULATOR."
+			c_info "Enquanto isso, abra no emulador:  $file"
+			exit 1
+		fi
+		if [[ ! -e "$EMULATOR" ]]; then
+			c_err "Não achei o emulador em: $EMULATOR  (confira o dev.conf)"
+			exit 1
+		fi
+		# emulador do Windows (.exe) recebe o caminho no formato do Windows
+		local arg="$file"
+		[[ "$EMULATOR" == *.exe ]] && arg="$(win_path "$file")"
+		c_info "Abrindo $(basename "$file") no emulador (sem registro)..."
+		# shellcheck disable=SC2086
+		( cd "$(dirname "$EMULATOR")" && "$EMULATOR" $EMULATOR_ARGS "$arg" >/dev/null 2>&1 & )
+		return 0
 	fi
-	if [[ ! -e "$EMULATOR" ]]; then
-		c_err "Não achei o emulador em: $EMULATOR  (confira o dev.conf)"
-		exit 1
-	fi
-	c_info "Abrindo $(basename "$file") no emulador..."
-	# shellcheck disable=SC2086
-	( cd "$(dirname "$EMULATOR")" && "$EMULATOR" $EMULATOR_ARGS "$(win_path "$file")" >/dev/null 2>&1 & )
+
+	# COM registro (etapa 07b): build-debug/ com DEBUG_PLAYLOG, cópia portátil,
+	# TTY gravado em logs/partida-AAAAMMDD-HHMM.txt
+	local bdir="build-debug"
+	cmd_build_debug || return 1
+	local ds; ds="$(portable_ds jogar | tail -1)" || return 1
+	mkdir -p "$ROOT/logs"
+	local log; log="$ROOT/logs/partida-$(date +%Y%m%d-%H%M).txt"
+	c_info "Abrindo no DuckStation (cópia portátil, com os seus controles)..."
+	c_ok "Registro: ${log#$ROOT/}  (feche o emulador para terminar; depois: ./dev analisar-partida)"
+	(
+		"$ds/AppRun" -fastboot -- "$ROOT/$bdir/arena.$what" 2>&1 |
+			sed -u 's/\x1b\[[0-9;]*m//g' | grep --line-buffered -o "TTY: .*" |
+			sed -u 's/^TTY: //' > "$log"
+	) &
 }
 
 # ---------------------------------------------------------------------------
@@ -245,7 +319,21 @@ cmd_doctor() {
 	else
 		[[ -d "$SDK_DIR/lib/libpsn00b" ]] && c_ok "SDK local: $SDK_DIR" || c_err "SDK local: não encontrado em $SDK_DIR"
 	fi
-	[[ -n "$EMULATOR" && -e "$EMULATOR" ]] && c_ok "Emulador:  $EMULATOR" || echo "Emulador:  não configurado (dev.conf)"
+	if [[ -z "$EMULATOR" ]]; then
+		c_err "Emulador:  não configurado (EMULATOR no dev.conf)"
+	elif [[ ! -e "$EMULATOR" ]]; then
+		c_err "Emulador:  não encontrado: $EMULATOR (dev.conf)"
+	elif [[ "$EMULATOR" == *.exe ]]; then
+		c_ok "Emulador:  $EMULATOR (Windows)"
+	elif [[ -x "$EMULATOR" ]]; then
+		c_ok "Emulador:  $EMULATOR (Linux)"
+	else
+		c_err "Emulador:  $EMULATOR não é executável"
+	fi
+	[[ -x "$DUCKSTATION_LINUX" ]] && c_ok "Registro:  DuckStation Linux $DUCKSTATION_LINUX (cópia portátil em build-bench/)" \
+		|| c_err "Registro:  DuckStation Linux não encontrado em $DUCKSTATION_LINUX (./dev run e ./dev bench precisam)"
+	[[ -f "$DUCKSTATION_DATA/settings.ini" ]] && c_ok "Controles: $DUCKSTATION_DATA/settings.ini (só lido)" \
+		|| echo "Controles: $DUCKSTATION_DATA/settings.ini não existe (a cópia usa o padrão)"
 	local b; b="$(find_blender)"
 	[[ -n "$b" ]] && c_ok "Blender:   $b" || echo "Blender:   não encontrado (opcional)"
 }
@@ -278,27 +366,9 @@ cmd_bench() {
 		cmake --build ./$bdir
 	" 2>&1 | quiet_filter || { c_err "A compilação do benchmark falhou."; return 1; }
 
-	if [[ ! -x "$DUCKSTATION_LINUX" ]]; then
-		c_err "DuckStation Linux não encontrado em $DUCKSTATION_LINUX (mude DUCKSTATION_LINUX no dev.conf)."
-		return 1
-	fi
-	# Configuração ISOLADA. O DuckStation usa ~/.local/share/duckstation se
-	# ela existir (ignora XDG_DATA_HOME), então rodamos uma CÓPIA do emulador
-	# em modo portátil (portable.txt ao lado do executável): configuração,
-	# saves e tempo de jogo ficam dentro de build-bench/duckstation. A sua
-	# instalação e a sua pasta de dados não são tocadas (conferido no fim).
-	# Cópia real (não hardlink): se o emulador gravasse num arquivo da própria
-	# pasta, um hardlink mudaria também o original.
-	local ds="$ROOT/build-bench/duckstation" log="$ROOT/$bdir/bench.log" out="$ROOT/$bdir/bench.txt"
-	local src_dir; src_dir="$(dirname "$DUCKSTATION_LINUX")"
-	if [[ ! -e "$ds/AppRun" ]]; then
-		c_info "Copiando o DuckStation para build-bench/duckstation (só na primeira vez)..."
-		cp -a "$src_dir" "$ds" || return 1
-	fi
-	local exe_dir; exe_dir="$(dirname "$(readlink -f "$ds/AppRun")")"
-	touch "$exe_dir/portable.txt"
-	python3 "$ROOT/tools/bench_settings.py" "$DUCKSTATION_DATA/settings.ini" \
-		"$exe_dir/settings.ini" "$DUCKSTATION_DATA/bios" || return 1
+	# Configuração ISOLADA: cópia portátil (portable_ds), velocidade ilimitada
+	local ds; ds="$(portable_ds bench | tail -1)" || return 1
+	local log="$ROOT/$bdir/bench.log" out="$ROOT/$bdir/bench.txt"
 	rm -f "$log" "$out"
 	local before; before="$(ls -laR --time-style=full-iso "$DUCKSTATION_DATA" 2>/dev/null | md5sum)"
 
@@ -443,6 +513,7 @@ cmd_replay_test() {
 case "${1:-build}" in
 	build)  cmd_build ;;
 	run)    shift; cmd_run "$@" ;;
+	build-debug) cmd_build_debug ;;
 	models) cmd_models ;;
 	watch)  cmd_watch ;;
 	clean)  cmd_clean ;;
@@ -454,5 +525,6 @@ case "${1:-build}" in
 	mapgen-test) shift; cmd_mapgen_test "$@" ;;
 	events-test) shift; cmd_events_test "$@" ;;
 	replay-test) shift; cmd_replay_test "$@" ;;
+	analisar-partida) shift; python3 "$ROOT/tools/analisar_partida.py" "$@" ;;
 	*)      sed -n '3,20p' "$0" | sed 's/^#//' ;;
 esac

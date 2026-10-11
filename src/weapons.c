@@ -156,6 +156,7 @@ void bullets_update(void) {
 		/* acertou um inimigo? (só os das células perto, pela grade) */
 		ENEMY *e = collide_enemy_at(b->pos.vx, b->pos.vz, 30);
 		if (e) {
+			PL(pl_attack(b->weapon));
 			enemy_damage(e, b->damage, b->vx / 3, b->vz / 3);
 			b->active = 0;
 			projectile_hit(b, e->pos.vx - b->vx, e->pos.vz - b->vz);
@@ -197,6 +198,7 @@ void ground_arrows_update(void) {
 			if (!player_alive(p) || p->arrows >= MAX_ARROWS) continue;
 			if (abs(p->pos.vx - g.garrow[i].x) < 140 && abs(p->pos.vz - g.garrow[i].z) < 140) {
 				p->arrows++;
+				PL(pl_arrow_picked(p));
 				g.garrow[i].active = 0;
 				sound_play_at(&sfx_item, p->pos.vx, p->pos.vz, VOL_ITEM / 2);
 				break;
@@ -231,6 +233,7 @@ static void melee_hits(PLAYER *p, const WEAPON_DEF *w) {
 		if (abs(angle_diff(p->angle, angle_of(dx, dz))) > w->arc) continue;
 		p->swing_hit |= 1u << i;
 		int a = angle_of(dx, dz);
+		PL(pl_attack(p->weapon));
 		enemy_damage(e, w->damage, (isin(a) * 40) >> 12, (icos(a) * 40) >> 12);
 	}
 	(void)widx;
@@ -255,6 +258,7 @@ static void magic_cast(PLAYER *p, const WEAPON_DEF *w) {
 			int dx = e->pos.vx - p->pos.vx, dz = e->pos.vz - p->pos.vz;
 			if (dist2d(dx, dz) >= w->reach) continue;
 			int a = angle_of(dx, dz);
+			PL(pl_attack(p->weapon));
 			enemy_damage(e, w->damage, (isin(a) * 60) >> 12, (icos(a) * 60) >> 12);
 			if (e->active) {
 				e->stun = FLASH_STUN;
@@ -264,6 +268,7 @@ static void magic_cast(PLAYER *p, const WEAPON_DEF *w) {
 		break;
 	}
 	case MAGIC_HEAL:
+		PL(pl_heal(1));
 		for (int i = 0; i < MAX_PLAYERS; i++) {
 			PLAYER *o = &g.players[i];
 			if (!player_alive(o)) continue;
@@ -319,6 +324,7 @@ void weapon_update(PLAYER *p, const INPUT *in) {
 			p->swing = 1;
 			p->swing_hit = 0;
 			p->cooldown = w->cooldown;
+			PL(pl_use(p, p->weapon));
 			sound_play_at(w->chops ? &sfx_machado : &sfx_espada, p->pos.vx, p->pos.vz, VOL_GOLPE);
 		}
 		break;
@@ -339,6 +345,7 @@ void weapon_update(PLAYER *p, const INPUT *in) {
 			muzzle(p, &x, &y, &z);
 			spawn_bullet(x, y, z, p->angle, spd, dmg, w->reach, p->weapon);
 			spend(p, w);
+			PL(pl_use(p, p->weapon));
 			noise_emit(x, z, w->noise);
 			sound_play_at(&sfx_arco, x, z, VOL_GOLPE);
 			p->charge = 0;
@@ -354,6 +361,7 @@ void weapon_update(PLAYER *p, const INPUT *in) {
 				break;
 			}
 			spend(p, w);
+			PL(pl_use(p, p->weapon));
 			p->cooldown = w->cooldown;
 			if (w->kind == WK_MAGIC) magic_cast(p, w);
 			else                     gun_fire(p, w);

@@ -51,7 +51,7 @@ enum { WK_MELEE,     /* golpe em arco à frente, sem projétil, silencioso */
 enum { AMMO_NONE, AMMO_ARROW, AMMO_BULLET, AMMO_MANA };
 enum { MAGIC_NONE, MAGIC_FIRE, MAGIC_FLASH, MAGIC_HEAL };
 /* índices em weapon_defs (data.c, mesma ordem) */
-enum { W_SWORD, W_AXE, W_BOW, W_FIREBALL, W_FLASH, W_HEAL, W_PISTOL, W_SHOTGUN };
+enum { W_SWORD, W_AXE, W_BOW, W_FIREBALL, W_FLASH, W_HEAL, W_PISTOL, W_SHOTGUN, NUM_WEAPON_SLOTS };
 #define MAGIC_BITS ((1u << W_FIREBALL) | (1u << W_FLASH) | (1u << W_HEAL))
 typedef struct {
 	const char  *name;
@@ -633,6 +633,27 @@ int  reach_begin(int cx, int cz, const uint16_t *blk, int n);      /* ... ou em 
 int  reach_step(int budget);
 void reach_stats(int *ok, int *cut, int *window, int *limit);
 int  reach_last_visits(void);
+
+/* playlog.c: registro de partida (só com DEBUG_PLAYLOG; etapa 07b). PL(x)
+ * some no build normal; os contadores ficam FORA de g (não muda a lógica) */
+#ifdef DEBUG_PLAYLOG
+void pl_begin(void);
+void pl_end(const char *reason);      /* fecha a fase (se ainda aberta) */
+void pl_tick(void);
+void pl_source(int enemy_type);
+void pl_damage(const PLAYER *p, int amount);
+void pl_heal(int magic);
+void pl_use(const PLAYER *p, int weapon);
+void pl_found(const PLAYER *p, int ammo, int amount);
+void pl_arrow_picked(const PLAYER *p);
+void pl_battery(const PLAYER *p);
+void pl_attack(int weapon);
+void pl_kill(int enemy_type);
+void pl_big_escape(void);
+#define PL(call) call
+#else
+#define PL(call) ((void)0)
+#endif
 
 /* events.c */
 void events_start(void);              /* fim do game_reset */

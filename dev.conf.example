@@ -4,10 +4,17 @@
 # Caminhos de programas do Windows são escritos no formato do WSL:
 #   C:\Users\Marcos\Emuladores  ->  /mnt/c/Users/Marcos/Emuladores
 
-# --- Emulador usado pelo "./dev run" -------------------------------------
-# DuckStation (recomendado; precisa de um BIOS do PS1 configurado nele):
+# --- Emulador usado pelo "./dev run --sem-registro" ----------------------
+# (o "./dev run" normal usa uma cópia portátil do DuckStation Linux, com os
+#  seus controles, para gravar o registro de partida em logs/; etapa 07b)
+# DuckStation Linux (recomendado; precisa de um BIOS configurado nele):
+#EMULATOR="$HOME/emuladores/duckstation/AppRun"
+#EMULATOR_ARGS="-fastboot"
+#RUN_FILE="cue"
+
+# DuckStation do Windows (.exe: o caminho do jogo é convertido sozinho):
 #EMULATOR="/mnt/c/Users/SEU_USUARIO/DuckStation/duckstation-qt-x64-ReleaseLTCG.exe"
-#EMULATOR_ARGS=""
+#EMULATOR_ARGS="-fastboot"
 #RUN_FILE="cue"
 
 # PCSX-Redux (já traz BIOS livre; carrega o .exe direto):

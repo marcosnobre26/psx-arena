@@ -63,6 +63,13 @@ if(ARENA_BENCHMARK)
 	target_compile_definitions(arena PRIVATE DEBUG_BENCHMARK ${ARENA_BENCH_DEFS})
 endif()
 
+# Registro de partida (./dev run): imprime PLAYLOG ... no TTY (etapa 07b).
+# Também numa pasta separada (build-debug/): o build normal nunca o liga.
+option(ARENA_PLAYLOG "Compila com DEBUG_PLAYLOG (registro de partida para balancear)" OFF)
+if(ARENA_PLAYLOG)
+	target_compile_definitions(arena PRIVATE DEBUG_PLAYLOG)
+endif()
+
 # ---------------------------------------------------------------------------
 # Texturas: PNG -> TIM (tools/build_textures.py escolhe a posição na VRAM)
 # ---------------------------------------------------------------------------

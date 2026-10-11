@@ -93,6 +93,7 @@ void enemy_damage(ENEMY *e, int amount, int push_x, int push_z) {
 		e->active = 0;
 		collide_track(e);                 /* morreu: sai da grade */
 		g.enemies_left--;
+		PL(pl_kill(e->type));
 		events_enemy_killed();
 		g.score += d->score;
 		effect_spawn(FX_BURST, e->pos.vx, e->pos.vz, (300 * d->scale) >> 12, 18,
@@ -161,6 +162,7 @@ void enemies_update(void) {
 				e->flee = LIGHT_FLEE;
 		}
 		if (e->state == EN_CHASE && (!p || --e->timer <= 0)) {   /* perdeu o rastro */
+			if (d->heavy) PL(pl_big_escape());          /* fugiu do grande */
 			e->state = EN_SEARCH;
 			e->timer = 0;
 		}
@@ -231,6 +233,7 @@ void enemies_update(void) {
 		if (e->hit_cooldown > 0) e->hit_cooldown--;
 		if (p && dist <= rad + PLAYER_RADIUS + 16 && p->pos.vy > -140 && e->hit_cooldown == 0 &&
 		    e->stun == 0) {
+			PL(pl_source(e->type));
 			player_damage(p, d->damage, e->pos.vx, e->pos.vz);
 			e->hit_cooldown = 30;
 		}
