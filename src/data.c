@@ -102,6 +102,14 @@ const SOUND_DEF sound_defs[] = {
 	{ &sfx_estalo,    3,    6  },       /* eventos (etapa 06): árvore vai cair */
 	{ &sfx_queda,     3,    4  },       /* ... árvore bateu no chão */
 	{ &sfx_raizes,    3,    0  },       /* ... barreira de raízes abriu */
+	{ &sfx_espada,    2,    8  },       /* combate (etapa 07) */
+	{ &sfx_machado,   2,    6  },
+	{ &sfx_arco,      2,    6  },
+	{ &sfx_flecha,    2,   10  },
+	{ &sfx_fogo,      2,    6  },
+	{ &sfx_clarao,    3,    0  },
+	{ &sfx_pisada,    2,    4  },
+	{ &sfx_grito,     3,   10  },
 	{ NULL }
 };
 

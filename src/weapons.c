@@ -143,7 +143,8 @@ void bullets_update(void) {
 		if (wall || collide_solid_at(b->pos.vx, b->pos.vz, 24)) {
 			if (wall)
 				crate_damage(cx, cz, b->damage);
-			sound_play_at(&sfx_acerto, b->pos.vx, b->pos.vz, VOL_PAREDE);
+			sound_play_at(weapon_defs[b->weapon].kind == WK_BOW ? &sfx_flecha : &sfx_acerto,
+			              b->pos.vx, b->pos.vz, VOL_PAREDE);
 			effect_spawn(FX_BURST, b->pos.vx - b->vx, b->pos.vz - b->vz, 90, 8,
 			             weapon_defs[b->weapon].color.r, weapon_defs[b->weapon].color.g,
 			             weapon_defs[b->weapon].color.b);
@@ -241,10 +242,12 @@ static void magic_cast(PLAYER *p, const WEAPON_DEF *w) {
 	case MAGIC_FIRE:
 		muzzle(p, &x, &y, &z);
 		spawn_bullet(x, y, z, p->angle, w->speed, w->damage, w->reach, p->weapon);
+		sound_play_at(&sfx_fogo, x, z, VOL_MAGIA);
 		break;
 	case MAGIC_FLASH: {
 		/* clarão: atordoa e assusta quem está em volta (ideia da antiga onda) */
 		effect_spawn(FX_SHOCKWAVE, p->pos.vx, p->pos.vz, w->reach, 22, w->color.r, w->color.g, w->color.b);
+		sound_play_at(&sfx_clarao, p->pos.vx, p->pos.vz, VOL_MAGIA);
 		uint32_t near = collide_enemies_near(p->pos.vx, p->pos.vz, w->reach);
 		for (int i = 0; near; i++, near >>= 1) {
 			if (!(near & 1)) continue;
@@ -316,6 +319,7 @@ void weapon_update(PLAYER *p, const INPUT *in) {
 			p->swing = 1;
 			p->swing_hit = 0;
 			p->cooldown = w->cooldown;
+			sound_play_at(w->chops ? &sfx_machado : &sfx_espada, p->pos.vx, p->pos.vz, VOL_GOLPE);
 		}
 		break;
 
@@ -336,6 +340,7 @@ void weapon_update(PLAYER *p, const INPUT *in) {
 			spawn_bullet(x, y, z, p->angle, spd, dmg, w->reach, p->weapon);
 			spend(p, w);
 			noise_emit(x, z, w->noise);
+			sound_play_at(&sfx_arco, x, z, VOL_GOLPE);
 			p->charge = 0;
 			p->cooldown = w->cooldown;
 		}

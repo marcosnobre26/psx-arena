@@ -485,6 +485,7 @@ int events_chop(int cx, int cz) {
 		if (!g.ev.fallen[k].active || in_cells(cx, cz, g.ev.fallen[k].cells, g.ev.fallen[k].n) < 0)
 			continue;
 		noise_emit(cx * TILE_SIZE + TILE_SIZE / 2, cz * TILE_SIZE + TILE_SIZE / 2, CHOP_NOISE);
+		sound_play_at(&sfx_flecha, cx * TILE_SIZE, cz * TILE_SIZE, VOL_GOLPE);   /* madeira */
 		effect_spawn(FX_BURST, cx * TILE_SIZE + TILE_SIZE / 2, cz * TILE_SIZE + TILE_SIZE / 2, 160, 10, 150, 110, 60);
 		if (--g.ev.fallen[k].hp > 0) return 1;
 		/* cedeu: tira o pinheiro deitado e libera as células */

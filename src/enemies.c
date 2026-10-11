@@ -151,6 +151,8 @@ void enemies_update(void) {
 			}
 		if (play && p && ((g.frame + i) & 7) == 0) {      /* visão (a cada 8 passos) */
 			if (can_see(e, d, p, dist)) {
+				if (e->state != EN_CHASE)          /* viu agora: grita (só som) */
+					sound_play_at(&sfx_grito, e->pos.vx, e->pos.vz, VOL_GRITO);
 				e->state = EN_CHASE;
 				e->tx = p->pos.vx; e->tz = p->pos.vz;
 				e->timer = LOSE_TIME;
@@ -221,7 +223,7 @@ void enemies_update(void) {
 
 		/* passos pesados do grande: ouve-se antes de ver (só som) */
 		if (d->heavy && sp > 0 && ((g.frame + i * 7) % 40) == 0)
-			sound_play_at(&sfx_passo2, e->pos.vx, e->pos.vz, VOL_PASSO_GRANDE);
+			sound_play_at(&sfx_pisada, e->pos.vx, e->pos.vz, VOL_PASSO_GRANDE);
 
 		/* --- encostou no jogador? (quem está pulando por cima escapa) ---
 		 * Como os dois não se atravessam, "encostar" é chegar a poucas
