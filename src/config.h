@@ -67,7 +67,7 @@
 #define MAP_MAX_H       128
 #define CHUNK_SLOTS     36      /* blocos montados ao mesmo tempo (cache) */
 #define CHUNK_LOAD_RADIUS 2     /* monta o 5x5 de blocos em volta do grupo */
-#define CHUNK_BUILDS_PER_FRAME 1 /* fila: blocos distantes montados por quadro */
+#define CHUNK_BUILDS_PER_FRAME 1 /* (sem uso desde a 10a: o anel externo é montado em fatias) */
 #define MAX_TREES       1024    /* árvores e troncos no mapa (8 bytes cada) */
 #define PLACE_SEARCH    6       /* level_place_safe: procura célula livre até aqui */
 #define FOREST_EDGE     4       /* borda de mata alta das florestas (células) */
@@ -88,8 +88,10 @@
 #define EV_PLANT_COUNT   5           /* mata fecha: árvores novas */
 #define EV_WAVE_COUNT    4           /* onda: inimigos */
 #define REBUILD_QUEUE    9           /* blocos esperando remontagem (anel de raízes: até 3x3) */
-#define REBUILD_LINES    12          /* remontagem em fatias: linhas por quadro, no máximo */
-#define REBUILD_CPU_CAP  500         /* ... e só se o quadro anterior deixou folga até aqui */
+#define REBUILD_LINES    40          /* montagem em fatias: linhas por quadro, no máximo */
+#ifndef REBUILD_CPU_CAP
+#define REBUILD_CPU_CAP  440         /* ... e só se o quadro anterior deixou folga até aqui */
+#endif
 #define REACH_WIN        33          /* janela da checagem local (células) */
 #define REACH_MAX_BLOCK  12          /* células bloqueadas por evento, no máximo */
 #ifndef REACH_MAX_VISIT

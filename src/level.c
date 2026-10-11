@@ -259,9 +259,9 @@ void level_build_stats(int *max_lines) {      /* zera ao ler */
 	build_lines_max = 0;
 }
 
-static void ensure(int cx, int cz) {
-	if (cx < 0 || cz < 0 || cx >= ncx || cz >= ncz || slot_of[cz][cx] >= 0)
-		return;
+/* Slot para o bloco (cx, cz): um livre, senão o mais longe do grupo (nunca
+ * um dos 3x3 dos jogadores). Libera o mapeamento do antigo. -1 = nenhum. */
+static int take_slot(void) {
 	int s = -1, worst = -1;
 	for (int i = 0; i < CHUNK_SLOTS; i++) {
 		if (slot_cx[i] < 0) { s = i; break; }                 /* livre */
@@ -269,21 +269,36 @@ static void ensure(int cx, int cz) {
 		int d = cheb(slot_cx[i], slot_cz[i], fcx, fcz);
 		if (d > worst) { worst = d; s = i; }                  /* o mais longe do grupo */
 	}
-	if (s < 0) return;
-	if (slot_cx[s] >= 0) {
+	if (s >= 0 && slot_cx[s] >= 0) {
 		slot_of[slot_cz[s]][slot_cx[s]] = -1;
+		slot_cx[s] = slot_cz[s] = -1;
 		loaded_count--;
 	}
-	uint16_t t0 = LINE_TIMER();
-	build_chunk(&slot_geom[s], cx, cz);
-	int bl = (uint16_t)(LINE_TIMER() - t0);
-	if (bl > build_lines_max) build_lines_max = bl;
+	return s;
+}
+
+static void install(int s, int cx, int cz) {
 	slot_cx[s] = cx;
 	slot_cz[s] = cz;
 	slot_of[cz][cx] = s;
 	loaded_count++;
+}
+
+/* Monta o bloco INTEIRO agora (3x3 dos jogadores e a carga da fase) */
+static void ensure(int cx, int cz) {
+	if (cx < 0 || cz < 0 || cx >= ncx || cz >= ncz || slot_of[cz][cx] >= 0)
+		return;
+	int s = take_slot();
+	if (s < 0) return;
+	uint16_t t0 = LINE_TIMER();
+	build_chunk(&slot_geom[s], cx, cz);
+	int bl = (uint16_t)(LINE_TIMER() - t0);
+	if (bl > build_lines_max) build_lines_max = bl;
+	install(s, cx, cz);
 	builds_this_frame++;
 }
+
+static int stream_bx = -1, stream_bz;        /* bloco do anel pedido (em fatias) */
 
 /* Decide o que montar neste quadro (só leitura de g) */
 static void stream_update(void) {
@@ -324,8 +339,10 @@ static void stream_update(void) {
 			int d = dx * dx + dz * dz;
 			if (best < 0 || d < best) { best = d; bx = cx; bz = cz; }
 		}
-	if (best >= 0 && builds_this_frame < CHUNK_BUILDS_PER_FRAME)
-		ensure(bx, bz);
+	/* o anel externo é montado EM FATIAS (construtor abaixo; etapa 10a):
+	 * montar um bloco inteiro aqui custava até ~190 linhas num quadro só */
+	if (best >= 0) { stream_bx = bx; stream_bz = bz; }
+	else stream_bx = -1;
 }
 
 /* Memória de rascunho para a geração do mapa: a do CACHE DE BLOCOS, que
@@ -366,12 +383,16 @@ void level_set_flags(int cx, int cz, int flags) {
 static CHUNK_GEOM rebuild_geom;              /* buffer reserva */
 static int8_t     rebuild_q[REBUILD_QUEUE][2];   /* blocos na fila */
 static int        rebuild_n, rebuild_cell = -1;
+/* tarefa do construtor: 1 = remontar um bloco montado; 2 = bloco novo do anel */
+static int        job_kind, job_bx, job_bz;
 
 void level_rebuild_chunk(int cx, int cz) {
 	int bx = cx / CHUNK_CELLS, bz = cz / CHUNK_CELLS;
 	if (cx < 0 || cz < 0 || bx >= ncx || bz >= ncz) return;
 	for (int i = 0; i < rebuild_n; i++)
 		if (rebuild_q[i][0] == bx && rebuild_q[i][1] == bz) return;
+	if (job_kind == 1 && job_bx == bx && job_bz == bz)
+		rebuild_cell = -1;                     /* já em andamento: recomeça */
 	if (rebuild_n >= REBUILD_QUEUE) {          /* fila cheia: o jeito antigo */
 		level_invalidate(cx, cz);
 		return;
@@ -381,15 +402,44 @@ void level_rebuild_chunk(int cx, int cz) {
 	rebuild_n++;
 }
 
+/* A tarefa ainda faz sentido? (o bloco a remontar continua montado; o
+ * bloco novo continua faltando e dentro do raio) */
+static int job_valid(void) {
+	if (job_kind == 1) return slot_of[job_bz][job_bx] >= 0;
+	return slot_of[job_bz][job_bx] < 0 &&
+	       cheb(job_bx, job_bz, fcx, fcz) <= CHUNK_LOAD_RADIUS;
+}
+
+/* Construtor EM FATIAS (etapas 06 e 10a): uma tarefa por vez, célula a
+ * célula, no buffer reserva. Remontagens (eventos) antes dos blocos novos
+ * do anel. Quando termina, copia para o slot (~8 KB). */
 static void rebuild_step(void) {
-	if (rebuild_n == 0) return;
-	int bx = rebuild_q[0][0], bz = rebuild_q[0][1];
-	if (slot_of[bz][bx] < 0) {                 /* não está montado: nada a fazer */
-		rebuild_cell = -1;                     /* (quando montar, já vem novo) */
-		goto next;
+	if (job_kind && !job_valid()) {            /* cancelada */
+		job_kind = 0;
+		rebuild_cell = -1;
+	}
+	if (!job_kind) {
+		if (rebuild_n > 0) {
+			job_kind = 1;
+			job_bx = rebuild_q[0][0];
+			job_bz = rebuild_q[0][1];
+			rebuild_n--;
+			for (int i = 0; i < rebuild_n; i++) {
+				rebuild_q[i][0] = rebuild_q[i + 1][0];
+				rebuild_q[i][1] = rebuild_q[i + 1][1];
+			}
+		} else if (stream_bx >= 0) {
+			job_kind = 2;
+			job_bx = stream_bx;
+			job_bz = stream_bz;
+		} else {
+			return;
+		}
+		if (!job_valid()) { job_kind = 0; return; }   /* (quando montar, já vem novo) */
+		rebuild_cell = -1;
 	}
 	if (rebuild_cell < 0) {
-		build_chunk_begin(&rebuild_geom, bx, bz);
+		build_chunk_begin(&rebuild_geom, job_bx, job_bz);
 		rebuild_cell = 0;
 	}
 	{
@@ -407,7 +457,7 @@ static void rebuild_step(void) {
 		uint16_t t0 = LINE_TIMER();
 		do {
 			uint16_t tc = LINE_TIMER();
-			build_chunk_cell(&rebuild_geom, bx, bz, rebuild_cell % CHUNK_CELLS, rebuild_cell / CHUNK_CELLS);
+			build_chunk_cell(&rebuild_geom, job_bx, job_bz, rebuild_cell % CHUNK_CELLS, rebuild_cell / CHUNK_CELLS);
 			int c = (uint16_t)(LINE_TIMER() - tc);
 			if (c > cell_cost) cell_cost = c;
 			rebuild_cell++;
@@ -417,14 +467,17 @@ static void rebuild_step(void) {
 		if (bl > build_lines_max) build_lines_max = bl;
 	}
 	if (rebuild_cell < CHUNK_CELLS * CHUNK_CELLS) return;
-	slot_geom[slot_of[bz][bx]] = rebuild_geom; /* pronto: troca (cópia de ~8 KB) */
-	rebuild_cell = -1;
-next:
-	rebuild_n--;
-	for (int i = 0; i < rebuild_n; i++) {
-		rebuild_q[i][0] = rebuild_q[i + 1][0];
-		rebuild_q[i][1] = rebuild_q[i + 1][1];
+	if (job_kind == 1) {
+		slot_geom[slot_of[job_bz][job_bx]] = rebuild_geom;   /* pronto: troca */
+	} else {
+		int s = take_slot();
+		if (s >= 0) {
+			slot_geom[s] = rebuild_geom;
+			install(s, job_bx, job_bz);
+		}
 	}
+	job_kind = 0;
+	rebuild_cell = -1;
 }
 
 void level_stats(int *loaded, int *slots, int *built, int *overflow) {
@@ -908,6 +961,8 @@ void level_load(int index) {
 	cache_reset();
 	rebuild_n = 0;                    /* remontagens em fatias pendentes: nenhuma */
 	rebuild_cell = -1;
+	job_kind = 0;
+	stream_bx = -1;
 	chunk_overflow = 0;
 	fcx = g.spawn_x / CHUNK_SIZE;
 	fcz = g.spawn_z / CHUNK_SIZE;
