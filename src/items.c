@@ -162,8 +162,9 @@ void crate_spawn(int cx, int cz) {
 	}
 }
 
-/* Chamado quando um tiro bate numa célula sólida */
-void crate_damage(int cx, int cz, int amount) {
+/* Chamado quando um tiro bate numa célula sólida ou um golpe corpo a corpo
+ * passa por ela. Devolve 1 se havia uma caixa ali (o golpe para nela). */
+int crate_damage(int cx, int cz, int amount) {
 	for (int i = 0; i < MAX_CRATES; i++) {
 		CRATE *c = &g.crates[i];
 		if (!c->active || c->cx != cx || c->cz != cz) continue;
@@ -179,8 +180,9 @@ void crate_damage(int cx, int cz, int amount) {
 			if (r < 35)      pickup_spawn(PICK_HEALTH, x, z);
 			else if (r < 70) pickup_spawn(PICK_ENERGY, x, z);
 		}
-		return;
+		return 1;
 	}
+	return 0;
 }
 
 void crates_draw(void) {

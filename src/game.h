@@ -609,7 +609,7 @@ void pickup_spawn(int type, int x, int z);
 void pickups_update(void);
 void pickups_draw(void);
 void crate_spawn(int cx, int cz);
-void crate_damage(int cx, int cz, int amount);
+int  crate_damage(int cx, int cz, int amount);   /* 1 = havia caixa */
 void crates_draw(void);
 void effect_spawn(int type, int x, int z, int radius, int duration, int r, int gr, int b);
 void effects_update(void);

@@ -314,6 +314,13 @@ void weapon_update(PLAYER *p, const INPUT *in) {
 				if (events_chop((p->pos.vx + ((isin(p->angle) * d) >> 12)) / TILE_SIZE,
 				                (p->pos.vz + ((icos(p->angle) * d) >> 12)) / TILE_SIZE))
 					break;
+		/* qualquer golpe quebra caixa à frente (07b: antes só projétil, e
+		 * quem não tinha arco nunca abria caixa). Uma vez por golpe. */
+		if (p->swing == sw->hit_from)
+			for (int d = 128; d <= sw->reach; d += 64)
+				if (crate_damage((p->pos.vx + ((isin(p->angle) * d) >> 12)) / TILE_SIZE,
+				                 (p->pos.vz + ((icos(p->angle) * d) >> 12)) / TILE_SIZE, sw->damage))
+					break;
 		if (++p->swing > sw->cooldown)
 			p->swing = 0;
 	}

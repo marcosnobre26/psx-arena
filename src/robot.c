@@ -15,7 +15,7 @@
  *      machado ou espada). Contra o GRANDE de perto: bate e recua (a arma
  *      alcança mais longe que o golpe dele);
  *   4. item útil ou flecha no chão a até ~10 células de caminho: vai pegar;
- *   5. caixa perto e arco com flechas (ou mana sobrando): atira nela;
+ *   5. caixa perto: atira (arco com flechas, ou mana sobrando) ou golpeia;
  *   6. objetivo da fase: inimigos (CACADA), saída (TRAVESSIA), relíquias e
  *      depois a saída (RELIQUIAS), o centro da clareira (CERCO);
  *   7. sem caminho: anda até uma célula sorteada por perto.
@@ -507,14 +507,20 @@ static int nearest_item(const PLAYER *p, int max, int *x, int *z) {
 
 /* Caixa perto que dá para acertar (arco com flechas ou mana sobrando) */
 static int crate_target(const PLAYER *p, int *w, int *x, int *z) {
+	int ranged = 1;
 	if (owns(p, W_BOW) && p->arrows >= 3) *w = W_BOW;
 	else if (p->energy >= 90) *w = W_FIREBALL;
-	else return 0;
+	else { *w = best_melee(p); ranged = 0; }     /* golpe também quebra caixa (07b) */
 	for (int i = 0; i < MAX_CRATES; i++) {
 		const CRATE *c = &g.crates[i];
 		if (!c->active) continue;
 		int cx = c->cx * TILE_SIZE + TILE_SIZE / 2, cz = c->cz * TILE_SIZE + TILE_SIZE / 2;
 		int dx = cx - p->pos.vx, dz = cz - p->pos.vz, d = dist2d(dx, dz);
+		if (!ranged) {                            /* de perto: até 6 passos de caminho */
+			if (local_dist(c->cx, c->cz, NULL, NULL) > 6) continue;
+			*x = cx; *z = cz;
+			return 2;
+		}
 		if (d > 5 * TILE_SIZE || d < 200) continue;
 		/* linha de visão até a frente da caixa (a célula dela é sólida) */
 		int a = angle_of(dx, dz);
@@ -615,7 +621,7 @@ void robot_input(INPUT *in) {
 		rb.no_heal++;                             /* precisou de cura e não tinha mana */
 	rb.low_hp_prev = low;
 
-	int nx, nz, ix = 0, iz = 0, w;
+	int nx, nz, ix = 0, iz = 0, w, r;
 	if (rb.fleeing > 0) rb.fleeing--;
 	rb.nav = 0;
 	/* 1. cura */
@@ -647,10 +653,17 @@ void robot_input(INPUT *in) {
 		rb.nav = 1;
 		goto done;
 	}
-	/* 5. caixa perto */
-	if (crate_target(p, &w, &ix, &iz)) {
-		face(in, p, ix, iz);
-		use_weapon(in, p, w, ix, iz, dist2d(ix - p->pos.vx, iz - p->pos.vz));
+	/* 5. caixa perto: de longe atira; de perto chega ao lado e golpeia */
+	if ((r = crate_target(p, &w, &ix, &iz)) != 0) {
+		int d = dist2d(ix - p->pos.vx, iz - p->pos.vz);
+		if (r == 2 && d > 300) {
+			if (local_go(p, ix, iz, &nx, &nz) == 1) go_cell(in, p, nx, nz);
+			else stick_world(in, ix - p->pos.vx, iz - p->pos.vz, 127);
+			rb.nav = 1;
+		} else {
+			face(in, p, ix, iz);
+			use_weapon(in, p, w, ix, iz, d);
+		}
 		goto done;
 	}
 	/* (sem luta: volta para a arma de perto, para não ser pego com o arco) */
