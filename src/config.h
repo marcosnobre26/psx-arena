@@ -78,6 +78,8 @@
 #define EV_FOG_RAMP      (5 * 60)    /* névoa: 5 s descendo, ... */
 #define EV_FOG_TOTAL     (40 * 60)   /* ... e volta ao normal depois de ~40 s */
 #define EV_SILENCE_TIME  (12 * 60)
+#define REACH_WIN        33          /* janela da checagem local (células) */
+#define REACH_MAX_BLOCK  12          /* células bloqueadas por evento, no máximo */
 #ifndef MAPGEN_TRIES
 #define MAPGEN_TRIES    16      /* mapa gerado inválido: tenta semente + 1 até aqui */
 #endif

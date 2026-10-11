@@ -274,6 +274,8 @@ static int random_cell(int x0, int z0, int x1, int z1, int sx, int sz, int dmin,
 /* ------------------------------------------------------------------ */
 
 static int walkable(int x, int z);
+static void store_reach(void);
+static void fixed_reach(void);
 
 /* Inundação a partir de (sx, sz) pelas células andáveis; marca 'bit' em
  * gmark. walkable() é calculado UMA vez por célula (bit GM_BLOCK), não a
@@ -626,6 +628,7 @@ int mapgen_build(int index) {
 		stats.gen_lines += (uint16_t)(t1 - t0);
 		stats.val_lines += (uint16_t)(LINE_TIMER() - t1);
 		if (ok) {
+			store_reach();                   /* GM_VISIT da validação */
 			measure();
 			set_worst_point();
 			gen_active = 1;
@@ -637,6 +640,7 @@ int mapgen_build(int index) {
 	reset_entities();
 	g.rng = saved;
 	ld->build();
+	fixed_reach();
 	stats.fallback = 1;
 	gen_active = 0;
 	return 0;
@@ -670,20 +674,39 @@ int mapgen_active(void) {
 	return gen_active;
 }
 
-void mapgen_mark_fixed(void) {
-	gen_active = 0;
-	memset(&stats, 0, sizeof(stats));
-#ifdef DEBUG_BENCHMARK
-	/* bench: mede a floresta fixa com o MESMO critério do gerador (janela
-	 * mais pesada e janela com mais árvores), para comparar de forma justa */
+/* Mapa de alcance da partida (reach.c) a partir das marcas GM_VISIT da
+ * última inundação: os eventos da etapa 06 o usam */
+static void store_reach(void) {
+	reach_clear();
+	for (int z = 0; z < H; z++)
+		for (int x = 0; x < W; x++)
+			if (gmark[z][x] & GM_VISIT) reach_set(x, z, 1);
+}
+
+/* Floresta fixa (plano B ou fase de teste): só a inundação para o mapa de
+ * alcance (memória de rascunho, livre antes dos blocos serem montados) */
+static void fixed_reach(void) {
 	uint8_t *scratch = level_scratch(MAP_MAX_W * MAP_MAX_H * 3);
 	gmark = (uint8_t (*)[MAP_MAX_W])scratch;
 	bfs_queue = (uint16_t *)(scratch + MAP_MAX_W * MAP_MAX_H);
 	memset(gmark, 0, MAP_MAX_W * MAP_MAX_H);
-	memset(chunk_trees, 0, sizeof(chunk_trees));
-	memset(chunk_wt, 0, sizeof(chunk_wt));
 	W = level_width();
 	H = level_height();
+	int sx = g.spawn_x / TILE_SIZE, sz = g.spawn_z / TILE_SIZE;
+	if (walkable(sx, sz)) flood(sx, sz, GM_VISIT);
+	store_reach();
+}
+
+void mapgen_mark_fixed(void) {
+	gen_active = 0;
+	memset(&stats, 0, sizeof(stats));
+	fixed_reach();
+#ifdef DEBUG_BENCHMARK
+	/* bench: mede a floresta fixa com o MESMO critério do gerador (janela
+	 * mais pesada e janela com mais árvores), para comparar de forma justa */
+	memset(gmark, 0, MAP_MAX_W * MAP_MAX_H);
+	memset(chunk_trees, 0, sizeof(chunk_trees));
+	memset(chunk_wt, 0, sizeof(chunk_wt));
 	int x, z, type;
 	for (int i = 0; (type = level_tree_get(i, &x, &z)) >= 0; i++) {
 		int bx = x / (CHUNK_CELLS * TILE_SIZE), bz = z / (CHUNK_CELLS * TILE_SIZE);

@@ -543,6 +543,15 @@ void props_draw(void);
 /* main.c */
 void show_message(const char *text, int frames);
 
+/* reach.c: alcance durante a partida (mapa de bits + checagem local) */
+enum { REACH_OK, REACH_CUT, REACH_WINDOW };
+void reach_clear(void);
+void reach_set(int cx, int cz, int on);
+int  reach_get(int cx, int cz);
+int  reach_walkable(int cx, int cz);
+int  reach_local_ok(int cx, int cz, const uint16_t *blk, int n);
+void reach_stats(int *ok, int *cut, int *window);
+
 /* events.c */
 void events_start(void);              /* fim do game_reset */
 void events_update(void);             /* um passo de lógica (STATE_PLAY) */
