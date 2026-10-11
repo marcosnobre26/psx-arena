@@ -84,9 +84,10 @@ static void collect(PICKUP *it, PLAYER *p) {
 		show_message("ITEM DE MISSAO!", 50);
 		break;
 	case PICK_WEAPON: {
-		/* arma nova, na ordem: arco, machado, pistola, espingarda (fogo é
-		 * raro: vem por último), com um pouco de munição */
-		static const int order[] = { W_BOW, W_AXE, W_PISTOL, W_SHOTGUN };
+		/* arma nova, na ordem: arco, pistola, machado, espingarda, com um
+		 * pouco de munição. A pistola vem cedo (07b): as fases têm 0-1 W e,
+		 * com ela depois do machado, as balas (M) ficavam sem arma. */
+		static const int order[] = { W_BOW, W_PISTOL, W_AXE, W_SHOTGUN };
 		int w = -1;
 		for (int k = 0; k < 4 && w < 0; k++)
 			if (!(p->weapons_owned & (1u << order[k]))) w = order[k];
