@@ -82,7 +82,9 @@ Exemplos:
 ## 3. Criar uma fase e escolher o objetivo
 
 As fases ficam em [`src/levels.c`](../src/levels.c): uma **função que monta
-a floresta** e uma linha na tabela `level_defs`. **A ordem da tabela é a
+a floresta** e uma linha na tabela `level_defs`. Desde a etapa 05 as fases
+1–4 são **geradas** a cada partida (`GEN_PARAMS`, ver "Fase gerada" abaixo);
+a função fixa vira o **plano B** e a fase 5 (teste) continua fixa. **A ordem da tabela é a
 ordem do jogo**; as `num_levels` primeiras são a sequência normal (a fase de
 teste fica depois, só para `DEBUG_START_LEVEL 5` e o `./dev bench`).
 
@@ -133,11 +135,11 @@ W X Q S L` e `A` (reservada para o ATIRADOR).
 /* nome
  *   céu=névoa  névoa near/far  luz ambiente  música
  *   objetivo   parâmetro  máx. inimigos  texto do objetivo
- *   gerador    pontos de teleporte (o 3o = pior ponto do bench) */
+ *   função fixa (plano B)  pontos de teleporte  parâmetros do gerador (NULL = fixa) */
 { "PONTE",
   10, 12, 24,  1300, 2800,  40, 40, 56,  0,
   OBJ_COLLECT,  0,  0,  "PEGUE O ITEM E SAIA",
-  build_f9, f9_pts },
+  build_f9, f9_pts, &f9_gen },
 ```
 
 | Objetivo | Vence quando | Parâmetro | HUD |
@@ -169,6 +171,62 @@ do commit.
 Florestas densas e névoa longa custam CPU: meça com `./dev bench` (ele mede
 o pior momento de cada fase: todos os inimigos juntos em volta do jogador). **Atalho:** com o overlay L2 aberto, segure **L2** e
 aperte **Start** para pular para a próxima fase (levando o progresso).
+
+### Fase gerada (etapa 05)
+
+O gerador ([`src/mapgen.c`](../src/mapgen.c)) monta uma floresta nova a cada
+partida a partir de `g.seed` (sorteada na seleção). Cada fase usa a semente
+`g.seed ^ ((fase+1) * 0x9E3779B1)`; **a mesma semente dá sempre o mesmo
+mapa** (no PC e no console). Vencer gera semente nova para a próxima fase;
+**game over recomeça com o mesmo mapa**.
+
+```c
+static const GEN_PARAMS f9_gen = {
+	64, 64,          /* tamanho em células (até 128x128) */
+	GEN_COLLECT,     /* onde ficam início/saída/itens: GEN_HUNT, GEN_CROSS, GEN_COLLECT, GEN_SURVIVE */
+	20, 90,          /* árvores por mil células (o ruído varia entre os dois) */
+	GEN_CHUNK_CAP,   /* teto de árvores por bloco 8x8 (5) */
+	GEN_WINDOW_CAP,  /* teto de "peso" numa janela 3x3 blocos (árvore 1, mata 1/4 por célula) */
+	12,              /* teto de ÁRVORES numa janela 3x3 blocos: o que mais pesa na CPU */
+	2, 4, 3, 5,      /* clareiras: quantidade mín/máx, raio mín/máx */
+	0,               /* GEN_SURVIVE: raio da clareira do cerco */
+	6,               /* troncos caídos */
+	8, 10,           /* inimigos; distância mínima do início (células) */
+	{ 1, 1, 2, 0, 1, 2 },   /* vida, energia, pilha, arma, gema, caixa */
+};
+```
+
+**Mapa sempre jogável.** Depois de gerar, uma busca em largura (BFS) a partir
+do `P` confere que saída, relíquias, itens e inimigos são alcançáveis (tronco
+caído é passável) e que nada ficou em sólido. Se falhar, tenta `semente + 1`
+até `MAPGEN_TRIES` (16) vezes; se todas falharem, usa a floresta fixa
+(**plano B**). O overlay L2 mostra `MAPA <semente> T<tentativas> CARGA
+<ms>` ou `MAPA PLANO B (FIXO)`.
+
+**Testar no PC (sem emulador):**
+
+```bash
+./dev mapgen-test 1000            # 1000 sementes por fase: inválidos, tentativas,
+                                  # densidade, janela mais densa, tempo, determinismo
+./dev mapgen-test 1000 --bench    # idem e grava src/bench_seeds.h (piores sementes)
+./dev mapgen-test 50 -D MAPGEN_TRIES=0   # força o plano B em tudo
+```
+
+**Ajustar densidade/tamanho:** mude o `GEN_PARAMS` da fase. Os tetos por
+janela (`GEN_TREES_F1..F4`) foram escolhidos pelo bench: o pior mapa de cada
+fase não pode passar do pior caso da 04e. Para testar outro valor **sem
+editar**, rode os dois com o mesmo `-D` (as piores sementes dependem do teto):
+
+```bash
+./dev mapgen-test 1000 --bench -D GEN_TREES_F4=12
+./dev bench -D GEN_TREES_F4=12
+git checkout src/bench_seeds.h    # se desistir do valor
+```
+
+**Forçar uma semente:** em `config.h`, descomente `#define DEBUG_FIXED_SEED
+0x12345678u` (todas as partidas usam essa semente; o overlay L2 mostra
+`SEED`). Para reproduzir um mapa visto no jogo, use o `SEED` do overlay.
+Comente de novo antes do commit.
 
 ### Como o mundo é montado
 

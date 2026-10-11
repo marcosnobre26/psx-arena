@@ -28,6 +28,7 @@ modificação: `docs/GUIA.md`.
 ./dev vram           # mapa das texturas na VRAM
 ./dev bench          # benchmark automático (FPS/POLIS/COL/CPU nos pontos da fase 5)
 ./dev bench -D TREE_LOD_DIST=1300   # variante sem mexer no config.h
+./dev mapgen-test 1000 [--bench] [-D N=V]   # gerador no PC (N sementes/fase); --bench grava src/bench_seeds.h
 ./dev clean          # apaga build/
 VERBOSE=1 ./dev build
 ```
@@ -52,7 +53,8 @@ VERBOSE=1 ./dev build
 | `data.c` | **tabelas**: `character_defs`, `weapon_defs`, `power_defs`, `enemy_defs`, `skin_defs`, `prop_defs` |
 | `config.h` | constantes globais |
 | `game.h` | tipos, `GAME g` (estado global), protótipos |
-| `levels.c` | **tabela de fases** `level_defs`: gerador da floresta (`build_forest`), posicionamento (`level_place_safe`), céu, objetivo |
+| `levels.c` | **tabela de fases** `level_defs`: florestas fixas (`build_forest`; plano B e fase 5), `GEN_PARAMS` de cada fase gerada, céu, objetivo |
+| `mapgen.c` | **gerador procedural** (etapa 05): floresta por `g.seed`, validação por BFS, novas tentativas (semente + 1), plano B, medidas para o teste do PC e o bench |
 | `level.c` | grade 128×128 (tipo + bit sólido), blocos 8×8 montados sob demanda num cache de 36, colisão com a grade |
 | `objective.c` | objetivo da fase (`objective_update/text`), saída `X`, reforços `S` |
 | `player.c` | até 2 jogadores (`g.players[2]`, `g.in[2]`), respawn |
@@ -106,6 +108,12 @@ Gerados no build (não edite): `build/gen/assets_gen.{h,c}` (declara
   um gerador separado e não afeta `g`.
 - Nada de ler o controle direto do hardware dentro da lógica (use `g.in[]`).
 - Todo campo novo é inicializado em `*_spawn`/reset (o `memset` de `g` zera o resto).
+- **Gerador de mapas:** só usa o RNG local semeado por `g.seed` + fase +
+  tentativa (nunca `g.rng`, tempo ou `VSync`); deixa `g.rng` como estava.
+  Mesma semente = mesmo mapa (o `./dev mapgen-test` compara o hash da grade).
+- **Semente no modo link (etapa 11, não implementado):** hoje a semente vem de
+  `g.frame` na seleção (cada console teria a sua). No modo link os dois
+  consoles precisam combinar a mesma semente na conexão: um envia, o outro usa.
 
 ## Roteiro
 
@@ -155,7 +163,15 @@ uma branch. As regras do ROADMAP (determinismo, orçamentos de desempenho,
   depois, senão a colisão fica desencontrada (`./dev bench` mostra
   `grade_erros`). Nada de percorrer `g.enemies`/`g.props` para colidir.
 - Fases: tudo é colocado com `level_place_safe` (nunca dentro de tronco ou
-  mata; se não achar lugar, não coloca). Fase 5 = só teste (`num_levels` = 4).
+  mata; se não achar lugar, não coloca). Fase 5 = só teste (`num_levels` = 4),
+  floresta fixa (o bench compara entre etapas). Fases 1–4 são geradas
+  (`GEN_PARAMS`); mudou o gerador ou um teto → rode `./dev mapgen-test 1000
+  --bench` (0 inválidos, determinístico) e depois `./dev bench`. Teto de
+  desempenho: cada fase ≤ pior caso da 04e + 5% e nunca > 504 linhas; se
+  passar, baixe o teto de árvores (`GEN_TREES_Fn`), não mexa na névoa.
+- Carga de fase: `start_level` desenha um quadro `CARREGANDO...` antes. Se a
+  geração passar de ~1 s, divida-a entre quadros SEM rodar `game_tick` até
+  o mapa ficar pronto (resultado idêntico ao de uma vez).
 - Árvores: `level_add_tree` (fora de `g`, por bloco), **depois** das células;
   em pé = círculo na grade, tronco caído = células baixas (`CELL_LOW`). Posição por hash **com semente** (fase de
   teste: fixa; etapa 05: derivada de `g.seed`, nunca `g.rng`). Nomes fixos

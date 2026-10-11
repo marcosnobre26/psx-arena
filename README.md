@@ -201,6 +201,7 @@ troque para `Debug` em [`CMakePresets.json`](CMakePresets.json) (`-Og`).
 | `image` | recria a imagem Docker |
 | `doctor` | verifica Docker, SDK, emulador e Blender |
 | `clean` | apaga `build/` |
+| `mapgen-test [N] [--bench] [-D N=V]` | testa o gerador de florestas no PC com N sementes por fase (inválidos, tentativas, densidade, tempo, determinismo); `--bench` grava as piores sementes em `src/bench_seeds.h` |
 | `bench [-D N=V ...]` | benchmark automático: compila com `DEBUG_BENCHMARK` em `build-bench/` (variantes com `-D` em `build-bench-var/`), roda no DuckStation Linux, mostra a tabela (detalhes no GUIA) |
 
 ---
@@ -241,6 +242,8 @@ psx-arena/
 │   ├── data.c               tabelas: personagens, armas, poderes, inimigos, skins, cenário
 │   ├── levels.c             tabela de fases (mapas em texto, aparência, objetivo)
 │   ├── level.c              leitura do mapa, geração de geometria, colisão com o mapa
+│   ├── mapgen.c             gerador procedural das florestas (semente, BFS, novas tentativas, plano B)
+│   ├── bench_seeds.h        piores sementes por fase (gerado por ./dev mapgen-test --bench)
 │   ├── objective.c          objetivos, saída (X) e reforços (S)
 │   ├── player.c             jogadores (até 2), respawn
 │   ├── enemies.c            IA dos inimigos
@@ -507,7 +510,16 @@ tronco em pé bloqueiam; tronco caído e chão vazio não; pessoas não. A IA ai
 - Estados novos no fim do enum: `STATE_INTRO` (3 s, START/X pulam) e `STATE_END`.
 - Progressão: `progress` (fora de `g`, como `sel[]`, porque o `memset` apaga `g`) guarda pontos,
   vida, energia, armas e poder ao vencer; `start_level()` aplica depois do `game_reset`. O game
-  over recomeça a fase com esse mesmo retrato. `DEBUG_START_LEVEL` (`config.h`) pula fases.
+  over recomeça a fase com esse mesmo retrato **e o mesmo mapa** (mesma `g.seed`).
+  `DEBUG_START_LEVEL` (`config.h`) pula fases.
+- **Geração procedural** (`mapgen.c`, etapa 05): fases com `gen` na tabela são geradas no
+  `level_load` a partir de `g.seed ^ ((fase+1) * 0x9E3779B1)`, com um RNG local (não toca em
+  `g.rng`). Ruído de valor inteiro decide a densidade; trilhas por passeio aleatório; tetos de
+  árvores por bloco 8×8 e por janela 3×3 blocos (o que a câmera vê) escolhidos pelo bench.
+  Validação por BFS (tudo alcançável, nada em sólido); inválido → semente + 1 até
+  `MAPGEN_TRIES`; senão, floresta fixa (plano B). O BFS usa a memória do cache de blocos
+  (`level_scratch`, livre durante a carga): 0 byte novo. Carga no console: ~0,25 s (64×64) e
+  ~0,77 s (128×128), com um quadro `CARREGANDO...` na tela.
 
 ### Entidades e dados
 
@@ -520,16 +532,16 @@ tronco em pé bloqueiam; tronco caído e chão vazio não; pessoas não. A IA ai
   com `g.rng` (via `rand_range`), semeado por `game_reset(seed)` com `g.seed`; efeitos puramente
   visuais usam `fx_range`, um gerador separado fora de `g`. Assim a mesma semente + as mesmas
   entradas reproduzem a partida — requisito do modo link. `DEBUG_FIXED_SEED` (`config.h`) força
-  uma semente para testes. O overlay **L2** mostra `SEED` e `POLIS` (polígonos enviados à GPU).
+  uma semente para testes. O overlay **L2** mostra `SEED`, `POLIS` (polígonos enviados à GPU) e `MAPA` (semente do gerador, tentativas, tempo de carga ou `PLANO B`).
 
 ### Memória (build atual)
 
 | Seção | Tamanho | Conteúdo principal |
 |---|---|---|
-| `.text` | ~93 KB | código do jogo + bibliotecas do SDK usadas |
-| `.data` | ~117 KB | modelos, texturas e sons embutidos, tabelas |
-| `.bss` | ~527 KB | 2 × 96 KB de primitivas, 2 × OT, cache de 36 blocos (~277 KB), grade 128×128 (16 KB), árvores (16 KB), pools |
-| **Total** | **~738 KB** de 2 MB | orçamento do roteiro: 1,2 MB |
+| `.text` | ~114 KB | código do jogo + bibliotecas do SDK usadas |
+| `.data` | ~101 KB | modelos, texturas e sons embutidos, tabelas |
+| `.bss` | ~586 KB | 2 × 96 KB de primitivas, 2 × OT, cache de 36 blocos (~277 KB; também é a memória do BFS do gerador), grade 128×128 (16 KB), árvores, pools |
+| **Total** | **~801 KB** (820 066 bytes) de 2 MB | orçamento do roteiro: 1,2 MB |
 
 Medido com `mipsel-linux-gnu-size build/arena.elf` (dentro do `./dev shell`).
 

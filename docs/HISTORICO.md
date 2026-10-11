@@ -399,3 +399,70 @@ automatizar testes visuais.
   a prioridade da etapa 10**: canto denso da fase 5 em 504 e CERCO com 2
   jogadores em 480 de ~525 linhas (o maior custo segue sendo o desenho dos
   blocos e das árvores).
+- 2026-10-11 — Etapa 05 (geração procedural): `src/mapgen.c` gera as
+  florestas das fases 1–4 a cada partida a partir de `g.seed` (semente da
+  fase = `g.seed ^ ((fase+1) * 0x9E3779B1)`, RNG local; `g.rng` intacto).
+  Ruído de valor inteiro para a densidade, trilhas por passeio aleatório,
+  clareiras, troncos, `P/X/Q/S`, inimigos por distância do início e itens
+  pelos orçamentos da 04e (`GEN_PARAMS` em `levels.c`). Validação por BFS
+  (tudo alcançável, tronco caído passável, nada em sólido); inválido →
+  semente + 1 até `MAPGEN_TRIES` (16); senão **plano B** = floresta fixa da
+  04e. Fase 5 continua fixa. Game over recomeça com o **mesmo mapa**; vencer
+  sorteia semente nova. Overlay L2: `MAPA <semente> T<tentativas> CARGA <ms>`
+  ou `MAPA PLANO B (FIXO)`. `./dev mapgen-test [N] [--bench] [-D]` testa no PC.
+
+  **Teste no PC, 1000 sementes por fase:** 0 inválidos (plano B 0 vezes),
+  0 problemas na checagem independente, 200 sementes geradas 2× com o mesmo
+  hash da grade (determinístico). Tentativas: f1 973×1 + 27×2; f2 988×1 +
+  12×2; f3 991×1 + 8×2 + 1×3; f4 988×1 + 12×2. Densidade (árvores por mil
+  células) mín/méd/máx: f1 15/20/24, f2 24/26/29, f3 12/14/17, f4 12/12/14.
+  Maior bloco: 5 árvores. Tempo no PC: méd 0,25 ms (64×64), 0,92 ms
+  (128×128), máx 2,3 ms.
+
+  **Tetos escolhidos pelo bench.** Medido com as 5 sementes de pior janela
+  3×3 (árvores+mata) e as 5 com mais árvores na janela, câmera e todos os
+  inimigos no centro dela. Achado: **árvore perto da câmera é o que pesa**
+  (modelo completo + raízes no chão sobem `desenho_blocos` e
+  `desenho_arvores`); mata quase não pesa. Com teto só de "peso" (40) as
+  janelas de árvores chegavam a f1 498, f2 496, f3 397, f4 416. Ficou: teto
+  de **árvores por janela 3×3** por fase (`GEN_TREES_F1..F4` = 16/20/12/10)
+  e **5 árvores por bloco 8×8** (`GEN_CHUNK_CAP`). Também medida a floresta
+  **fixa da 04e no seu próprio canto mais denso** (mesmo critério;
+  `f{N}_fixo_*` no bench): f1 450, f2 494, f3 389, f4 415 — o bench da 04e
+  não passava por esses cantos.
+
+  **Conflito registrado (f4 e densidade):** o limite estrito da f4 (375 +
+  5% = 394) não foi alcançável: mesmo com 8 árvores por janela (abaixo de
+  2%) o canto de árvores deu 406. Ficou em 10 árvores → **415**, igual ao
+  canto mais denso da própria floresta fixa da 04e (415) e longe de 504.
+  Para caber nos limites, f3 e f4 ficaram com densidade média de 1,2–1,7%
+  (abaixo da faixa pedida de 2–9%); f1 1,5–2,4%, f2 2,4–2,9%.
+
+  **Antes** (04e, florestas fixas, pior ponto medido na 04e) e **depois**
+  (05, pior entre 10 sementes por fase), CPU em linhas (30 FPS = ~525),
+  natural / todos os inimigos juntos:
+
+  | Fase | Limite (04e +5%) | Antes: CPU | Depois: CPU (ponto) | Depois: POLIS máx | FPS | Fixa 04e no canto mais denso |
+  |---|---|---|---|---|---|---|
+  | f1 CACADA | 458 | 335 / 435 | 375 / **450** (arv5) | 785 | 30 | 450 |
+  | f2 TRAVESSIA | 468 | 303 / 446 | 320 / **465** (arv1) | 772 | 30 | 494 |
+  | f3 RELIQUIAS | 372 | 291 / 354 | 338 / **369** (arv2) | 651 | 30 | 389 |
+  | f4 CERCO | 394 | 247 / 375 | 302 / **415** (arv3) | 743 | 30 | 415 |
+  | f4 2 jogadores | 504 | 360 / 480 | 304 / **415** (pior1) | 691 | 30 | — |
+  | fase 5 (fixa) | — | canto denso 504 | 504 (igual) | 769 | 30 | — |
+
+  **Carga no console** (DuckStation, `BENCH carga`): antes f1 160, f2 379,
+  f3 140, f4 145, f5 416 ms; depois (gerada) 64×64 232–259 ms, 128×128
+  749–766 ms; plano B igual à 04e. Abaixo de 1 s: geração **não** dividida
+  entre quadros; `start_level` desenha um quadro `CARREGANDO...` (só
+  desenho, não muda `g`) que fica na tela enquanto a CPU gera.
+
+  **RAM:** 808 586 → 820 066 bytes (**+11 480**, ~11,2 KB: código do
+  gerador e ~1,2 KB de tabelas). O BFS (marcas 16 KB + fila 32 KB) usa a
+  memória do cache de blocos, livre durante a carga (`level_scratch`):
+  0 byte novo. Total ~801 KB de 1,2 MB.
+
+  **Modo link (anotação para a etapa 11, não implementado):** a semente vem
+  de `g.frame` na seleção, diferente em cada console. No modo link os dois
+  consoles precisam combinar a mesma semente na conexão (um envia, o outro
+  usa); o gerador já é determinístico dado `g.seed`.
