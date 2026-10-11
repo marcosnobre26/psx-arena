@@ -1501,11 +1501,6 @@ static void bench_frame(int vs) {
 #ifdef SUBCULL_CHECK
 		{ extern int subcull_lost; printf("BENCH subcull ponto=%s perdidos=%d\n", bench.name, subcull_lost); subcull_lost = 0; }
 #endif
-#ifdef ENEMY_PROF
-		{ extern int enemy_prof_move; int f = bench.frames ? bench.frames : 1;
-		  printf("BENCH inimprof ponto=%s medida=%d colisao_por_quadro=%d\n", bench.name, bench.stage, enemy_prof_move / f);
-		  enemy_prof_move = 0; }
-#endif
 		if (bench.stage == 1 || bench.stage == 9)   /* a série, 1 linha por segundo */
 			for (int si = 0; si < BENCH_SECS && bench.sec[si].frames; si++) {
 				const BENCH_SEC *sc = &bench.sec[si];
