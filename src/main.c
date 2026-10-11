@@ -965,6 +965,7 @@ static struct {
 	int      cpu_max, cpu_sum, gpu_max, gpu_sum;  /* perfil do quadro, em linhas */
 	int      logic_sum, logic_last;               /* parte da CPU gasta na lógica */
 	int      p_chunks, p_trees, p_other;          /* desenho por categoria (soma) */
+	int      build_max;                           /* pior montagem de bloco (linhas) */
 	int      cut_max;                             /* blocos+árvores cortados (buffer) */
 } bench;
 
@@ -1048,6 +1049,8 @@ static void bench_reset_stats(void) {
 	bench.cpu_max = bench.cpu_sum = bench.gpu_max = bench.gpu_sum = 0;
 	bench.logic_sum = 0;
 	bench.p_chunks = bench.p_trees = bench.p_other = 0;
+	bench.build_max = 0;
+	{ int d; level_build_stats(&d); }         /* zera o pior */
 	bench.cut_max = 0;
 }
 
@@ -1106,6 +1109,11 @@ static void bench_frame(int vs) {
 		if (--bench.timer <= 0) {
 			bench_reset_stats();
 			bench.timer = BENCH_MEASURE;
+			if (bench.stage == 2) {          /* invalida agora: o próximo quadro remonta */
+				const PLAYER *p0 = &g.players[0];
+				level_invalidate(p0->pos.vx / TILE_SIZE, p0->pos.vz / TILE_SIZE);
+				bench.timer = 60;            /* o quadro da montagem + 59 */
+			}
 			bench.phase = BENCH_MEASURING;
 		}
 		break;
@@ -1137,6 +1145,11 @@ static void bench_frame(int vs) {
 		bench.gpu_sum += pg;
 		bench.logic_sum += bench.logic_last;
 		bench.p_chunks += prof_get(PROF_CHUNKS);
+		{
+			int b;
+			level_build_stats(&b);
+			if (b > bench.build_max) bench.build_max = b;
+		}
 		bench.p_trees  += prof_get(PROF_TREES);
 		bench.p_other  += prof_get(PROF_OTHER);
 		if (level_cut_count() > bench.cut_max) bench.cut_max = level_cut_count();
@@ -1151,7 +1164,8 @@ static void bench_frame(int vs) {
 		       "polis_max=%d polis_med=%d ram_gpu_max=%d col_max=%d col_med=%d "
 		       "arvores_modelo=%d arvores_plana=%d grade_erros=%d cam_max=%d cam_med=%d cam_celulas_max=%d arvores_transp=%d "
 		       "cpu_max=%d cpu_med=%d gpu_espera_max=%d gpu_espera_med=%d logica_med=%d "
-		       "desenho_blocos=%d desenho_arvores=%d desenho_resto=%d separacao=%d corte=%d\n",
+		       "desenho_blocos=%d desenho_arvores=%d desenho_resto=%d separacao=%d corte=%d "
+		       "medida=%s montagem_max=%d\n",
 		       bench.name, bench.extras, n, bench.fps_min,
 		       bench.vsyncs ? bench.frames * 60 / bench.vsyncs : 0,
 		       bench.polis_max, bench.frames ? bench.polis_sum / bench.frames : 0, bench.ram_max,
@@ -1167,7 +1181,9 @@ static void bench_frame(int vs) {
 		       bench.frames ? bench.p_other / bench.frames : 0,
 		       g.players[1].active ? dist2d(g.players[1].pos.vx - g.players[0].pos.vx,
 		                                    g.players[1].pos.vz - g.players[0].pos.vz) : 0,
-		       bench.cut_max);
+		       bench.cut_max,
+		       bench.stage == 0 ? "natural" : bench.stage == 1 ? "multidao" : "remontagem",
+		       bench.build_max);
 
 		if (bench.stage == 0) {              /* agora a "multidão" */
 			uint32_t before = 0, after = 0;
@@ -1187,6 +1203,10 @@ static void bench_frame(int vs) {
 			bench.stage = 1;
 			bench.timer = BENCH_SETTLE_E;
 			bench.phase = BENCH_WAIT;
+		} else if (bench.stage == 1) {       /* remontagem: o bloco do jogador */
+			bench.stage = 2;                 /* (custo de um evento que muda o mapa); */
+			bench.timer = 10;                /* espera: o printf acima é lento e cairia */
+			bench.phase = BENCH_WAIT;        /* no quadro medido */
 		} else {
 			bench.point++;
 			bench.phase = BENCH_TELEPORT;

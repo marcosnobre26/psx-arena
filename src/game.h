@@ -417,6 +417,7 @@ int  level_place_failures(int i, char *ch, int *cx, int *cz);   /* teste: falhas
 int  level_placed(int i, char *ch, int *cx, int *cz);           /* teste: colocados */
 void level_invalidate(int cx, int cz);  /* célula mudou: remonta o bloco */
 void level_stats(int *loaded, int *slots, int *built, int *overflow);
+void level_build_stats(int *max_lines);           /* pior montagem de bloco; zera ao ler */
 int  level_cell_top(int cx, int cz);    /* altura do topo da célula (0, 384, 768) */
 /* Árvore na posição do mundo (x, z). angle 0..4095; scale ONE = 1.0.
  * Marca a(s) célula(s) do tronco como sólida(s). Troncos caídos: use

@@ -232,6 +232,21 @@ static int is_must(int cx, int cz) {
 }
 
 /* Monta o bloco (cx, cz) se ainda não estiver montado */
+/* Contador de linhas do PS1 (timer 1). No teste do PC (HOST_TEST) não há
+ * esse hardware: vale 0. */
+#ifdef HOST_TEST
+#define LINE_TIMER() 0
+#else
+#define LINE_TIMER() TIMER_VALUE(1)
+#endif
+
+static int build_lines_max;           /* perfil: pior montagem de bloco (linhas) */
+
+void level_build_stats(int *max_lines) {      /* zera ao ler */
+	*max_lines = build_lines_max;
+	build_lines_max = 0;
+}
+
 static void ensure(int cx, int cz) {
 	if (cx < 0 || cz < 0 || cx >= ncx || cz >= ncz || slot_of[cz][cx] >= 0)
 		return;
@@ -247,7 +262,10 @@ static void ensure(int cx, int cz) {
 		slot_of[slot_cz[s]][slot_cx[s]] = -1;
 		loaded_count--;
 	}
+	uint16_t t0 = LINE_TIMER();
 	build_chunk(&slot_geom[s], cx, cz);
+	int bl = (uint16_t)(LINE_TIMER() - t0);
+	if (bl > build_lines_max) build_lines_max = bl;
 	slot_cx[s] = cx;
 	slot_cz[s] = cz;
 	slot_of[cz][cx] = s;
@@ -665,13 +683,6 @@ void level_reset_objects(void) {
 
 static int load_lines;                 /* tempo do último level_load (linhas) */
 
-/* Contador de linhas do PS1 (timer 1). No teste do PC (HOST_TEST) não há
- * esse hardware: vale 0. */
-#ifdef HOST_TEST
-#define LINE_TIMER() 0
-#else
-#define LINE_TIMER() TIMER_VALUE(1)
-#endif
 
 int level_load_lines(void) {
 	return load_lines;
