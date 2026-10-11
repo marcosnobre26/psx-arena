@@ -409,6 +409,7 @@ int render_mesh(const MESH *m, const VECTOR *pos, const SVECTOR *rot,
 	uint32_t *ot   = fb[cur].ot;
 	uint8_t  *end  = fb[cur].pkt + PACKET_LEN - 64;
 	int       semi = (opt->flags & DRAW_SEMITRANS) ? 1 : 0;
+	const uint32_t hide = opt->hide;         /* quase sempre 0: o teste nem roda */
 
 	for (int i = 0; i < m->nfaces; i++) {
 		const MESH_FACE *f = &m->faces[i];
@@ -419,6 +420,9 @@ int render_mesh(const MESH *m, const VECTOR *pos, const SVECTOR *rot,
 
 		if (nextpri >= end)
 			break;   /* sem memória para mais primitivas neste quadro */
+
+		if (hide && (hide & (1u << f->mat)))
+			continue;               /* material escondido (arma embutida no modelo) */
 
 		gte_ldv3(&m->verts[f->v[0]], &m->verts[f->v[1]], &m->verts[f->v[2]]);
 		gte_rtpt();                 /* gira, move e projeta 3 vértices */

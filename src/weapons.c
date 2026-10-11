@@ -171,6 +171,11 @@ void bullets_draw(void) {
 		if (!b->active) continue;
 		const WEAPON_DEF *w = &weapon_defs[b->weapon];
 
+		if (w->kind == WK_BOW) {                 /* flecha: aponta para onde voa */
+			SVECTOR rot = { 0, angle_of(b->vx, b->vz), 0 };
+			render_mesh(&flecha_mesh, &b->pos, &rot, ONE, NULL);
+			continue;
+		}
 		opt.palette  = &w->color;
 		opt.npalette = 1;
 		SVECTOR rot = { g.frame * 90, g.frame * 130, 0 };
@@ -200,15 +205,11 @@ void ground_arrows_update(void) {
 }
 
 void ground_arrows_draw(void) {
-	static const CVECTOR wood = { 200, 170, 110 };
-	DRAWOPT opt = { 0 };
-	opt.palette = &wood;
-	opt.npalette = 1;
 	for (int i = 0; i < MAX_GROUND_ARROWS; i++) {
 		if (!g.garrow[i].active) continue;
-		VECTOR pos = { g.garrow[i].x, -20, g.garrow[i].z };
-		SVECTOR rot = { 0, (i * 700) & 4095, 0 };
-		render_mesh(&bullet_mesh, &pos, &rot, ONE / 2, &opt);
+		VECTOR pos = { g.garrow[i].x, -10, g.garrow[i].z };
+		SVECTOR rot = { 0, (g.garrow[i].x * 7 + g.garrow[i].z * 3) & 4095, 0 };   /* deitada, ao acaso */
+		render_mesh(&flecha_mesh, &pos, &rot, ONE, NULL);
 	}
 }
 
@@ -357,7 +358,27 @@ void weapon_update(PLAYER *p, const INPUT *in) {
 	}
 }
 
-/* Arma na mão: desenhada no passo 3 da etapa 07 */
+/* Arma na mão (só desenho: lê g). Presa ao ponto 'hand' do personagem,
+ * girando com ele; o golpe corpo a corpo inclina a arma para a frente e a
+ * carga do arco puxa o arco para trás. Magias: sem modelo. */
 void weapon_draw(const PLAYER *p) {
-	(void)p;
+	const WEAPON_DEF *w = &weapon_defs[p->weapon];
+	if (!w->mesh) return;
+	const CHARACTER_DEF *c = &character_defs[p->character];
+	int s = isin(p->angle), co = icos(p->angle);
+	int hx = (c->hand.vx * c->scale) >> 12, hy = (c->hand.vy * c->scale) >> 12;
+	int hz = (c->hand.vz * c->scale) >> 12;
+	VECTOR pos = {
+		p->pos.vx + ((hx * co + hz * s) >> 12),
+		p->pos.vy + hy,
+		p->pos.vz + ((-hx * s + hz * co) >> 12),
+	};
+	SVECTOR rot = { 0, p->angle, 0 };
+	if (p->swing > 0) {                          /* golpe: desce para a frente */
+		int k = p->swing * 4096 / (w->cooldown ? w->cooldown : 1);
+		rot.vx = -(isin(k >> 1) * 900 >> 12);
+	}
+	if (p->charge > 0)                           /* arco: recua com a carga */
+		pos.vy -= p->charge;
+	render_mesh(w->mesh, &pos, &rot, ONE, NULL);
 }

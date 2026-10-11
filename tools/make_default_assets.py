@@ -142,8 +142,9 @@ def make_player():
     s.box(-0.18, -0.16, 0.95, 0.18, 0.16, 1.25, head, 1)
     # visor (sem luz: parece que brilha)
     s.box(-0.14, -0.19, 1.05, 0.14, -0.16, 1.15, visor, 3, unlit=True)
-    # antena
-    s.box(0.08, -0.02, 1.25, 0.11, 0.02, 1.42, gun, 4)
+    # antena (material da cabeça: a "Arma" (4) some quando a arma na mão é
+    # desenhada; etapa 07)
+    s.box(0.08, -0.02, 1.25, 0.11, 0.02, 1.42, gun, 1)
     return s.save("player")
 
 

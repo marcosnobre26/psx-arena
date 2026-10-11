@@ -36,6 +36,7 @@ typedef struct {
 	const TEXTURE *tex;      /* textura para faces com UV */
 	int            flags;    /* DRAW_* */
 	int            zbias;    /* negativo = desenha "mais à frente" */
+	uint32_t       hide;     /* bit N = não desenha as faces do material N (etapa 07) */
 } DRAWOPT;
 
 /* ---- Blocos do mapa (geometria montada em level.c) ----

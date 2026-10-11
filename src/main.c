@@ -413,7 +413,7 @@ static void select_draw(void) {
 		if (s->ready)
 			pos.vy = -((isin((g.frame * 200) & 4095) < 0 ? -isin((g.frame * 200) & 4095)
 			                                              :  isin((g.frame * 200) & 4095)) >> 7);
-		player_draw_model(&pos, &rot, s->character, s->skin);
+		player_draw_model(&pos, &rot, s->character, s->skin, 0);
 
 		DRAWOPT ro = { 0 };
 		ro.flags = DRAW_UNLIT | DRAW_SEMITRANS | DRAW_NOCULL;

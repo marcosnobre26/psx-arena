@@ -71,6 +71,7 @@ typedef struct {
 	int          noise;     /* raio do barulho, em células (0 = silencioso) */
 	int          scale;     /* tamanho do projétil / do efeito */
 	CVECTOR      color;
+	const MESH  *mesh;      /* modelo na mão (NULL = nenhum: magias) */
 } WEAPON_DEF;
 
 typedef struct {
@@ -104,6 +105,8 @@ typedef struct {
 	int            weapon;    /* arma inicial (índice em weapon_defs) */
 	int            weapon2;   /* segunda arma inicial (-1 = nenhuma) */
 	int            arrows;    /* flechas iniciais */
+	int            weapon_mat;/* material da arma embutida no modelo (some no jogo; -1 = nenhum) */
+	SVECTOR        hand;      /* onde a arma fica presa (espaço do modelo, escala ONE) */
 } CHARACTER_DEF;
 
 /* Objeto de cenário: um modelo colocado no mapa por um dígito (1..9) */
@@ -541,7 +544,7 @@ void player_spawn(PLAYER *p, int x, int z);
 void player_update(PLAYER *p, INPUT *in);
 void player_draw(PLAYER *p);
 void player_damage(PLAYER *p, int amount, int from_x, int from_z);
-void player_draw_model(const VECTOR *pos, const SVECTOR *rot, int character, int skin);
+void player_draw_model(const VECTOR *pos, const SVECTOR *rot, int character, int skin, int hide_weapon);
 int  player_alive(const PLAYER *p);
 int  players_alive(void);
 PLAYER *player_nearest(int x, int z, int *dist_out);   /* vivo mais próximo */

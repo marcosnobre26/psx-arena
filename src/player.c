@@ -293,9 +293,11 @@ int lantern_lit(const PLAYER *p) {
 }
 
 /* Desenha o modelo de um personagem (usado no jogo e na tela de seleção) */
-void player_draw_model(const VECTOR *pos, const SVECTOR *rot, int character, int skin) {
+void player_draw_model(const VECTOR *pos, const SVECTOR *rot, int character, int skin, int hide_weapon) {
 	const CHARACTER_DEF *c = &character_defs[character];
 	DRAWOPT opt = { 0 };
+	if (hide_weapon && c->weapon_mat >= 0)
+		opt.hide = 1u << c->weapon_mat;     /* a arma vem na mão (weapon_draw) */
 	if (c->use_skins) {
 		opt.palette  = skin_defs[skin].colors;
 		opt.npalette = 5;
@@ -319,7 +321,7 @@ void player_draw(PLAYER *p) {
 		pos.vy -= (bob < 0 ? -bob : bob) >> 9;   /* sobe e desce 0..8 */
 		rot.vz = isin(p->walk_anim * 3) >> 6;
 	}
-	player_draw_model(&pos, &rot, p->character, p->skin);
+	player_draw_model(&pos, &rot, p->character, p->skin, 1);
 	weapon_draw(p);                       /* arma na mão (etapa 07) */
 	shadow_draw(&p->pos, ONE * 3 / 4);
 
