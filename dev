@@ -11,6 +11,7 @@
 #   ./dev image          (re)cria a imagem Docker do SDK
 #   ./dev vram           mostra onde cada textura ficou na VRAM
 #   ./dev bench          mede FPS/POLIS/COL sozinho no DuckStation Linux (build-bench/)
+#   ./dev mapgen-test [N] testa o gerador de florestas no PC (N sementes por fase)
 #   ./dev doctor         confere se está tudo instalado
 #
 #  Por padrão usa Docker. Se você instalou o SDK direto no Ubuntu
@@ -345,6 +346,22 @@ cmd_bench() {
 	c_ok "Resultado bruto: $bdir/bench.txt"
 }
 
+# ---------------------------------------------------------------------------
+# Teste do gerador no PC: compila o código real (mapgen/level/levels/...)
+# para o PC com gcc (dentro do Docker) e roda N sementes por fase.
+# ---------------------------------------------------------------------------
+cmd_mapgen_test() {
+	local n="${1:-1000}"
+	[[ -f build/gen/assets_gen.c ]] || cmd_build >/dev/null || return 1
+	sdk sh -c "
+		I=$SDK_DIR/include/libpsn00b
+		gcc -O2 -w -DHOST_TEST -include stdlib.h -I src -I models -I build/gen -I \$I \
+			-o build/mapgen_test tools/mapgen_test.c src/mapgen.c src/level.c src/levels.c \
+			src/collision.c src/rng.c src/data.c src/mathutil.c build/gen/assets_gen.c \
+			-Wl,--unresolved-symbols=ignore-all && ./build/mapgen_test $n
+	"
+}
+
 case "${1:-build}" in
 	build)  cmd_build ;;
 	run)    shift; cmd_run "$@" ;;
@@ -356,5 +373,6 @@ case "${1:-build}" in
 	vram)   cmd_vram ;;
 	doctor) cmd_doctor ;;
 	bench)  shift; cmd_bench "$@" ;;
-	*)      sed -n '3,19p' "$0" | sed 's/^#//' ;;
+	mapgen-test) shift; cmd_mapgen_test "$@" ;;
+	*)      sed -n '3,20p' "$0" | sed 's/^#//' ;;
 esac
