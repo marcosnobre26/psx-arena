@@ -32,6 +32,7 @@
  * Se a validação falhar, tenta de novo com semente + 1 (até MAPGEN_TRIES);
  * se todas falharem, usa a floresta fixa da fase (LEVEL_DEF.build, plano B).
  */
+#include <stdlib.h>
 #include <string.h>
 #include "game.h"
 #ifndef HOST_TEST
@@ -334,6 +335,18 @@ static void build_thicket(const GEN_PARAMS *gp, uint32_t nseed) {
 		}
 }
 
+/* O GRANDE a até BIG_GUARD_CELLS de uma relíquia (Q) ou da saída (X) vira
+ * CAÇADOR (etapa 07b: no mapa f3 00021ef0 ele "guardava" uma relíquia
+ * obrigatória e ninguém vencia). Não sorteia nada: os outros mapas não mudam. */
+#ifndef BIG_GUARD_CELLS
+#define BIG_GUARD_CELLS 6
+#endif
+static int big_guards(int x, int z, const int *qx, const int *qz, int nq, int ex, int ez) {
+	for (int q = 0; q < nq; q++)
+		if (abs(x - qx[q]) <= BIG_GUARD_CELLS && abs(z - qz[q]) <= BIG_GUARD_CELLS) return 1;
+	return ex >= 0 && abs(x - ex) <= BIG_GUARD_CELLS && abs(z - ez) <= BIG_GUARD_CELLS;
+}
+
 /* Barreira de raízes (etapa 06): um ANEL de células entre os raios r+1 e
  * r+2 em volta de uma clareira sorteada, fechando um desvio opcional com um
  * prêmio. Um passo de 1 célula muda a distância ao centro em no máximo 1,
@@ -542,6 +555,8 @@ static void generate(const GEN_PARAMS *gp) {
 		int frac = dist2d(dx, dz) * 100 / far;        /* 0..~140 */
 		int r = rnd(0, 99);
 		char ch = (r < frac / 4) ? 'B' : (r < 20 + frac / 3) ? 'F' : 'E';
+		if (ch == 'B' && big_guards(x, z, qx, qz, nq, ex, ez))
+			ch = 'F';                                 /* não guarda relíquia/saída (07b) */
 		if (ch == 'B' && ++n_big > (W > 64 ? 2 : 1))
 			ch = 'F';                                 /* o GRANDE é raro: 1 por mapa (2 no grande) */
 		level_place_safe(ch, x, z);
