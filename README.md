@@ -516,6 +516,8 @@ tronco em pé bloqueiam; tronco caído e chão vazio não; pessoas não. A IA ai
   `level_load` a partir de `g.seed ^ ((fase+1) * 0x9E3779B1)`, com um RNG local (não toca em
   `g.rng`). Ruído de valor inteiro decide a densidade; trilhas por passeio aleatório; tetos de
   árvores por bloco 8×8 e por janela 3×3 blocos (o que a câmera vê) escolhidos pelo bench.
+  Mata alta no interior (~20% em média): manchas por ruído + paredes junto das trilhas
+  (corredores), suavizadas; o custo é o contorno (4 quads por lado exposto).
   Validação por BFS (tudo alcançável, nada em sólido); inválido → semente + 1 até
   `MAPGEN_TRIES`; senão, floresta fixa (plano B). O BFS usa a memória do cache de blocos
   (`level_scratch`, livre durante a carga): 0 byte novo. Carga no console: ~0,25 s (64×64) e

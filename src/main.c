@@ -1078,9 +1078,11 @@ static void bench_frame(int vs) {
 				bench_force_fixed = bench.seed == BENCH_SEED_FIXED;
 				start_level(bp->level, bench.seed);
 				const MAPGEN_STATS *ms = mapgen_stats();
-				printf("BENCH carga fase=%d nome=%s semente=%08x linhas=%d ms=%d tentativas=%d plano_b=%d janela=%d\n",
+				printf("BENCH carga fase=%d nome=%s semente=%08x linhas=%d ms=%d tentativas=%d plano_b=%d janela=%d "
+				       "gerar_ms=%d validar_ms=%d mata=%d\n",
 				       bp->level + 1, level_defs[bp->level].name, (unsigned)bench.seed, level_load_lines(),
-				       level_load_lines() * 635 / 10000, ms->tries, ms->fallback, ms->win_weight / 4);
+				       level_load_lines() * 635 / 10000, ms->tries, ms->fallback, ms->win_weight / 4,
+				       ms->gen_lines * 635 / 10000, ms->val_lines * 635 / 10000, ms->thicket_permil);
 			}
 			g.state = STATE_PLAY;                /* pula a introdução */
 			if (bp->pt == 5)

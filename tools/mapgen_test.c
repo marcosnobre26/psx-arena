@@ -112,6 +112,8 @@ int main(int argc, char **argv) {
 		if (!level_defs[lv].gen) continue;
 		int fallback = 0, problems = 0, nondet = 0, max_tries = 0, tries_hist[5] = { 0 };
 		int dmin = 1 << 30, dmax = 0, dsum = 0, cmax = 0, wmax = 0, wsum = 0;
+		int kmin = 1 << 30, kmax = 0, ksum = 0;      /* mata alta */
+		int smax = 0, ssum = 0;                      /* contorno por janela */
 		double tsum = 0, tmax = 0;
 		struct { int w; uint32_t s; } top[5], topt[5];
 		for (int i = 0; i < 5; i++) top[i].w = topt[i].w = -1;
@@ -131,6 +133,11 @@ int main(int argc, char **argv) {
 				if (st->dens_permil < dmin) dmin = st->dens_permil;
 				if (st->dens_permil > dmax) dmax = st->dens_permil;
 				dsum += st->dens_permil;
+				if (st->thicket_permil < kmin) kmin = st->thicket_permil;
+				if (st->thicket_permil > kmax) kmax = st->thicket_permil;
+				ksum += st->thicket_permil;
+				if (st->win_sides > smax) smax = st->win_sides;
+				ssum += st->win_sides;
 				if (st->max_chunk > cmax) cmax = st->max_chunk;
 				if (st->win_weight > wmax) wmax = st->win_weight;
 				wsum += st->win_weight;
@@ -161,6 +168,8 @@ int main(int argc, char **argv) {
 		       tries_hist[0], tries_hist[1], tries_hist[2], tries_hist[3] + tries_hist[4], max_tries, problems, nondet);
 		printf("        densidade (arvores/mil) min %d med %d max %d   maior bloco %d arvores   janela 3x3 (arvores eq.) max %d med %d\n",
 		       dmin, ok ? dsum / ok : 0, dmax, cmax, wmax / 4, ok ? wsum / ok / 4 : 0);
+		printf("        mata alta no interior (celulas/mil) min %d med %d max %d   contorno por janela max %d med %d\n",
+		       kmin, ok ? ksum / ok : 0, kmax, smax, ok ? ssum / ok : 0);
 		printf("        tempo no PC: med %.2f ms max %.2f ms (referencia; o do console vem do ./dev bench)\n", tsum / N, tmax);
 		printf("        5 piores janelas arvores+mata: ");
 		for (int i = 0; i < 5; i++) { printf("0x%08x(%d) ", top[i].s, top[i].w / 4); worst[lv][i] = top[i].s; }

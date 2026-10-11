@@ -18,11 +18,15 @@
  *      clareira do cerco) e clareiras sorteadas;
  *   3. trilhas: caminhada aleatória com tendência ao alvo, do início até
  *      cada ponto de interesse;
+ *   3b. mata alta no interior: manchas por ruído + "paredes" coladas na
+ *      faixa das trilhas (corredores), suavizadas (sem pontas nem células
+ *      soltas: o contorno da mata é o que custa desenhar);
  *   4. árvores pela densidade de um ruído de valor (3 oitavas), com TETO por
  *      bloco 8x8 e por janela de 3x3 blocos (o que a câmera vê): vários
  *      blocos cheios vizinhos formariam um canto pesado demais;
- *   5. troncos caídos; inimigos e itens pelo orçamento da fase (inimigos
- *      longe do início, os mais fortes mais longe ainda);
+ *   5. troncos caídos; inundação a partir do início (o que é alcançável);
+ *      inimigos e itens pelo orçamento da fase, só em células alcançáveis
+ *      (inimigos longe do início, os mais fortes mais longe ainda);
  *   6. validação: nada em sólido e tudo alcançável a partir do início
  *      (tronco caído passável: dá para pular).
  * Se a validação falhar, tenta de novo com semente + 1 (até MAPGEN_TRIES);
@@ -30,6 +34,12 @@
  */
 #include <string.h>
 #include "game.h"
+#ifndef HOST_TEST
+#include <hwregs_c.h>
+#define LINE_TIMER() TIMER_VALUE(1)        /* perfil (linhas de vídeo) */
+#else
+#define LINE_TIMER() 0
+#endif
 
 /* Marcas de trabalho por célula (16 KB): trilha, perto de trilha, clareira
  * e "visitado" da busca de alcance; e a fila da busca (32 KB). Não são
@@ -39,12 +49,17 @@
 #define GM_NEAR    2
 #define GM_CLEAR   4
 #define GM_VISIT   8
+#define GM_REACH  16          /* alcançável do início (fechar bolsões) */
+#define GM_THICK  32          /* mata (durante a geração da mata alta) */
+#define GM_NEXT   64          /* suavização: estado do próximo passo */
+#define GM_BLOCK 128          /* inundação: célula não andável (calculada 1 vez) */
 static uint8_t  (*gmark)[MAP_MAX_W];
 static uint16_t *bfs_queue;
 
 #define MAX_CB  (MAP_MAX_W / CHUNK_CELLS)      /* blocos por lado (16) */
 static int16_t chunk_trees[MAX_CB][MAX_CB];   /* árvores por bloco */
 static int16_t chunk_wt[MAX_CB][MAX_CB];      /* peso: árvore = 4, célula de mata = 1 */
+static int16_t chunk_sides[MAX_CB][MAX_CB];   /* lados expostos da mata interior */
 
 static MAPGEN_STATS stats;
 static DEBUG_POINT  gen_pts[4];               /* pontos de teleporte do mapa gerado */
@@ -72,25 +87,62 @@ static int inside(int x, int z, int margin) {
 	return x >= margin && z >= margin && x < W - margin && z < H - margin;
 }
 
-/* Ruído de valor em inteiros: rede de valores 0..255 a cada 'cell' células,
- * interpolada com curva suave (3t^2 - 2t^3, em inteiros). */
-static int smooth255(int t) {
-	return t * t * (765 - 2 * t) / 65025;
+/* Ruído de valor em inteiros: rede de valores 0..255 a cada 2^shift
+ * células, interpolada com curva suave (3t^2 - 2t^3). Tudo em potências de
+ * 2 (shifts no lugar de divisões): o MIPS do PS1 leva ~36 ciclos por
+ * divisão, e isto roda para cada célula do mapa. */
+static int smooth256(int t) {                  /* t: 0..256 */
+	return (t * t * (768 - 2 * t)) >> 16;
 }
 
-static int noise_octave(uint32_t seed, int x, int z, int cell) {
-	int gx = x / cell, gz = z / cell;
-	int fx = smooth255((x % cell) * 255 / cell), fz = smooth255((z % cell) * 255 / cell);
+static int noise_octave(uint32_t seed, int x, int z, int shift) {
+	int gx = x >> shift, gz = z >> shift, mask = (1 << shift) - 1;
+	int fx = smooth256((x & mask) << (8 - shift)), fz = smooth256((z & mask) << (8 - shift));
 	int a = mhash(seed, gx, gz) & 255,     b = mhash(seed, gx + 1, gz) & 255;
 	int c = mhash(seed, gx, gz + 1) & 255, d = mhash(seed, gx + 1, gz + 1) & 255;
-	int ab = a + (b - a) * fx / 255, cd = c + (d - c) * fx / 255;
-	return ab + (cd - ab) * fz / 255;
+	int ab = a + (((b - a) * fx) >> 8), cd = c + (((d - c) * fx) >> 8);
+	return ab + (((cd - ab) * fz) >> 8);
 }
 
 /* 0..255: 3 oitavas (16, 8 e 4 células), pesos 4:2:1 */
 static int density_noise(uint32_t seed, int x, int z) {
-	return (4 * noise_octave(seed, x, z, 16) + 2 * noise_octave(seed ^ 0x51u, x, z, 8) +
-	        noise_octave(seed ^ 0xa3u, x, z, 4)) / 7;
+	return (4 * noise_octave(seed, x, z, 4) + 2 * noise_octave(seed ^ 0x51u, x, z, 3) +
+	        noise_octave(seed ^ 0xa3u, x, z, 2)) / 7;
+}
+
+/* 0..255: manchas de mata (oitavas de 16 e 8 células, pesos 2:1) */
+static int blob_noise(uint32_t seed, int x, int z) {
+	return (2 * noise_octave(seed, x, z, 4) + noise_octave(seed ^ 0x3du, x, z, 3)) / 3;
+}
+
+/* Suavização (autômato celular): célula com 5+ vizinhos de mata vira mata,
+ * com 3 ou menos vira chão. Tira pontas e células soltas: o que custa na
+ * GPU/CPU é o CONTORNO da mata (cada lado exposto = 4 quads de 3 m); o
+ * miolo de uma mancha custa o mesmo que o chão (1 quad de topo).
+ * Trabalha só nos bits de gmark (rápido no console); level_set_cell uma vez
+ * no fim. Entrada: GM_THICK = mata (a borda já vem marcada). */
+static void smooth_thicket(int passes) {
+	const int E = FOREST_EDGE;
+	uint8_t (*m)[MAP_MAX_W] = gmark;
+	for (int p = 0; p < passes; p++) {
+		for (int z = E + 1; z < H - E - 1; z++) {
+			const uint8_t *up = m[z - 1], *mid = m[z], *dn = m[z + 1];
+			for (int x = E + 1; x < W - E - 1; x++) {
+				if (mid[x] & (GM_NEAR | GM_CLEAR)) continue;
+				int n = (up[x - 1] & GM_THICK) + (up[x] & GM_THICK) + (up[x + 1] & GM_THICK) +
+				        (mid[x - 1] & GM_THICK) + (mid[x + 1] & GM_THICK) +
+				        (dn[x - 1] & GM_THICK) + (dn[x] & GM_THICK) + (dn[x + 1] & GM_THICK);
+				n >>= 5;                          /* GM_THICK = 32 */
+				if (n >= 5) m[z][x] |= GM_NEXT;
+				else if (n > 3 && (mid[x] & GM_THICK)) m[z][x] |= GM_NEXT;
+			}
+		}
+		for (int z = E + 1; z < H - E - 1; z++)
+			for (int x = E + 1; x < W - E - 1; x++) {
+				if (m[z][x] & (GM_NEAR | GM_CLEAR)) continue;
+				m[z][x] = (m[z][x] & ~(GM_THICK | GM_NEXT)) | ((m[z][x] & GM_NEXT) ? GM_THICK : 0);
+			}
+	}
 }
 
 /* ------------------------------------------------------------------ */
@@ -167,6 +219,16 @@ static int window_tree_count(int bx, int bz) {
 	return t;
 }
 
+/* Lados expostos de mata interior numa janela de 3x3 blocos em (bx, bz) */
+static int window_sides(int bx, int bz) {
+	int t = 0;
+	for (int z = bz - 1; z <= bz + 1; z++)
+		for (int x = bx - 1; x <= bx + 1; x++)
+			if (x >= 0 && z >= 0 && x < MAX_CB && z < MAX_CB)
+				t += chunk_sides[z][x];
+	return t;
+}
+
 /* Cabe mais uma árvore no bloco (bx, bz) sem estourar o teto do bloco nem o
  * de nenhuma janela 3x3 que o contém? */
 static int tree_fits(const GEN_PARAMS *gp, int bx, int bz) {
@@ -198,6 +260,7 @@ static int random_cell(int x0, int z0, int x1, int z1, int sx, int sz, int dmin,
 	for (int k = 0; k < 64; k++) {
 		int x = rnd(x0, x1), z = rnd(z0, z1);
 		if (!inside(x, z, FOREST_EDGE + 1) || level_cell_solid(x, z)) continue;
+		if (!(gmark[z][x] & GM_REACH)) continue;    /* bolsão sem acesso */
 		int dx = x - sx, dz = z - sz;
 		if (dx * dx + dz * dz < dmin * dmin) continue;
 		*ox = x; *oz = z;
@@ -210,6 +273,65 @@ static int random_cell(int x0, int z0, int x1, int z1, int sx, int sz, int dmin,
 /* Uma tentativa                                                        */
 /* ------------------------------------------------------------------ */
 
+static int walkable(int x, int z);
+
+/* Inundação a partir de (sx, sz) pelas células andáveis; marca 'bit' em
+ * gmark. walkable() é calculado UMA vez por célula (bit GM_BLOCK), não a
+ * cada vizinho visitado: no console isso corta o tempo pela metade. */
+static void flood(int sx, int sz, int bit) {
+	for (int z = 0; z < H; z++)
+		for (int x = 0; x < W; x++) {
+			if (walkable(x, z)) gmark[z][x] &= ~GM_BLOCK;
+			else                gmark[z][x] |= GM_BLOCK;
+		}
+	if (gmark[sz][sx] & GM_BLOCK) return;
+	uint16_t *queue = bfs_queue;
+	int head = 0, tail = 0;
+	gmark[sz][sx] |= bit;
+	queue[tail++] = sz * MAP_MAX_W + sx;
+	while (head < tail) {
+		int c = queue[head++], x = c % MAP_MAX_W, z = c / MAP_MAX_W;
+		static const int d[4][2] = { { 1, 0 }, { -1, 0 }, { 0, 1 }, { 0, -1 } };
+		for (int k = 0; k < 4; k++) {
+			int nx = x + d[k][0], nz = z + d[k][1];
+			if ((unsigned)nx >= (unsigned)W || (unsigned)nz >= (unsigned)H) continue;
+			if (gmark[nz][nx] & (GM_BLOCK | bit)) continue;
+			gmark[nz][nx] |= bit;
+			queue[tail++] = nz * MAP_MAX_W + nx;
+		}
+	}
+}
+
+/* Mata alta do interior: máscara pelo ruído + paredes coladas nas trilhas,
+ * suavizada; mede os lados expostos por bloco (o que custa desenhar: cada
+ * lado = 4 quads de 3 m), para o teste do PC e a escolha das piores
+ * sementes do bench. */
+static void build_thicket(const GEN_PARAMS *gp, uint32_t nseed) {
+	const int E = FOREST_EDGE;
+	for (int z = 0; z < H; z++)
+		for (int x = 0; x < W; x++)
+			if (!inside(x, z, E)) gmark[z][x] |= GM_THICK;   /* borda já é mata */
+	for (int z = E + 1; z < H - E - 1; z++)
+		for (int x = E + 1; x < W - E - 1; x++) {
+			if (gmark[z][x] & (GM_NEAR | GM_CLEAR)) continue;
+			int edge = (gmark[z - 1][x] | gmark[z + 1][x] | gmark[z][x - 1] | gmark[z][x + 1] |
+			            gmark[z - 1][x - 1] | gmark[z - 1][x + 1] | gmark[z + 1][x - 1] |
+			            gmark[z + 1][x + 1]) & GM_NEAR;   /* vizinho da faixa da trilha? */
+			int n = blob_noise(nseed, x, z);
+			if (n >= gp->thicket || (edge && n >= gp->thicket - gp->walls))
+				gmark[z][x] |= GM_THICK;
+		}
+	smooth_thicket(2);
+	for (int z = E + 1; z < H - E - 1; z++)
+		for (int x = E + 1; x < W - E - 1; x++) {
+			if (!(gmark[z][x] & GM_THICK)) continue;
+			level_set_cell(x, z, CELL_THICKET);
+			chunk_sides[z / CHUNK_CELLS][x / CHUNK_CELLS] +=
+				!(gmark[z][x + 1] & GM_THICK) + !(gmark[z][x - 1] & GM_THICK) +
+				!(gmark[z + 1][x] & GM_THICK) + !(gmark[z - 1][x] & GM_THICK);
+		}
+}
+
 static void generate(const GEN_PARAMS *gp) {
 	const uint32_t seed = stats.seed;
 	const int E = FOREST_EDGE;
@@ -217,6 +339,7 @@ static void generate(const GEN_PARAMS *gp) {
 	memset(gmark, 0, MAP_MAX_W * MAP_MAX_H);
 	memset(chunk_trees, 0, sizeof(chunk_trees));
 	memset(chunk_wt, 0, sizeof(chunk_wt));
+	memset(chunk_sides, 0, sizeof(chunk_sides));
 
 	/* 1) chão em manchas de 4x4 + borda de mata alta */
 	for (int z = 0; z < H; z++)
@@ -281,11 +404,17 @@ static void generate(const GEN_PARAMS *gp) {
 	for (int q = 0; q < nq; q++) walk_trail(sx, sz, qx[q], qz[q]);
 	for (int k = 0; k < nc; k++) walk_trail(sx, sz, ccx[k], ccz[k]);
 
+	/* 3b) mata alta no interior: manchas pelo ruído e "paredes" coladas na
+	 * faixa das trilhas (limiar mais baixo ali), o que forma corredores.
+	 * Nunca na trilha, perto dela ou em clareira. */
+	if (gp->thicket < 256)
+		build_thicket(gp, seed ^ 0x7c1u);
+
 	/* 4) árvores: densidade do ruído (dens_min..dens_max por mil), nunca nas
 	 * trilhas/perto delas/clareiras, respeitando os tetos */
 	for (int z = E; z < H - E; z++)
 		for (int x = E; x < W - E; x++) {
-			if (gmark[z][x] & (GM_NEAR | GM_CLEAR)) continue;
+			if ((gmark[z][x] & (GM_NEAR | GM_CLEAR)) || level_cell_solid(x, z)) continue;
 			int dens = gp->dens_min + (gp->dens_max - gp->dens_min) * density_noise(seed, x, z) / 255;
 			int edge = x == E || z == E || x == W - E - 1 || z == H - E - 1;
 			int want = edge ? ((x + z) & 1) == 0 : (int)(mhash(seed, x, z) % 1000) < dens;
@@ -310,6 +439,26 @@ static void generate(const GEN_PARAMS *gp) {
 		chunk_wt[z / CHUNK_CELLS][x / CHUNK_CELLS] += 4;
 		placed++;
 	}
+
+	/* 5) o que é alcançável do início: inundação com a mesma regra da
+	 * validação (mata e tronco em pé bloqueiam, tronco caído passa), DEPOIS
+	 * das árvores e troncos, que também fecham passagens. Itens e inimigos
+	 * só são sorteados em células marcadas (random_cell). Os bolsões
+	 * fechados ficam como estão: enchê-los de mata criava tufos soltos entre
+	 * as árvores, com 3-4 lados expostos cada (caro de desenhar). */
+	flood(sx, sz, GM_REACH);
+
+	/* peso da mata interior nas janelas: 1 por LADO EXPOSTO (o que custa
+	 * desenhar). Só DEPOIS das árvores, para o teto de peso (GEN_WINDOW_CAP)
+	 * continuar valendo para árvores + borda como antes; entra nas medidas
+	 * (pior janela do bench) */
+	for (int z = E; z < H - E; z++)
+		for (int x = E; x < W - E; x++) {
+			if (!(gmark[z][x] & GM_THICK)) continue;
+			int sides = !(gmark[z][x + 1] & GM_THICK) + !(gmark[z][x - 1] & GM_THICK) +
+			            !(gmark[z + 1][x] & GM_THICK) + !(gmark[z - 1][x] & GM_THICK);
+			chunk_wt[z / CHUNK_CELLS][x / CHUNK_CELLS] += sides;   /* 1 por lado exposto */
+		}
 
 	/* 5b) início, saída, relíquias, pontos de reforço */
 	level_place_safe('P', sx, sz);
@@ -364,22 +513,9 @@ static int validate(void) {
 	char ch; int cx, cz;
 	if (level_place_failures(0, &ch, &cx, &cz) > 0)
 		return 0;                                     /* algo ficou sem lugar */
-	uint16_t *queue = bfs_queue;               /* marcas: bit VISIT da grade gmark */
 	int sx = g.spawn_x / TILE_SIZE, sz = g.spawn_z / TILE_SIZE;
 	if (!walkable(sx, sz)) return 0;
-	int head = 0, tail = 0;
-	gmark[sz][sx] |= GM_VISIT;
-	queue[tail++] = sz * MAP_MAX_W + sx;
-	while (head < tail) {
-		int c = queue[head++], x = c % MAP_MAX_W, z = c / MAP_MAX_W;
-		static const int d[4][2] = { { 1, 0 }, { -1, 0 }, { 0, 1 }, { 0, -1 } };
-		for (int k = 0; k < 4; k++) {
-			int nx = x + d[k][0], nz = z + d[k][1];
-			if (!walkable(nx, nz) || (gmark[nz][nx] & GM_VISIT)) continue;
-			gmark[nz][nx] |= GM_VISIT;
-			queue[tail++] = nz * MAP_MAX_W + nx;
-		}
-	}
+	flood(sx, sz, GM_VISIT);                    /* marcas: bit VISIT da grade gmark */
 	int n = level_placed(0, &ch, &cx, &cz);
 	for (int i = 0; i < n; i++) {
 		level_placed(i, &ch, &cx, &cz);
@@ -402,15 +538,20 @@ static void measure(void) {
 				best = w;
 				stats.win_bx = bx; stats.win_bz = bz;
 			}
+			if (window_sides(bx, bz) > stats.win_sides) stats.win_sides = window_sides(bx, bz);
 			int t = window_tree_count(bx, bz);
 			if (t > stats.win_trees) {
 				stats.win_trees = t;
 				stats.wt_bx = bx; stats.wt_bz = bz;
 			}
 		}
+	int thick = 0;
 	for (int z = FOREST_EDGE; z < H - FOREST_EDGE; z++)
-		for (int x = FOREST_EDGE; x < W - FOREST_EDGE; x++)
+		for (int x = FOREST_EDGE; x < W - FOREST_EDGE; x++) {
 			interior++;
+			thick += level_cell_type(x, z) == CELL_THICKET;
+		}
+	stats.thicket_permil = interior ? thick * 1000 / interior : 0;
 	stats.trees = trees;
 	stats.dens_permil = interior ? trees * 1000 / interior : 0;
 	stats.win_weight = best;
@@ -478,8 +619,13 @@ int mapgen_build(int index) {
 		stats.seed = base + t;
 		stats.tries = t + 1;
 		rng_seed(&gr, stats.seed);
+		uint16_t t0 = LINE_TIMER();
 		generate(gp);
-		if (validate()) {
+		uint16_t t1 = LINE_TIMER();
+		int ok = validate();
+		stats.gen_lines += (uint16_t)(t1 - t0);
+		stats.val_lines += (uint16_t)(LINE_TIMER() - t1);
+		if (ok) {
 			measure();
 			set_worst_point();
 			gen_active = 1;

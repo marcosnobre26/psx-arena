@@ -367,7 +367,9 @@ cmd_mapgen_test() {
 		gcc -O2 -w -DHOST_TEST $defs -include stdlib.h -I src -I models -I build/gen -I \$I \
 			-o build/mapgen_test tools/mapgen_test.c src/mapgen.c src/level.c src/levels.c \
 			src/collision.c src/rng.c src/data.c src/mathutil.c build/gen/assets_gen.c \
-			-Wl,--unresolved-symbols=ignore-all 2>&1 | grep -v 'relocation against\\|DT_TEXTREL' >&2
+			-Wl,--unresolved-symbols=ignore-all 2> build/mapgen_test.log ||
+			{ cat build/mapgen_test.log >&2; echo 'mapgen-test: a compilacao falhou' >&2; exit 1; }
+		grep -v 'relocation against\\|DT_TEXTREL' build/mapgen_test.log >&2
 		./build/mapgen_test $n $bench
 	" > "$out" || { cat "$out"; rm -f "$out"; return 1; }
 	grep -v '^BENCHSEEDS:' "$out"

@@ -170,12 +170,18 @@ typedef struct {
 	int enemies;                 /* orçamento de inimigos */
 	int enemy_min_dist;          /* distância mínima do início (células) */
 	int items[GEN_ITEM_TYPES];   /* vida, energia, pilha, arma, gema, caixa */
+	int thicket;                 /* mata alta: ruído >= isto (0..255; 256 = nenhuma) */
+	int walls;                   /* paredes ao lado das trilhas: limiar mais baixo
+	                                (thicket - walls) colado na faixa da trilha */
 } GEN_PARAMS;
 
 typedef struct {
 	uint32_t seed;               /* semente usada (base + tentativas - 1) */
 	int tries, fallback;         /* tentativas; 1 = usou o plano B */
 	int trees, dens_permil, max_chunk;
+	int thicket_permil;               /* mata alta no interior (por mil células) */
+	int gen_lines, val_lines;         /* perfil: linhas gerando / validando */
+	int win_sides;                    /* maior contorno de mata numa janela 3x3 */
 	int win_weight, win_bx, win_bz;   /* janela 3x3 mais pesada (peso: árvore = 4, mata = 1/célula) */
 	int win_trees, wt_bx, wt_bz;      /* janela 3x3 com MAIS ÁRVORES (o interior) */
 } MAPGEN_STATS;

@@ -169,6 +169,10 @@ uma branch. As regras do ROADMAP (determinismo, orçamentos de desempenho,
   --bench` (0 inválidos, determinístico) e depois `./dev bench`. Teto de
   desempenho: cada fase ≤ pior caso da 04e + 5% e nunca > 504 linhas; se
   passar, baixe o teto de árvores (`GEN_TREES_Fn`), não mexa na névoa.
+- Mata alta gerada: o custo é o **contorno** (cada lado exposto = 4 quads
+  de 3 m). Não encha bolsões com mata (vira tufos soltos caros); sorteie só
+  em células alcançáveis (`GM_REACH`). Ponto do bench perto de ~510 linhas
+  cai para 20 FPS e a lógica sobe 1,5× (3 passos por quadro): deixe folga.
 - Carga de fase: `start_level` desenha um quadro `CARREGANDO...` antes. Se a
   geração passar de ~1 s, divida-a entre quadros SEM rodar `game_tick` até
   o mapa ficar pronto (resultado idêntico ao de uma vez).

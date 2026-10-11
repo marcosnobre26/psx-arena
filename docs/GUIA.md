@@ -193,8 +193,17 @@ static const GEN_PARAMS f9_gen = {
 	6,               /* troncos caídos */
 	8, 10,           /* inimigos; distância mínima do início (células) */
 	{ 1, 1, 2, 0, 1, 2 },   /* vida, energia, pilha, arma, gema, caixa */
+	150,             /* mata alta: limiar do ruído 0..255 (menor = mais mata; 256 = nenhuma) */
+	40,              /* paredes: junto das trilhas o limiar é 40 mais baixo (corredores) */
 };
 ```
+
+**Mata alta (terror).** Manchas de mata de 3 m pelo ruído e paredes coladas
+nas trilhas, que viram corredores. Uma suavização tira pontas e células
+soltas. O que custa desenhar é o **contorno**: cada lado exposto são 4 quads
+de 3 m, e o miolo custa o mesmo que o chão. Por isso o gerador **não** enche
+bolsões fechados com mata (isso criava tufos soltos entre as árvores);
+itens e inimigos só são sorteados em células alcançáveis do início.
 
 **Mapa sempre jogável.** Depois de gerar, uma busca em largura (BFS) a partir
 do `P` confere que saída, relíquias, itens e inimigos são alcançáveis (tronco
@@ -212,7 +221,8 @@ até `MAPGEN_TRIES` (16) vezes; se todas falharem, usa a floresta fixa
 ./dev mapgen-test 50 -D MAPGEN_TRIES=0   # força o plano B em tudo
 ```
 
-**Ajustar densidade/tamanho:** mude o `GEN_PARAMS` da fase. Os tetos por
+**Ajustar densidade/tamanho:** mude o `GEN_PARAMS` da fase (mata alta:
+`GEN_THICKET_F1..F4` e `GEN_WALLS` em `levels.c`). Os tetos por
 janela (`GEN_TREES_F1..F4`) foram escolhidos pelo bench: o pior mapa de cada
 fase não pode passar do pior caso da 04e. Para testar outro valor **sem
 editar**, rode os dois com o mesmo `-D` (as piores sementes dependem do teto):

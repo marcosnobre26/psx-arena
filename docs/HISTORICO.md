@@ -466,3 +466,51 @@ automatizar testes visuais.
   de `g.frame` na seleção, diferente em cada console. No modo link os dois
   consoles precisam combinar a mesma semente na conexão (um envia, o outro
   usa); o gerador já é determinístico dado `g.seed`.
+- 2026-10-11 — Etapa 05, mata alta (pedido do Marcos: "a floresta ficou rala
+  para um terror"). Critério novo, que **substitui** o limite por fase da 04e +
+  5%: 0 inválidos em 1000 sementes, tudo alcançável e o bench das piores
+  sementes ≤ 504 linhas a 30 FPS. Os tetos de árvores não mudaram
+  (16/20/12/10 por janela, 5 por bloco). Gerador: manchas de mata
+  (`blob_noise`, oitavas de 16 e 8 células) + paredes coladas na faixa das
+  trilhas (limiar 40 mais baixo: corredores), 2 passes de suavização
+  (autômato celular, só bits de `gmark`), `GEN_THICKET_F1..F4` = 150 e
+  `GEN_WALLS` = 40. Ruído com shifts em vez de divisões (o MIPS do PS1 leva
+  ~36 ciclos por divisão) e inundação com `walkable()` calculado uma vez por
+  célula: a carga da fase 2 ficou em 0,9 s mesmo com mais trabalho.
+
+  **Achados do bench:** (1) encher os bolsões fechados com mata criava
+  tufos soltos entre as árvores (3–4 lados expostos cada, até 16 quads por
+  célula): a fase 2 caía para 20 FPS até com 4% de mata. Agora os bolsões
+  ficam como estão e itens/inimigos só nascem em células alcançáveis
+  (`GM_REACH`). (2) Teto de "contorno por janela 3x3" testado e descartado:
+  as laterais aparecem até a névoa, bem além da janela; não convergia e
+  deixava a carga lenta. (3) O canto denso da fase 5 está no limite (504):
+  um contador no laço de desenho bastou para cair a 20 FPS, e a lógica sobe
+  1,5× (3 passos por quadro). `./dev mapgen-test` agora para se a
+  compilação falhar (antes rodava o binário velho em silêncio).
+
+  **Densidade (1000 sementes por fase), antes → depois:**
+
+  | Fase | Árvores ‰ mín/méd/máx | Mata alta no interior ‰ mín/méd/máx | Tentativas máx |
+  |---|---|---|---|
+  | f1 CACADA | 15/20/24 → 11/18/23 | 0/0/0 → 6/200/592 | 2 → 3 |
+  | f2 TRAVESSIA | 24/26/29 → 18/23/27 | 0/0/0 → 88/224/509 | 2 → 2 |
+  | f3 RELIQUIAS | 12/14/17 → 10/13/17 | 0/0/0 → 5/167/458 | 3 → 3 |
+  | f4 CERCO | 12/12/14 → 11/12/14 | 0/0/0 → 0/213/578 | 2 → 3 |
+
+  (árvores caem um pouco porque a mata ocupa células; os tetos são os mesmos)
+
+  **Bench, piores sementes (CPU em linhas, todos os inimigos juntos):**
+
+  | Ponto | Antes | Depois | FPS depois |
+  |---|---|---|---|
+  | f1 (pior de 10 sementes) | 450 | 470 | 30 |
+  | f2 | 465 | 494 | 30 |
+  | f3 | 369 | 400 | 30 |
+  | f4 | 415 | 452 | 30 |
+  | f4 2 jogadores | 415 | 423 | 30 |
+  | fase 5 canto denso (fixa) | 504 | 504 | 30 |
+
+  **Carga no console:** 64×64 232–259 → 276–335 ms; 128×128 749–766 →
+  883–929 ms (< 1 s; quadro `CARREGANDO...`). **RAM:** 820 066 → 823 122
+  bytes (+3 056).
