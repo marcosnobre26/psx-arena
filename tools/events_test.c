@@ -40,6 +40,8 @@ const VECTOR *render_camera_pos(void) { return &campos; }
 void prof_begin(int s) {}
 void prof_end(int s) {}
 void show_message(const char *t, int f) {}
+void noise_emit(int x, int z, int cells) {}
+void effect_spawn(int t, int x, int z, int r, int d, int cr, int cg, int cb) {}
 void sound_play_at(const SOUND *s, int x, int z, int v) {}
 int isin(int a) { return (int)lround(sin(a * 2 * M_PI / 4096.0) * 4096); }
 int icos(int a) { return (int)lround(cos(a * 2 * M_PI / 4096.0) * 4096); }
@@ -198,8 +200,25 @@ static void load(int lv, uint32_t seed) {
 	g.ev.keys = 1;                               /* para a barreira abrir */
 }
 
+/* Machado (etapa 07): corta todas as árvores caídas registradas e a
+ * barreira de raízes, golpe a golpe, como o jogador faria */
+#define ACT_CHOP 99
+static int chop_all(void) {
+	int did = 0;
+	for (int k = 0; k < 4; k++)
+		while (g.ev.fallen[k].active)
+			did |= events_chop(g.ev.fallen[k].cells[0] & 0xff, g.ev.fallen[k].cells[0] >> 8);
+	for (int z = 0; z < level_height() && !g.ev.barrier_open; z++)
+		for (int x = 0; x < level_width() && !g.ev.barrier_open; x++)
+			if (level_cell_type(x, z) == CELL_BARRIER)
+				for (int t = 0; t < 10 && !g.ev.barrier_open; t++)
+					did |= events_chop(x, z);
+	return did;
+}
+
 /* Uma ação, como o atalho de depuração; roda os passos até acabar */
 static int run_action(int a) {
+	if (a == ACT_CHOP) return chop_all();
 	int last = g.ev.last;
 	g.ev.last = -1;
 	if (a == EV_WAVE)                            /* a onda repõe: "mata" 2 antes */
@@ -222,7 +241,7 @@ static int run_action(int a) {
 
 static const int seq[] = { EV_TREE_FALL, EV_CLOSE_BEHIND, EV_WAVE, EV_TREE_FALL, EV_OPEN_PATH,
                            EV_CLOSE_BEHIND, EV_FOG, EV_TREE_FALL, EV_SILENCE, EV_CLOSE_BEHIND,
-                           EV_TREE_FALL, EV_WAVE };
+                           EV_TREE_FALL, EV_WAVE, ACT_CHOP };
 #define NSEQ ((int)(sizeof(seq) / sizeof(seq[0])))
 
 static int run_seed(int lv, uint32_t seed, int *done, int *tried, int *fails, uint32_t *hash) {
@@ -230,12 +249,13 @@ static int run_seed(int lv, uint32_t seed, int *done, int *tried, int *fails, ui
 	trng = seed * 2654435761u + 1;
 	for (int i = 0; i < NSEQ; i++) {
 		place_player();
-		tried[seq[i]]++;
-		done[seq[i]] += run_action(seq[i]);
+		int a = seq[i] == ACT_CHOP ? NUM_EV_ACTIONS : seq[i];
+		tried[a]++;
+		done[a] += run_action(seq[i]);
 		if (!check_all()) {
 			if (*fails < 5)
 				printf("    FALHA fase %d semente %08x depois de %s: %s inalcancavel/preso\n",
-				       lv + 1, seed, event_name(seq[i]), fail_what);
+				       lv + 1, seed, seq[i] == ACT_CHOP ? "MACHADO" : event_name(seq[i]), fail_what);
 			(*fails)++;
 			break;
 		}
@@ -249,14 +269,14 @@ int main(int argc, char **argv) {
 	printf("Eventos: %d sementes por fase, %d acoes por partida (todas as acoes)\n", N, NSEQ);
 	for (int lv = 0; lv < num_levels; lv++) {
 		if (!level_defs[lv].gen) continue;
-		int done[NUM_EV_ACTIONS] = { 0 }, tried[NUM_EV_ACTIONS] = { 0 }, fails = 0, nondet = 0;
+		int done[NUM_EV_ACTIONS + 1] = { 0 }, tried[NUM_EV_ACTIONS + 1] = { 0 }, fails = 0, nondet = 0;
 		int ok0, cut0, win0, lim0, ok1, cut1, win1, lim1;
 		reach_stats(&ok0, &cut0, &win0, &lim0);
 		for (int k = 0; k < N; k++) {
 			uint32_t seed = 0x2000u + (uint32_t)k * 7919u, h1, h2;
 			run_seed(lv, seed, done, tried, &fails, &h1);
 			if (k < 50) {                            /* determinismo */
-				int d2[NUM_EV_ACTIONS] = { 0 }, t2[NUM_EV_ACTIONS] = { 0 }, f2 = 0;
+				int d2[NUM_EV_ACTIONS + 1] = { 0 }, t2[NUM_EV_ACTIONS + 1] = { 0 }, f2 = 0;
 				run_seed(lv, seed, d2, t2, &f2, &h2);
 				if (h1 != h2) nondet++;
 			}
@@ -267,6 +287,7 @@ int main(int argc, char **argv) {
 		printf("        aconteceram:");
 		for (int a = 0; a < NUM_EV_ACTIONS; a++)
 			printf("  %s %d/%d", event_name(a), done[a], tried[a]);
+		printf("  MACHADO %d/%d", done[NUM_EV_ACTIONS], tried[NUM_EV_ACTIONS]);
 		printf("\n        checagens locais: ok %d  corta %d  janela %d  teto de visitas %d\n",
 		       ok1 - ok0, cut1 - cut0, win1 - win0, lim1 - lim0);
 		total_fail += fails;

@@ -413,6 +413,13 @@ typedef struct {
 		int      last;            /* última ação aplicada (EV_*), para o overlay */
 		int      barrier_open;    /* a barreira de raízes já foi aberta */
 		int      enemy_cap;       /* onda: inimigos vivos no máximo (os do começo) */
+		int      barrier_hp;      /* golpes de machado que a barreira aguenta (etapa 07) */
+		/* árvores caídas que o machado pode cortar (as 4 últimas) */
+		struct {
+			int      active, x, z, hp, n;
+			uint16_t cells[REACH_MAX_BLOCK];
+		} fallen[4];
+		int      fallen_next;
 		/* busca de lugar em andamento (árvore cai / mata fecha): no máximo 1
 		 * checagem de alcance por passo, para não pesar num quadro só */
 		struct { int action, arg, k, j, tries, placed, dir0, start, checking, cand; } job;
@@ -616,6 +623,7 @@ void events_update(void);             /* um passo de lógica (STATE_PLAY) */
 void events_debug(int action);        /* atalho de depuração: na hora, sem regras */
 void events_enemy_killed(void);
 void events_draw(void);               /* árvore caindo (só desenho: lê g) */
+int  events_chop(int cx, int cz);     /* golpe de machado na célula: 1 = acertou algo */
 void events_prof(int *job, int *impact);   /* só no bench */
 int  events_prof_check(void);
 int  ev_fall_footprint(int x, int z, int dir, int scale, uint16_t *cells, uint8_t *crown);

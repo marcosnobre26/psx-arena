@@ -54,6 +54,7 @@ void events_start(void) {
 	g.ev.last = -1;
 	g.ev.job.action = -1;
 	g.ev.enemy_cap = g.enemies_left;           /* a onda repõe até aqui */
+	g.ev.barrier_hp = CHOP_BARRIER_HP;
 }
 
 void events_enemy_killed(void) {
@@ -327,6 +328,17 @@ static void fall_impact(void) {
 	g.ev.shake = EV_SHAKE_TIME;
 	sound_play_at(&sfx_queda, g.ev.fall.x, g.ev.fall.z, VOL_QUEDA);
 	show_message("UMA ARVORE CAIU", 90);
+	noise_emit(g.ev.fall.x, g.ev.fall.z, FALL_NOISE);   /* atrai quem está perto */
+
+	/* o machado pode cortar (etapa 07): guarda as células (as 4 últimas) */
+	int k = g.ev.fallen_next;
+	g.ev.fallen_next = (k + 1) & 3;
+	g.ev.fallen[k].active = 1;
+	g.ev.fallen[k].x = g.ev.fall.x;
+	g.ev.fallen[k].z = g.ev.fall.z;
+	g.ev.fallen[k].hp = CHOP_FALLEN_HP;
+	g.ev.fallen[k].n = n;
+	memcpy(g.ev.fallen[k].cells, cells, sizeof(g.ev.fallen[k].cells));
 }
 
 /* ---------- a mata se fecha atrás ---------- */
@@ -436,10 +448,11 @@ static int act_wave(int arg) {
 
 /* ---------- caminho se abre (chave na barreira de raízes) ---------- */
 
-static int act_open_path(void) {
+/* use_key: 1 = a chave abre (gasta uma); 0 = o machado cortou (etapa 07) */
+static int open_barrier(int use_key) {
 	int bcx, bcz, br;
 	if (g.ev.barrier_open || !mapgen_barrier(&bcx, &bcz, &br)) return 0;
-	if (g.ev.keys <= 0 && !g.ev.job.arg) return 0;
+	if (use_key && g.ev.keys <= 0 && !g.ev.job.arg) return 0;
 	for (int z = bcz - br - 2; z <= bcz + br + 2; z++)
 		for (int x = bcx - br - 2; x <= bcx + br + 2; x++) {
 			int d = (x - bcx) * (x - bcx) + (z - bcz) * (z - bcz);
@@ -450,11 +463,59 @@ static int act_open_path(void) {
 			}
 			if (reach_walkable(x, z)) reach_set(x, z, 1);   /* a região de trás */
 		}
-	if (g.ev.keys > 0) g.ev.keys--;
+	if (use_key && g.ev.keys > 0) g.ev.keys--;
 	g.ev.barrier_open = 1;
 	sound_play_at(&sfx_raizes, bcx * TILE_SIZE, bcz * TILE_SIZE, VOL_RAIZES);
-	show_message("AS RAIZES SE ABREM", 120);
+	show_message(use_key ? "AS RAIZES SE ABREM" : "AS RAIZES CEDEM", 120);
 	return 1;
+}
+
+static int act_open_path(void) {
+	return open_barrier(1);
+}
+
+/* ---------- machado (etapa 07) ---------- */
+
+/* Golpe de machado na célula (cx, cz): copa/tronco de uma árvore caída ou
+ * a barreira de raízes. Cada um aguenta alguns golpes; cada golpe faz
+ * barulho médio. Cortar só LIBERA células (não precisa da checagem de
+ * alcance). Devolve 1 se acertou algo. */
+int events_chop(int cx, int cz) {
+	for (int k = 0; k < 4; k++) {
+		if (!g.ev.fallen[k].active || in_cells(cx, cz, g.ev.fallen[k].cells, g.ev.fallen[k].n) < 0)
+			continue;
+		noise_emit(cx * TILE_SIZE + TILE_SIZE / 2, cz * TILE_SIZE + TILE_SIZE / 2, CHOP_NOISE);
+		effect_spawn(FX_BURST, cx * TILE_SIZE + TILE_SIZE / 2, cz * TILE_SIZE + TILE_SIZE / 2, 160, 10, 150, 110, 60);
+		if (--g.ev.fallen[k].hp > 0) return 1;
+		/* cedeu: tira o pinheiro deitado e libera as células */
+		g.ev.fallen[k].active = 0;
+		for (int i = 0; i < g.ev.fallen[k].n; i++) {
+			int x = g.ev.fallen[k].cells[i] & 0xff, z = g.ev.fallen[k].cells[i] >> 8;
+			level_set_flags(x, z, 0);
+			if (reach_walkable(x, z)) reach_set(x, z, 1);
+		}
+		int bx = g.ev.fallen[k].x / (CHUNK_CELLS * TILE_SIZE), bz = g.ev.fallen[k].z / (CHUNK_CELLS * TILE_SIZE);
+		int start, n = level_chunk_trees(bx, bz, &start);
+		for (int i = start; i < start + n; i++) {
+			int x, z, type, scale, ang;
+			level_tree_info(i, &x, &z, &type, &scale, &ang);
+			if (type == TREE_FALLEN && x == g.ev.fallen[k].x && z == g.ev.fallen[k].z) {
+				level_remove_tree(i);
+				break;
+			}
+		}
+		sound_play_at(&sfx_queda, cx * TILE_SIZE, cz * TILE_SIZE, VOL_QUEDA / 2);
+		show_message("O TRONCO CEDEU", 90);
+		return 1;
+	}
+	if (level_cell_type(cx, cz) == CELL_BARRIER && !g.ev.barrier_open) {
+		noise_emit(cx * TILE_SIZE + TILE_SIZE / 2, cz * TILE_SIZE + TILE_SIZE / 2, CHOP_NOISE);
+		effect_spawn(FX_BURST, cx * TILE_SIZE + TILE_SIZE / 2, cz * TILE_SIZE + TILE_SIZE / 2, 160, 10, 120, 90, 50);
+		if (--g.ev.barrier_hp <= 0)
+			open_barrier(0);
+		return 1;
+	}
+	return 0;
 }
 
 /* Jogador com chave encostado na barreira (gatilho EVT_KEY) */

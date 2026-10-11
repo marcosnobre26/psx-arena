@@ -300,6 +300,11 @@ void weapon_update(PLAYER *p, const INPUT *in) {
 		const WEAPON_DEF *sw = &weapon_defs[p->weapon];
 		if (p->swing >= sw->hit_from && p->swing <= sw->hit_to)
 			melee_hits(p, sw);
+		if (sw->chops && p->swing == sw->hit_from)   /* machado: corta o que está à frente */
+			for (int d = 128; d <= sw->reach; d += 64)
+				if (events_chop((p->pos.vx + ((isin(p->angle) * d) >> 12)) / TILE_SIZE,
+				                (p->pos.vz + ((icos(p->angle) * d) >> 12)) / TILE_SIZE))
+					break;
 		if (++p->swing > sw->cooldown)
 			p->swing = 0;
 	}

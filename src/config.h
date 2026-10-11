@@ -157,6 +157,9 @@
 #define MAX_NOISES          4   /* barulhos guardados por passo (os mais fortes) */
 #define STEP_NOISE          3   /* passo andando (células); R2 segurado = 0 */
 #define CHOP_NOISE          8   /* golpe de machado em copa/raízes: barulho médio */
+#define CHOP_FALLEN_HP      3   /* golpes para a árvore caída ceder */
+#define CHOP_BARRIER_HP     4   /* golpes para a barreira de raízes ceder */
+#define FALL_NOISE          14  /* árvore caindo: barulho alto */
 #define FLASH_STUN          90  /* clarão: passos atordoado ... */
 #define FLASH_FLEE          180 /* ... e fugindo */
 
