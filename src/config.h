@@ -71,7 +71,9 @@
 #define MAX_TREES       1024    /* árvores e troncos no mapa (8 bytes cada) */
 #define PLACE_SEARCH    6       /* level_place_safe: procura célula livre até aqui */
 #define FOREST_EDGE     4       /* borda de mata alta das florestas (células) */
+#ifndef MAPGEN_TRIES
 #define MAPGEN_TRIES    16      /* mapa gerado inválido: tenta semente + 1 até aqui */
+#endif
 #ifndef TREE_LOD_DIST                   /* (./dev bench -D TREE_LOD_DIST=... testa outros) */
 #define TREE_LOD_DIST   1300    /* profundidade em que a árvore vira imagem plana
                                    (1800 -> 1300 na 04d: canto denso a 30 FPS) */

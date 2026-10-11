@@ -146,8 +146,21 @@ static void progress_save(void) {
 	}
 }
 
+static void draw_center(int y, const char *text);
+
+/* Um quadro "CARREGANDO..." antes de montar a fase. A geração leva até
+ * ~0,8 s no console (fase 2, 128x128); sem isto a tela ficaria parada no
+ * último quadro. É só desenho: não muda g, então não afeta o determinismo.
+ * A GPU mostra este quadro enquanto a CPU gera o mapa. */
+static void draw_loading(void) {
+	render_rect(0, 0, SCREEN_W, SCREEN_H, 0, 0, 0, 0);
+	draw_center(112, "CARREGANDO...");
+	render_end_frame();
+}
+
 /* Começa a fase pela tela de introdução, com o progresso guardado */
 static void start_level(int level, uint32_t seed) {
+	draw_loading();
 	game_reset(level, seed);
 	g.score = progress.score;
 	for (int i = 0; i < MAX_PLAYERS; i++) {
@@ -273,6 +286,16 @@ static void draw_hud(void) {
 		int pc, pg, pv;
 		render_stats_time(&pc, &pg, &pv);
 		hud_print(12, 136, "CPU %d GPU %d FOLGA %d (linhas)", pc, pg, pv);
+		/* mapa: semente usada pelo gerador (SEED + fase + tentativa), quantas
+		 * tentativas e o tempo de carga; PLANO B = floresta fixa da 04e */
+		const MAPGEN_STATS *ms = mapgen_stats();
+		int load_ms = level_load_lines() * 635 / 10000;   /* 1 linha = 63,5 us */
+		if (ms->fallback)
+			hud_print(12, 126, "MAPA PLANO B (FIXO)  CARGA %dMS", load_ms);
+		else if (mapgen_active())
+			hud_print(12, 126, "MAPA %08X T%d  CARGA %dMS", (unsigned)ms->seed, ms->tries, load_ms);
+		else
+			hud_print(12, 126, "MAPA FIXO  CARGA %dMS", load_ms);
 		hud_print(12, 186, "SEED %08X  POLIS %d", (unsigned)g.seed, render_stats_polys());
 		if (level_cut_count() && ((g.frame >> 3) & 1))   /* pisca: buffer no limite */
 			hud_print(12, 196, "FPS %d RAM GPU %d CORTE %d!", fps, render_stats_bytes(), level_cut_count());
