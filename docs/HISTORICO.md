@@ -726,3 +726,21 @@ automatizar testes visuais.
   final do Marcos, jogando de verdade**; o robô só aponta os extremos.
   Mesmas sementes da economia: o mapa f3 `00021ef0` (dos mais apertados na
   economia) foi o único em que ninguém venceu com hab. 80.
+- 2026-10-11 — Etapa 07b, **ajustes aprovados pelo Marcos** (um commit
+  cada): dano do GRANDE 30 → 22; item W na ordem arco, **pistola**, machado,
+  espingarda (as balas ficavam sem arma); golpe corpo a corpo também quebra
+  caixa (`crate_damage` devolve 1 se havia caixa; o robô passou a usar);
+  vida do Batedor 70 → 80 (condicional: ainda morria em 35–40% na f1/f3
+  depois dos outros três). `./dev replay-test` IGUAL nos quatro (o build
+  do bench não dá dano ao jogador, o roteiro não pega W nem bate em caixa e
+  joga com o Robô): nada a regravar. Vitórias em 240 partidas: hab. 50
+  177 → 207 (mortes 55 → 22; GRANDE 35 → 14), hab. 80 202 → 222 (mortes
+  32 → 12; GRANDE 23 → 8). O GRANDE continua o que mais mata. Batedor hab.
+  50 ainda morre 9/20 na f3 (acima de 30%; sem novo ajuste, decisão no
+  teste final). Mapa f3 `00021ef0`: o GRANDE nasce a 2 células de uma
+  relíquia OBRIGATÓRIA (a fase pede as 4); não é beco (8 vizinhas livres);
+  só 1 item de vida. Em 1000 mapas da f3, 10% têm o grande a ≤ 4 células
+  de uma relíquia (16% a ≤ 6). Correção PROPOSTA (não aplicada): no
+  `mapgen.c` 5c, um 'B' a ≤ 6 células de 'Q' ou 'X' vira 'F' (sem sorteio
+  a mais: os outros mapas não mudam); exige `./dev mapgen-test 1000
+  --bench` e `./dev bench`.

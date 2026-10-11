@@ -57,8 +57,9 @@ Depois de qualquer mudança: `./dev run` (compila e abre no emulador) ou
 entra apertando **Start**; com dois jogadores, a partida começa quando os
 dois confirmam.
 
-**Objetivo:** o da fase. Gemas dão pontos e mana; caixas podem soltar vida
-ou mana; `W` dá a próxima arma (arco, machado, pistola, espingarda), `V`
+**Objetivo:** o da fase. Gemas dão pontos e mana; caixas (quebram com
+golpe ou projétil) podem soltar vida ou mana; `W` dá a próxima arma (arco,
+pistola, machado, espingarda), `V`
 flechas e `M` balas. A mana volta sozinha bem devagar só até 25%. Com
 2 jogadores, quem cai volta em 5 s ao lado do parceiro; se os dois caírem,
 é game over. Na tela final, **Start** joga de novo e **Select** volta à
@@ -573,7 +574,7 @@ compare: vitórias/mortes por fase e personagem, quem mata, quanto sobra de
 munição e mana. O ajuste fino é sempre no teste jogando de verdade.
 
 Limites do robô: não anda agachado (R2), não usa o clarão a não ser contra
-o grande, só abre caixa com arco (ou bola de fogo com mana quase cheia), não
+o grande, abre caixa com o golpe (ou arco/bola de fogo de longe), não
 pula por cima de inimigos.
 
 ## 4. Modelar no Blender
