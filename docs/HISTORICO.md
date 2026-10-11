@@ -514,3 +514,65 @@ automatizar testes visuais.
   **Carga no console:** 64×64 232–259 → 276–335 ms; 128×128 749–766 →
   883–929 ms (< 1 s; quadro `CARREGANDO...`). **RAM:** 820 066 → 823 122
   bytes (+3 056).
+- 2026-10-11 — Etapa 06 (eventos: a floresta muda). `src/events.c`: tabela
+  `EVENT_DEF` por fase (gatilho → ação: aleatório a cada 45–90 s, tempo,
+  área, N-ésimo item, N mortes, chave), fila com prioridade, estado todo em
+  `g.ev`; nada nos primeiros 30 s e no máximo 1 evento que muda o mapa a
+  cada 30 s (a chave abre na hora). Ações: **névoa avança** (volta em ~40 s;
+  `spawn_ok` passa a ler `g.ev.fog_far`), **árvore cai** (pinheiro à frente
+  do grupo; estalo, tombo, tremor; tronco pulável, copa sólida, só BITS das
+  células — nenhum bloco remontado; copa no próprio modelo deitado
+  `TREE_FALLEN`), **mata fecha atrás** (pinheiros novos fora da visão, nos
+  tetos da 05), **onda** (repõe inimigos até os do começo da fase),
+  **silêncio** (vento e grilos param 12 s), **caminho se abre** (o gerador
+  põe um anel de raízes `CELL_BARRIER` em volta de uma clareira com prêmio
+  — 94/99/65/0% dos mapas das fases 1–4 — e uma chave `K`; abrir remonta o
+  bloco em fatias). Sons sintetizados (`tools/make_event_sounds.py`).
+  Atalhos: overlay L2 aberto + L2 + □/○/×/L1/R1/R2; L2 + → vai para a
+  frente da barreira.
+
+  **Alcance:** `src/reach.c` — 1 bit por célula (da inundação do gerador,
+  também nas florestas fixas) e checagem LOCAL antes de bloquear células
+  (janela 33×33, mesma regra de andável da 05: tronco caído passa, árvore
+  nova bloqueia). Retomável (40 visitas por passo, teto 600, determinístico).
+
+  **Teste no PC** (`./dev events-test 1000`; 12 ações por partida, jogador
+  e câmera sorteados, BFS completo depois de cada uma): **0 objetivos
+  inalcançáveis, ninguém preso (jogador/inimigo/item), determinístico**.
+  Checagens locais por fase (ok / corta / **janela** / teto de visitas):
+  f1 13 011 / 432 / **25** / 51; f2 9 253 / 250 / **6** / 85; f3 16 348 /
+  412 / **12** / 65; f4 16 754 / 341 / **25** / 54 — cancelados pela
+  janela: 68 de ~57 600 (0,12%); pelo teto: 255 (0,44%). Aconteceram
+  (pedidos forçados): árvore cai 57–82%, mata fecha 52–96% (fase 2 menos:
+  janelas perto do teto de árvores), caminho abre 92/99/68/0%.
+
+  **Passo 0 (medida):** remontar um bloco inteiro custa 62–70 linhas nas
+  florestas fixas e 100–187 nas geradas (contorno da mata alta); no quadro
+  da remontagem os piores pontos iam a 530–604 (20 FPS). Em fatias, com
+  orçamento adaptativo (folga do quadro anterior até 500, máx. 12 linhas):
+  +17 linhas no pior caso. Achado: andar pela floresta já remonta 1 bloco
+  por quadro (streaming) com o mesmo custo — candidato a usar as fatias na
+  etapa 10.
+
+  **Bench do evento** (cada ponto: controle de 180 quadros sem evento, e
+  depois cada evento; pior quadro, CPU em linhas):
+
+  | Evento | Pior quadro (pontos válidos) | Pior acréscimo sobre o controle | FPS |
+  |---|---|---|---|
+  | árvore cai | 512 | +39 | 30 |
+  | mata fecha | 513 | +23 | 30 |
+  | caminho abre | 505 | +24 | 30 |
+  | onda | 499 | +15 | 30 |
+
+  Quadros normais (multidão, 3 s): média ≤ 497, máximo 504. **Achado:**
+  3 pontos (canto denso da fase 5, f2_arv3, f2_fixo_arv) já passam de 515
+  e caem a 20 FPS **sem evento nenhum** depois de ~3 s de multidão parada
+  (o bench antigo media só 3 s); fica para a folga de CPU da etapa 10.
+  Caminho até aqui: a busca fazia até 40 pegadas e uma checagem inteira
+  por passo (lógica a 234–425 linhas); o tremor movia a câmera (+100
+  polígonos) e depois a saída de vídeo (perdia um quadro) — ficou o offset
+  de desenho (`DRAWENV.ofs`), custo zero.
+
+  **RAM:** 823 122 → 875 218 bytes (**+52 096**: código ~19 KB, 3 sons
+  ~17 KB — também ~17 KB de SPU —, buffer da remontagem em fatias 7,7 KB,
+  alcance + janela ~7,6 KB). Total ~855 KB de 1,2 MB.

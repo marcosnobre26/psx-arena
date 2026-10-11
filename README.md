@@ -201,6 +201,7 @@ troque para `Debug` em [`CMakePresets.json`](CMakePresets.json) (`-Og`).
 | `image` | recria a imagem Docker |
 | `doctor` | verifica Docker, SDK, emulador e Blender |
 | `clean` | apaga `build/` |
+| `events-test [N] [-D N=V]` | simula os eventos da etapa 06 no PC com N sementes por fase (objetivo alcançável, ninguém preso, determinismo, cancelamentos) |
 | `mapgen-test [N] [--bench] [-D N=V]` | testa o gerador de florestas no PC com N sementes por fase (inválidos, tentativas, densidade, tempo, determinismo); `--bench` grava as piores sementes em `src/bench_seeds.h` |
 | `bench [-D N=V ...]` | benchmark automático: compila com `DEBUG_BENCHMARK` em `build-bench/` (variantes com `-D` em `build-bench-var/`), roda no DuckStation Linux, mostra a tabela (detalhes no GUIA) |
 
@@ -523,6 +524,21 @@ tronco em pé bloqueiam; tronco caído e chão vazio não; pessoas não. A IA ai
   (`level_scratch`, livre durante a carga): 0 byte novo. Carga no console: ~0,25 s (64×64) e
   ~0,77 s (128×128), com um quadro `CARREGANDO...` na tela.
 
+### Eventos (`events.c`, `reach.c`; etapa 06)
+
+- Tabela `EVENT_DEF` por fase (gatilho → ação → fila com prioridade). Estado todo em `g.ev`.
+  Ações: névoa avança, árvore cai, mata fecha atrás, onda, silêncio, caminho se abre (chave `K`
+  + anel de raízes `CELL_BARRIER` em volta de uma clareira com prêmio, posto pelo gerador).
+- **Alcance**: `reach.c` guarda 1 bit por célula ("alcançável do início", da inundação do
+  gerador) e faz a checagem LOCAL antes de bloquear células: numa janela de 33×33, as vizinhas
+  livres da mudança continuam ligadas? É retomável (no máximo 40 visitas por passo, teto 600) e
+  conservadora (rota que sairia da janela = o evento não acontece).
+- **Mapa em tempo de jogo**: árvore que cai é o pinheiro deitado (`TREE_FALLEN`), colisão por
+  bits das células (`level_set_flags`: tronco baixo, copa sólida) — não remonta bloco. Árvores
+  entram/saem do vetor por bloco sem reordenar tudo. A barreira aberta remonta o bloco em
+  fatias (`level_rebuild_chunk`, orçamento adaptativo pela folga do quadro anterior).
+- Tremor: offset de desenho da GPU (`DRAWENV.ofs`), não a câmera.
+
 ### Entidades e dados
 
 - Estado global único `GAME g` (em `main.c`), zerado a cada partida; a seleção de personagens fica
@@ -540,10 +556,10 @@ tronco em pé bloqueiam; tronco caído e chão vazio não; pessoas não. A IA ai
 
 | Seção | Tamanho | Conteúdo principal |
 |---|---|---|
-| `.text` | ~114 KB | código do jogo + bibliotecas do SDK usadas |
-| `.data` | ~101 KB | modelos, texturas e sons embutidos, tabelas |
-| `.bss` | ~586 KB | 2 × 96 KB de primitivas, 2 × OT, cache de 36 blocos (~277 KB; também é a memória do BFS do gerador), grade 128×128 (16 KB), árvores, pools |
-| **Total** | **~801 KB** (820 066 bytes) de 2 MB | orçamento do roteiro: 1,2 MB |
+| `.text` | ~135 KB | código do jogo + bibliotecas do SDK usadas |
+| `.data` | ~118 KB | modelos, texturas e sons embutidos, tabelas |
+| `.bss` | ~602 KB | 2 × 96 KB de primitivas, 2 × OT, cache de 36 blocos (~277 KB; também é a memória do BFS do gerador) + 1 de reserva (remontagem em fatias), grade 128×128 (16 KB), alcance (2 KB) e janela da checagem (~5 KB), árvores, pools |
+| **Total** | **~855 KB** (875 218 bytes) de 2 MB | orçamento do roteiro: 1,2 MB |
 
 Medido com `mipsel-linux-gnu-size build/arena.elf` (dentro do `./dev shell`).
 

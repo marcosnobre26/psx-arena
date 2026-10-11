@@ -29,6 +29,7 @@ modificação: `docs/GUIA.md`.
 ./dev bench          # benchmark automático (FPS/POLIS/COL/CPU nos pontos da fase 5)
 ./dev bench -D TREE_LOD_DIST=1300   # variante sem mexer no config.h
 ./dev mapgen-test 1000 [--bench] [-D N=V]   # gerador no PC (N sementes/fase); --bench grava src/bench_seeds.h
+./dev events-test 1000                       # eventos simulados no PC (alcance, ninguém preso, determinismo)
 ./dev clean          # apaga build/
 VERBOSE=1 ./dev build
 ```
@@ -54,6 +55,8 @@ VERBOSE=1 ./dev build
 | `config.h` | constantes globais |
 | `game.h` | tipos, `GAME g` (estado global), protótipos |
 | `levels.c` | **tabela de fases** `level_defs`: florestas fixas (`build_forest`; plano B e fase 5), `GEN_PARAMS` de cada fase gerada, céu, objetivo |
+| `events.c` | **eventos** (etapa 06): tabela `EVENT_DEF` por fase, fila, ações (névoa, árvore cai, mata fecha, onda, silêncio, caminho abre), buscas em passos |
+| `reach.c` | alcance durante a partida: 1 bit/célula + checagem local retomável (janela 33×33) |
 | `mapgen.c` | **gerador procedural** (etapa 05): floresta por `g.seed`, validação por BFS, novas tentativas (semente + 1), plano B, medidas para o teste do PC e o bench |
 | `level.c` | grade 128×128 (tipo + bit sólido), blocos 8×8 montados sob demanda num cache de 36, colisão com a grade |
 | `objective.c` | objetivo da fase (`objective_update/text`), saída `X`, reforços `S` |
@@ -173,6 +176,16 @@ uma branch. As regras do ROADMAP (determinismo, orçamentos de desempenho,
   de 3 m). Não encha bolsões com mata (vira tufos soltos caros); sorteie só
   em células alcançáveis (`GM_REACH`). Ponto do bench perto de ~510 linhas
   cai para 20 FPS e a lógica sobe 1,5× (3 passos por quadro): deixe folga.
+- **Eventos (etapa 06):** são lógica (só `g.in`, passos, `g.rng`); visual só
+  lê `g.ev`. Toda célula que um evento bloqueia passa antes por
+  `reach_begin/reach_step` (janela 33×33; fora dela = não acontece). Nada em
+  cima de entidade/saída/início/S. Prefira mudar BITS (`level_set_flags`,
+  não remonta) a mudar TIPO (`level_rebuild_chunk`, em fatias). Trabalho
+  pesado da lógica vai em passos com orçamento por CONTAGEM (nunca tempo).
+  Árvores em jogo: `level_add_tree` + `level_trees_changed` /
+  `level_remove_tree` (o vetor fica ordenado por bloco). Tremor = offset de
+  desenho (`render_set_shake`), nunca mexer na câmera nem na saída de vídeo.
+  Bench: cada ponto mede um controle (180 quadros sem evento) e cada evento.
 - Carga de fase: `start_level` desenha um quadro `CARREGANDO...` antes. Se a
   geração passar de ~1 s, divida-a entre quadros SEM rodar `game_tick` até
   o mapa ficar pronto (resultado idêntico ao de uma vez).

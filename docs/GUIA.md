@@ -47,7 +47,8 @@ Depois de qualquer mudança: `./dev run` (compila e abre no emulador) ou
 | **Start** | pausar |
 | **L2** (soltar) | depuração: névoa, memória do SPU, semente, polígonos, FPS, memória de primitivas, posição |
 | **L2 + Start** | (com o overlay aberto) pula para a próxima fase |
-| **L2 + direcional** | (com o overlay aberto) teleporta para os 4 pontos fixos da fase de teste |
+| **L2 + direcional** | (com o overlay aberto) teleporta para os 4 pontos da fase (← início, → frente da barreira de raízes, se houver, ↑ canto mais denso, ↓ saída) |
+| **L2 + Quadrado / Círculo / X / L1 / R1 / R2** | (com o overlay aberto) dispara na hora: névoa avança / árvore cai / caminho abre (mesmo sem chave) / mata fecha atrás / onda / silêncio |
 | **L2 + Select** | (com o overlay aberto) mostra a grade de colisão: quadrado em cada célula sólida perto do jogador 1 |
 | **L2 + Triângulo** | (com o overlay aberto) nascem 8 inimigos em volta do jogador 1, até 24 (para medir); `COL` no overlay = testes de colisão no último passo |
 
@@ -124,9 +125,10 @@ nasce ao lado do `P`, dentro do `MAX_PLAYER_SEPARATION`.
 | `X` | **saída** da fase | `Q` | **item de missão** |
 | `S` | **ponto de reforço** (SURVIVE; em célula livre, nunca na mata) | `L` | **pilha** da lanterna |
 | `E` `B` `F` | inimigos (`enemy_defs`) | `1`…`9` | objetos de cenário (`prop_defs`) |
+| `K` | **chave** (abre a barreira de raízes; etapa 06) | | |
 
 Ao criar inimigo ou cenário novo, **não use letras reservadas**: `P C G H N
-W X Q S L` e `A` (reservada para o ATIRADOR).
+W X Q S L K` e `A` (reservada para o ATIRADOR).
 
 **2. Acrescente a linha na tabela** (antes da fase de teste) e aumente
 `num_levels`:
@@ -237,6 +239,53 @@ git checkout src/bench_seeds.h    # se desistir do valor
 0x12345678u` (todas as partidas usam essa semente; o overlay L2 mostra
 `SEED`). Para reproduzir um mapa visto no jogo, use o `SEED` do overlay.
 Comente de novo antes do commit.
+
+### Como criar um evento (etapa 06)
+
+A floresta muda durante a partida ([`src/events.c`](../src/events.c)).
+Cada fase tem uma tabela `EVENT_DEF` em `levels.c`: **gatilho → ação**.
+
+```c
+static const EVENT_DEF f9_events[] = {
+	/* gatilho      ação             prio  p1  p2  arg */
+	{ EVT_RANDOM,  0,                1,    45, 90, EV_ALL },   /* a cada 45-90 s, uma ação da máscara */
+	{ EVT_PICKUP,  EV_CLOSE_BEHIND,  3,     2,  0, 0 },        /* pegou a 2a relíquia: a mata fecha */
+	{ EVT_AREA,    EV_FOG,           3, AREA_EXIT, 24, 50 },   /* a 24 células da saída: névoa a 50% */
+	{ EVT_KILLS,   EV_SILENCE,       2,     6,  0, 0 },        /* derrotou 6: silêncio */
+	{ EVT_TIME,    EV_WAVE,          2,    90,  0, 3 },        /* aos 90 s: onda de 3 */
+	{ EVT_KEY,     EV_OPEN_PATH,     9,     0,  0, 0 },        /* chave na barreira de raízes */
+};
+/* ... e na linha da fase em level_defs: ..., &f9_gen, EVENTS(f9_events) }, */
+```
+
+| Ação | O que faz | `arg` |
+|---|---|---|
+| `EV_FOG` | a névoa desce até `arg`% em 5 s e volta em ~40 s | % (0 = 55) |
+| `EV_TREE_FALL` | um pinheiro à frente do grupo estala (~1 s) e cai atravessado: tronco pulável, copa sólida; a tela treme | — |
+| `EV_CLOSE_BEHIND` | pinheiros novos nascem atrás do grupo, fora da visão (respeita os tetos da 05) | árvores (0 = 5) |
+| `EV_WAVE` | inimigos fora da visão, até o número do começo da fase | inimigos (0 = 4) |
+| `EV_SILENCE` | o vento e os grilos param por 12 s | — |
+| `EV_OPEN_PATH` | a chave abre o anel de raízes em volta do prêmio | — |
+
+**Regras (valem para qualquer evento novo):**
+
+- É **lógica**: depende só de `g.in`, do tempo em passos e de `g.rng`.
+  Visual (tremor, árvore tombando, névoa desenhada, som) só **lê** `g.ev`.
+- Ritmo: nada nos primeiros 30 s; no máximo 1 evento que muda o mapa a cada
+  30 s (`EV_GRACE`, `EV_MAP_COOLDOWN`). A chave abre na hora.
+- Antes de bloquear células: **checagem de alcance local**
+  (`reach_begin`/`reach_step`, janela de 33×33): todas as vizinhas livres
+  da mudança continuam ligadas entre si. Se não, o evento tenta outro lugar
+  ou não acontece. Nada cai em cima de jogador, inimigo, item, caixa, saída,
+  início ou ponto S.
+- Mudar só **bits** de colisão (`level_set_flags`) não remonta o bloco;
+  mudar o **tipo** da célula remonta em fatias (`level_rebuild_chunk`).
+- Busca de lugar anda em passos (orçamento por contagem, não por tempo):
+  nenhum quadro passa de ~515 linhas.
+
+**Testar:** `./dev events-test 1000` (simula todas as ações em 1000
+sementes por fase: 0 objetivos inalcançáveis, ninguém preso, determinismo)
+e `./dev bench` (mede o quadro de cada evento contra um controle sem evento).
 
 ### Como o mundo é montado
 
