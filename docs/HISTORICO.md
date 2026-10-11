@@ -672,3 +672,27 @@ automatizar testes visuais.
   | cura | 40 mana, +35 vida | mana | começa 50, volta só até 25 |
   | rastejador | vida 8, vel. 4, dano 14, visão 4 | caçador | vida 3, vel. 11, dano 9, visão 7 |
   | grande | vida 25, vel. 6, dano 30, visão 5 | soltos | vida 12%, mana 8%, pilha 6%, flechas 6% |
+- 2026-10-11 — Etapa 07b (balanceamento com dados). **Registro de partida**
+  (`DEBUG_PLAYLOG`, `src/playlog.c`): contadores FORA de `g` (ganchos
+  `PL(...)`), `PLAYLOG RESUMO` a cada 30 s e `FIM_FASE`; `./dev replay-test
+  -D DEBUG_PLAYLOG=1` IGUAL. `./dev run` passa a usar o build com registro
+  (`build-debug/`) numa cópia portátil do DuckStation Linux com os controles
+  do Marcos (o `settings.ini` dele só é lido) e grava o TTY em
+  `logs/partida-AAAAMMDD-HHMM.txt`; `./dev run --sem-registro` abre o build
+  normal no emulador do `dev.conf` (agora o DuckStation Linux; caminho sem
+  `win_path`). `./dev analisar-partida`, `./dev doctor` confere emulador e
+  controles. **Economia no PC** (`./dev economia`, 1000 sementes, 1 jogador;
+  corpo a corpo 40% do tempo-alvo com 50% de acerto; distância 70%):
+
+  | Fase | dano/vida (Robô) min/méd/máx | só distância | cura cuidadoso | cura médio |
+  |---|---|---|---|---|
+  | f1 | 4,2 / 6,6 / 13,2 | 0,6 / 0,8 / 1,5 | 51 / 72 / 117 | −133 / −91 / −1 |
+  | f2 | 4,1 / 6,9 / 11,1 | 0,5 / 0,7 / 1,1 | 3 / 31 / 75 | −225 / −168 / −81 |
+  | f3 | 5,2 / 7,1 / 13,3 | 0,3 / 0,8 / 1,8 | 52 / 69 / 98 | −76 / −43 / 16 |
+  | f4 | 0,6 / 0,7 / 0,8 | 0,1 / 0,2 / 0,2 | −2 / 14 / 29 | −192 / −160 / −130 |
+
+  Leitura: corpo a corpo sobra; munição e mana sozinhas ~1x a vida dos
+  inimigos (escassez como pedida); cura falta no cenário "médio" (cada
+  inimigo acerta 2 vezes). Ajustes só depois de o Marcos jogar com o
+  registro (passo 3). **Pendente:** economia com 2 jogadores (munição
+  dividida, mesmos inimigos) fica para depois.

@@ -533,6 +533,22 @@ dá IGUAL; uma mudança de lógica (`-D REACH_MAX_VISIT=60`) dá DIFERENTE.
 Se der DIFERENTE sem você ter mudado a lógica de propósito, há um bug de
 determinismo (algo visual, de tempo ou de VSync entrando na lógica).
 
+### Jogar com o registro de partida (balanceamento)
+
+```bash
+./dev run                 # build com registro + DuckStation Linux (seus controles)
+# jogue; FECHE o emulador ao terminar
+./dev analisar-partida    # resumo do registro mais novo (logs/partida-AAAAMMDD-HHMM.txt)
+./dev run --sem-registro  # o build normal, no emulador do dev.conf
+./dev economia 1000       # sem jogar: munição/mana/cura x inimigos de 1000 mapas por fase
+```
+
+O registro sai a cada 30 s de jogo e no fim de cada fase (vitória, morte
+ou pulo de fase): vida mínima e final, quem te matou, curas, mana por
+magia, munição achada/usada/sobrando, flechas recolhidas, golpes por arma,
+inimigos mortos por tipo e arma, fugas do grande, itens não pegos e pilha.
+Ele não muda a lógica (os contadores ficam fora de `g`).
+
 ## 4. Modelar no Blender
 
 Regras do PS1 que o exportador espera:

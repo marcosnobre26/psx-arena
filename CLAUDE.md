@@ -15,15 +15,21 @@ modificação: `docs/GUIA.md`.
 - Compilação dentro do **Docker** (imagem `psx-arena-sdk`, ver `Dockerfile`):
   Ubuntu 24.04, GCC `mipsel-linux-gnu` 12.4, CMake 3.28, Python 3 + Pillow,
   PSn00bSDK compilado de um commit fixo.
-- Emulador no Windows (PCSX-Redux sem BIOS; DuckStation com BIOS),
-  configurado em `dev.conf` (pessoal, fora do git).
+- Emulador: **DuckStation Linux** em `~/emuladores/duckstation/AppRun`
+  (`dev.conf`, pessoal, fora do git). A pasta de dados dele
+  (`~/.local/share/duckstation`) só é LIDA (controles, BIOS); bench e
+  `./dev run` usam uma cópia portátil em `build-bench/duckstation`.
 - Blender 5.2 no Windows (`/mnt/c/Program Files/Blender Foundation/...`).
 
 ## Comandos
 
 ```bash
 ./dev build          # compila (Docker). Erros aparecem com caminho real do arquivo
-./dev run            # compila e abre no emulador do Windows
+./dev run            # build COM registro de partida (build-debug/), cópia portátil do
+                     # DuckStation Linux com os controles do Marcos; TTY em logs/partida-*.txt
+./dev run --sem-registro   # build normal no emulador do dev.conf
+./dev analisar-partida     # resumo do último logs/partida-*.txt
+./dev economia 1000        # munição/mana/cura x inimigos por fase, no PC
 ./dev models         # exporta assets/blender/*.blend -> models/*.h (Blender do Windows)
 ./dev vram           # mapa das texturas na VRAM
 ./dev bench          # benchmark automático (FPS/POLIS/COL/CPU nos pontos da fase 5)
@@ -195,6 +201,10 @@ uma branch. As regras do ROADMAP (determinismo, orçamentos de desempenho,
   `level_remove_tree` (o vetor fica ordenado por bloco). Tremor = offset de
   desenho (`render_set_shake`), nunca mexer na câmera nem na saída de vídeo.
   Bench: cada ponto mede um controle (180 quadros sem evento) e cada evento.
+- **Registro de partida (etapa 07b):** ganchos `PL(...)` nos pontos de
+  lógica, contadores em `playlog.c` FORA de `g` (some sem `DEBUG_PLAYLOG`).
+  Mexeu em dano/munição/golpes? Mantenha os ganchos e rode
+  `./dev replay-test -D DEBUG_PLAYLOG=1` (tem que dar IGUAL).
 - **Combate (etapa 07):** `weapon_defs` na ordem do enum `W_*`; o tipo
   (`WK_*`) decide o comportamento. Barulho = `noise_emit(x, z, células)`
   (lista dos 4 mais fortes do passo em `g`; zerada no fim de
