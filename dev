@@ -380,6 +380,29 @@ cmd_mapgen_test() {
 	rm -f "$out"
 }
 
+cmd_events_test() {
+	local n="300" defs=""
+	while [[ $# -gt 0 ]]; do
+		case "$1" in
+			-D) defs="$defs -D$2"; shift 2 ;;
+			-D*) defs="$defs $1"; shift ;;
+			*) n="$1"; shift ;;
+		esac
+	done
+	[[ -f build/gen/assets_gen.c ]] || cmd_build >/dev/null || return 1
+	# liga SEM ignorar símbolos: um stub esquecido vira erro, não segfault
+	sdk sh -c "
+		I=$SDK_DIR/include/libpsn00b
+		gcc -O2 -w -DHOST_TEST $defs -include stdlib.h -I src -I models -I build/gen -I \$I \
+			-o build/events_test tools/events_test.c src/events.c src/reach.c src/mapgen.c \
+			src/level.c src/levels.c src/collision.c src/rng.c src/data.c src/mathutil.c \
+			build/gen/assets_gen.c -lm -ffunction-sections -fdata-sections -Wl,--gc-sections \\
+			2> build/events_test.log ||
+			{ grep -v 'relocation against\\|DT_TEXTREL' build/events_test.log >&2; echo 'events-test: a compilacao falhou' >&2; exit 1; }
+		./build/events_test $n
+	"
+}
+
 case "${1:-build}" in
 	build)  cmd_build ;;
 	run)    shift; cmd_run "$@" ;;
@@ -392,5 +415,6 @@ case "${1:-build}" in
 	doctor) cmd_doctor ;;
 	bench)  shift; cmd_bench "$@" ;;
 	mapgen-test) shift; cmd_mapgen_test "$@" ;;
+	events-test) shift; cmd_events_test "$@" ;;
 	*)      sed -n '3,20p' "$0" | sed 's/^#//' ;;
 esac
