@@ -14,7 +14,7 @@
  *   Letras de inimigos e dígitos de cenário: data.c (enemy_defs, prop_defs)
  *
  * Letras reservadas (não use em enemy_defs/prop_defs): P C G H N W X Q S L
- * e A (ATIRADOR, registrado no histórico, ainda não está no código).
+ * (o antigo ATIRADOR 'A' saiu na etapa 07).
  *
  * Objetivos (ver objective.c): OBJ_KILL_ALL, OBJ_REACH_EXIT (precisa de X),
  * OBJ_COLLECT (parâmetro = quantos Q; 0 = todos), OBJ_SURVIVE (parâmetro =

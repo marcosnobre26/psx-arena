@@ -84,6 +84,11 @@ typedef struct {
 	int           score;
 	const MESH   *mesh;
 	CVECTOR       palette[3];/* cores por material do modelo */
+	/* percepção (etapa 07) */
+	int           sight;     /* visão em células, no escuro (lanterna ligada: x2, até a névoa) */
+	int           hearing;   /* % do raio de um barulho que ele ouve */
+	uint8_t       flee_light;/* 1 = foge da lanterna apontada para ele */
+	uint8_t       heavy;     /* 1 = passos pesados que se ouvem (só som) */
 } ENEMY_DEF;
 
 typedef struct {
@@ -210,6 +215,12 @@ typedef struct {
 /* Objetivo de uma fase (ver objective.c) */
 enum { OBJ_KILL_ALL, OBJ_REACH_EXIT, OBJ_COLLECT, OBJ_SURVIVE };
 
+/* Estados de um inimigo (enemies.c; etapa 07) */
+enum { EN_WANDER,        /* vaga à toa */
+       EN_INVESTIGATE,   /* ouviu algo: vai até o barulho */
+       EN_CHASE,         /* viu o jogador: persegue */
+       EN_SEARCH };      /* perdeu o rastro: vai onde viu por último e desiste */
+
 /* Eventos durante a partida (events.c; etapa 06) */
 enum { EV_FOG, EV_TREE_FALL, EV_OPEN_PATH, EV_CLOSE_BEHIND, EV_WAVE, EV_SILENCE,
        NUM_EV_ACTIONS };
@@ -294,6 +305,9 @@ typedef struct {
 	int     vy;             /* velocidade vertical (pulo por cima de tronco caído) */
 	int     stun;           /* passos atordoado (clarão): não anda */
 	int     flee;           /* passos fugindo (clarão / luz) */
+	int     state;          /* EN_* (percepção, etapa 07) */
+	int     tx, tz;         /* para onde vai: barulho ouvido / onde viu o jogador */
+	int     timer;          /* passos no estado (perseguir sem ver / investigar) */
 } ENEMY;
 
 typedef struct {

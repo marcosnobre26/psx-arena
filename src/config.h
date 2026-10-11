@@ -192,6 +192,7 @@
 #define VOL_MORTE       0x3fff
 #define VOL_ITEM        0x3000
 #define VOL_ROSNADO     0x3800
+#define VOL_PASSO_GRANDE 0x3fff /* passos pesados do grande (etapa 07) */
 #define VOL_ESTALO      0x3400  /* eventos (etapa 06) */
 #define VOL_QUEDA       0x3fff
 #define VOL_RAIZES      0x3000

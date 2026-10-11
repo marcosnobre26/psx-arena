@@ -100,46 +100,57 @@ SHADE = (80, 80, 80)
 EYE = (255, 255, 255)
 
 
+def sides(s, x0, y0, z0, x1, y1, z1, rgb, mat):
+    """Só as 4 laterais (pernas/braços: topo e base ficam escondidos)."""
+    c = ((x0 + x1) / 2, (y0 + y1) / 2, (z0 + z1) / 2)
+    for f in ([(x0, y0, z0), (x1, y0, z0), (x1, y0, z1), (x0, y0, z1)],
+              [(x1, y1, z0), (x0, y1, z0), (x0, y1, z1), (x1, y1, z1)],
+              [(x0, y1, z0), (x0, y0, z0), (x0, y0, z1), (x0, y1, z1)],
+              [(x1, y0, z0), (x1, y1, z0), (x1, y1, z1), (x1, y0, z1)]):
+        s.poly(f, rgb, mat, center=c)
+
+
 def eyes(s, y, z, dx, size):
+    """Um quad de frente (-Y) por olho, sem luz: brilham no escuro."""
     for x in (-dx, dx):
-        s.box(x - size, y - 0.01, z - size, x + size, y + 0.01, z + size, EYE, 2, unlit=True)
+        s.poly([(x - size, y, z - size), (x + size, y, z - size), (x + size, y, z + size), (x - size, y, z + size)],
+               EYE, 2, outward=(0, -1, 0), unlit=True)
 
 
 def make_rastejador():
-    """Baixo e comprido, quatro patas: lento e resistente."""
+    """Baixo e comprido, patas em 2 pares: lento e resistente. ~20 faces."""
     s = Shape(["Corpo", "Sombra", "Olhos"])
-    s.box(-0.30, -0.70, 0.20, 0.30, 0.60, 0.55, BODY, 0)                             # tronco
-    s.box(-0.22, -1.05, 0.25, 0.22, -0.70, 0.55, SHADE, 1)                           # cabeça
-    for x in (-0.28, 0.28):
-        for y in (-0.55, 0.40):
-            s.box(x - 0.07, y - 0.07, 0.0, x + 0.07, y + 0.07, 0.22, SHADE, 1)       # patas
-    eyes(s, -1.06, 0.45, 0.12, 0.04)
+    s.box(-0.30, -0.70, 0.20, 0.30, 0.60, 0.55, BODY, 0)                             # tronco (5)
+    s.box(-0.22, -1.05, 0.25, 0.22, -0.70, 0.55, SHADE, 1)                           # cabeça (5)
+    sides(s, -0.36, -0.62, 0.0, 0.36, -0.48, 0.22, SHADE, 1)                         # patas da frente (4)
+    sides(s, -0.36, 0.33, 0.0, 0.36, 0.47, 0.22, SHADE, 1)                           # patas de trás (4)
+    eyes(s, -1.06, 0.45, 0.12, 0.04)                                                 # (2)
     return s
 
 
 def make_cacador():
-    """Alto e magro, curvado para a frente: rápido."""
+    """Alto e magro, curvado para a frente: rápido. ~28 faces."""
     s = Shape(["Corpo", "Sombra", "Olhos"])
     for x in (-0.12, 0.12):
-        s.box(x - 0.05, -0.05, 0.0, x + 0.05, 0.05, 0.85, SHADE, 1)                  # pernas
-    s.box(-0.20, -0.25, 0.85, 0.20, 0.10, 1.55, BODY, 0)                             # tronco
-    s.box(-0.14, -0.50, 1.40, 0.14, -0.20, 1.70, BODY, 0)                            # cabeça baixa
+        sides(s, x - 0.05, -0.05, 0.0, x + 0.05, 0.05, 0.85, SHADE, 1)               # pernas (8)
+    s.box(-0.20, -0.25, 0.85, 0.20, 0.10, 1.55, BODY, 0)                             # tronco (5)
+    s.box(-0.14, -0.50, 1.40, 0.14, -0.20, 1.70, BODY, 0)                            # cabeça baixa (5)
     for x in (-0.26, 0.26):
-        s.box(x - 0.04, -0.45, 0.80, x + 0.04, -0.05, 1.45, SHADE, 1)                # braços longos
-    eyes(s, -0.51, 1.58, 0.07, 0.03)
+        sides(s, x - 0.04, -0.45, 0.80, x + 0.04, -0.05, 1.45, SHADE, 1)             # braços longos (8)
+    eyes(s, -0.51, 1.58, 0.07, 0.03)                                                 # (2)
     return s
 
 
 def make_grande():
-    """Largo e pesado: raro, ouve-se antes de ver."""
+    """Largo e pesado: raro, ouve-se antes de ver. ~28 faces."""
     s = Shape(["Corpo", "Sombra", "Olhos"])
     for x in (-0.35, 0.35):
-        s.box(x - 0.16, -0.16, 0.0, x + 0.16, 0.16, 0.90, SHADE, 1)                  # pernas
-    s.box(-0.60, -0.40, 0.90, 0.60, 0.40, 2.10, BODY, 0)                             # tronco
-    s.box(-0.28, -0.55, 2.00, 0.28, -0.05, 2.45, BODY, 0)                            # cabeça
+        sides(s, x - 0.16, -0.16, 0.0, x + 0.16, 0.16, 0.90, SHADE, 1)               # pernas (8)
+    s.box(-0.60, -0.40, 0.90, 0.60, 0.40, 2.10, BODY, 0)                             # tronco (5)
+    s.box(-0.28, -0.55, 2.00, 0.28, -0.05, 2.45, BODY, 0)                            # cabeça (5)
     for x in (-0.75, 0.75):
-        s.box(x - 0.15, -0.30, 0.70, x + 0.15, 0.10, 2.00, SHADE, 1)                 # braços
-    eyes(s, -0.56, 2.28, 0.13, 0.05)
+        sides(s, x - 0.15, -0.30, 0.70, x + 0.15, 0.10, 2.00, SHADE, 1)              # braços (8)
+    eyes(s, -0.56, 2.28, 0.13, 0.05)                                                 # (2)
     return s
 
 

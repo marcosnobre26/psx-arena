@@ -533,7 +533,7 @@ static void generate(const GEN_PARAMS *gp) {
 	}
 
 	/* 5c) inimigos: longe do início; os mais fortes mais longe ainda */
-	int far = W > H ? W : H;
+	int far = W > H ? W : H, n_big = 0;
 	for (int k = 0; k < gp->enemies; k++) {
 		int x, z;
 		if (!random_cell(E, E, W - E - 1, H - E - 1, sx, sz, gp->enemy_min_dist, &x, &z))
@@ -542,6 +542,8 @@ static void generate(const GEN_PARAMS *gp) {
 		int frac = dist2d(dx, dz) * 100 / far;        /* 0..~140 */
 		int r = rnd(0, 99);
 		char ch = (r < frac / 4) ? 'B' : (r < 20 + frac / 3) ? 'F' : 'E';
+		if (ch == 'B' && ++n_big > (W > 64 ? 2 : 1))
+			ch = 'F';                                 /* o GRANDE é raro: 1 por mapa (2 no grande) */
 		level_place_safe(ch, x, z);
 	}
 

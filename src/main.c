@@ -1577,6 +1577,21 @@ static void bench_frame(int vs) {
 			}
 			for (int i = 0; i < MAX_ENEMIES; i++) after |= (uint32_t)g.enemies[i].active << i;
 			bench.spawned = after & ~before;
+			for (int i = 0; i < MAX_ENEMIES; i++)    /* pior caso: todos perseguindo */
+				if (g.enemies[i].active) {
+					g.enemies[i].state = EN_CHASE;
+					g.enemies[i].timer = 1 << 20;
+				}
+			if (bench.cur.combat) {                  /* combate: o grande + flechas no chão */
+				for (int i = 0; i < MAX_ENEMIES; i++)
+					if (g.enemies[i].active) { g.enemies[i].type = 2; break; }
+				const PLAYER *p0 = &g.players[0];
+				for (int k = 0; k < MAX_GROUND_ARROWS; k++) {
+					g.garrow[k].active = 1;
+					g.garrow[k].x = p0->pos.vx + ((isin(k * 683) * 420) >> 12);
+					g.garrow[k].z = p0->pos.vz + ((icos(k * 683) * 420) >> 12);
+				}
+			}
 			if (bench.cur.crowd != CROWD_GATHER) {
 				bench.extras = 0;            /* contar bits sem builtin (libgcc) */
 				for (uint32_t m = bench.spawned; m; m &= m - 1)

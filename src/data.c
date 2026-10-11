@@ -51,10 +51,11 @@ const int num_weapons = sizeof(weapon_defs) / sizeof(weapon_defs[0]);
 /* Paleta: [0] corpo, [1] chifres, [2] olhos (materiais do modelo)    */
 /* ------------------------------------------------------------------ */
 const ENEMY_DEF enemy_defs[] = {
-	/* nome     letra  vida vel dano tamanho  pontos modelo        paleta */
-	{ "GRUNT",   'E',   3,   7,  10, ONE,      100, &grunt_mesh, { { 210,  50,  60 }, {  90,  20,  40 }, { 255, 230,  60 } } },
-	{ "BRUTO",   'B',  10,   4,  25, ONE*3/2,  300, &grunt_mesh, { { 130,  60, 200 }, {  40,  20,  70 }, { 255,  80,  80 } } },
-	{ "VELOZ",   'F',   2,  12,   8, ONE*3/4,  150, &grunt_mesh, { {  60, 200,  80 }, {  20,  70,  30 }, { 255, 255, 255 } } },
+	/* Inimigos de TERROR (etapa 07): assustam mais do que enxameiam.
+	 *  nome          letra vida vel dano tamanho pontos modelo            paleta (corpo, sombra, olhos)                       visão audição foge_luz pesado */
+	{ "RASTEJADOR", 'E',   8,   4,  14, ONE,     100, &rastejador_mesh, { { 110, 120,  95 }, {  50,  55,  45 }, { 255, 220,  80 } },  4,  70, 0, 0 },
+	{ "CACADOR",    'F',   3,  11,   9, ONE,     150, &cacador_mesh,    { {  70,  70,  85 }, {  30,  30,  40 }, { 255,  60,  60 } },  7, 100, 1, 0 },
+	{ "GRANDE",     'B',  25,   6,  30, ONE,     400, &grande_mesh,     { { 120,  90,  80 }, {  60,  40,  35 }, { 255, 255, 255 } },  5,  60, 0, 1 },
 };
 const int num_enemy_types = sizeof(enemy_defs) / sizeof(enemy_defs[0]);
 
