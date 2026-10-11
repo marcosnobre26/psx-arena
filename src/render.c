@@ -593,11 +593,9 @@ void render_chunk(const CHUNK_GEOM *c) {
 	uint32_t *ot  = fb[cur].ot;
 	uint8_t  *end = fb[cur].pkt + PACKET_LEN - 64;
 	const int far = fog_base.far;
-	/* câmera no espaço do bloco: o descarte de face de costas das faces
-	 * alinhadas aos eixos vira uma comparação inteira, ANTES da GTE (etapa
-	 * 10a: ~metade das laterais de mata estão de costas e pagavam a
-	 * projeção à toa). Exato: é o mesmo critério do nclip para esses planos. */
-	const int lcx = cam_pos.vx - c->origin.vx, lcy = cam_pos.vy, lcz = cam_pos.vz - c->origin.vz;
+	/* (etapa 10a, medido: descartar as faces de costas por comparação em C
+	 * ANTES da GTE custava +18 linhas: a GTE projeta e descarta mais rápido
+	 * que o C decide. Por isso não há pré-descarte aqui nem nos modelos.) */
 
 	int qd = 0;
 	for (int i = 0; i < c->nquads; i++) {
@@ -628,16 +626,6 @@ void render_chunk(const CHUNK_GEOM *c) {
 
 		if (nextpri >= end)
 			break;
-		{
-			const SVECTOR *v0 = &chunk_verts[q->v[0]];
-			switch (q->n) {
-			case 0: if (lcy >= v0->vy) continue; break;   /* topo: câmera acima (Y para baixo) */
-			case 1: if (lcz >= v0->vz) continue; break;   /* face -Z */
-			case 2: if (lcz <= v0->vz) continue; break;   /* face +Z */
-			case 3: if (lcx >= v0->vx) continue; break;   /* face -X */
-			case 4: if (lcx <= v0->vx) continue; break;   /* face +X */
-			}
-		}
 
 		gte_ldv3(&chunk_verts[q->v[0]], &chunk_verts[q->v[1]], &chunk_verts[q->v[2]]);
 		gte_rtpt();

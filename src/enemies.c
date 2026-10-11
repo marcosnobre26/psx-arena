@@ -165,9 +165,7 @@ void enemies_draw(void) {
 
 		SVECTOR rot = { 0, e->angle, 0 };
 		render_mesh(d->mesh, &pos, &rot, d->scale, &opt);
-#ifndef BENCH_NO_SHADOW                          /* (medição temporária) */
 		shadow_draw(&e->pos, d->scale);
-#endif
 	}
 }
 

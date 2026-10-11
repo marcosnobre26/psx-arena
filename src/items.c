@@ -234,10 +234,33 @@ void effects_draw(void) {
 /* Sombra redonda: um truque barato e muito usado no PS1               */
 /* ------------------------------------------------------------------ */
 
+/* Sombra SIMPLES (etapa 10a): um quadrado de mesma área do octógono
+ * (lado 2 x 108 ~ área de um octógono de raio 128), 1 quad em vez de 6
+ * triângulos. Usada longe da câmera, onde a diferença de forma não se vê
+ * (o preparo + 6 faces custavam ~1,8 linha por sombra). Montada aqui no
+ * código: models/*.h só o exportador gera. */
+static const SVECTOR shadow4_verts[4] = {
+	{ -108, 0, -108, 0 }, { -108, 0, 108, 0 }, { 108, 0, -108, 0 }, { 108, 0, 108, 0 },
+};
+static const SVECTOR shadow4_norm[1] = { { 0, -4096, 0, 0 } };
+static const MESH_FACE shadow4_face[1] = {
+	{ { 0, 1, 2, 3 }, 0, 0, 0, FACE_QUAD | FACE_UNLIT, 0, 0, { 0 }, 0 },
+};
+static const MESH shadow4_mesh = { 4, 1, shadow4_verts, shadow4_norm, shadow4_face, 153 };
+
 void shadow_draw(const VECTOR *pos, int scale) {
 	static const CVECTOR black = { 0, 0, 0 };
 	DRAWOPT opt = { 0 };
 	opt.flags = DRAW_UNLIT | DRAW_SEMITRANS;
+	if (render_view_depth(pos->vx, 0, pos->vz) > SHADOW_SIMPLE_DIST) {
+		opt.flags |= DRAW_NOCULL;              /* vale qualquer sentido do quad */
+		opt.palette = &black;
+		opt.npalette = 1;
+		opt.zbias = 2;
+		VECTOR p = { pos->vx, -2, pos->vz };
+		render_mesh(&shadow4_mesh, &p, NULL, scale, &opt);
+		return;
+	}
 	opt.palette = &black;
 	opt.npalette = 1;
 	opt.zbias = 2;                 /* entre o chão (+6) e os objetos */

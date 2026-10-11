@@ -74,6 +74,7 @@ static int8_t  ent_head[MAP_MAX_H][MAP_MAX_W];       /* 16 KB */
 static int8_t  ent_next[MAX_ENT];
 static int16_t ent_cx[MAX_ENT], ent_cz[MAX_ENT];     /* célula atual (-1 = fora) */
 static int     ent_max_r;                            /* maior raio de entidade */
+static int16_t type_rad[8];                          /* raio de cada tipo de inimigo (= enemy_radius) */
 
 /* Qual id da grade é este ponteiro? (jogador, inimigo ou -1 = outra coisa) */
 static int ent_id(const void *self) {
@@ -149,6 +150,7 @@ void collide_reset(void) {
 	ent_max_r = PLAYER_RADIUS;
 	for (int t = 0; t < num_enemy_types; t++) {
 		int r = (90 * enemy_defs[t].scale) >> 12;     /* mesmo cálculo de enemy_radius */
+		if (t < 8) type_rad[t] = r;
 		if (r > ent_max_r) ent_max_r = r;
 	}
 }
@@ -239,10 +241,16 @@ static int cells_block(int x, int z, int y, int r, int from_x, int from_z) {
 	if (x - r < 0 || z - r < 0) return 1;
 	int x0 = (x - r) / TILE_SIZE, x1 = (x + r) / TILE_SIZE;
 	int z0 = (z - r) / TILE_SIZE, z1 = (z + r) / TILE_SIZE;
+	/* leitura direta da grade (etapa 10a): o mesmo que level_cell_solid/
+	 * level_cell_low, sem duas chamadas por célula. Fora do mapa = sólido. */
+	const uint8_t (*cells)[MAP_MAX_W] = level_cells();
+	const int w = level_width(), h = level_height();
 	for (int cz = z0; cz <= z1; cz++)
 		for (int cx = x0; cx <= x1; cx++) {
-			if (!level_cell_solid(cx, cz)) continue;
-			if (level_cell_low(cx, cz) &&
+			if (cx >= w || cz >= h) return 1;
+			int c = cells[cz][cx];
+			if (!(c & CELL_SOLID)) continue;
+			if ((c & CELL_LOW) &&
 			    (y < -LOW_CLEAR || cell_touches(cx, cz, from_x, from_z, r)))
 				continue;
 			return 1;
@@ -288,9 +296,20 @@ int collide_blocked(int x, int z, int y, int radius, const void *self, int mask,
 		for (int cx = x0; cx <= x1; cx++)
 			for (int id = ent_head[cz][cx]; id >= 0; id = ent_next[id]) {
 				if (id == me) continue;
-				if (!(mask & (id < ENT_ENEMY0 ? COL_PLAYERS : COL_ENEMIES))) continue;
+				/* o mesmo que ent_info, em linha (etapa 10a: é o laço mais
+				 * quente da lógica com inimigos juntos) */
 				int ox, oz, oy, orad;
-				if (!ent_info(id, &ox, &oz, &oy, &orad)) continue;
+				if (id < ENT_ENEMY0) {
+					if (!(mask & COL_PLAYERS)) continue;
+					const PLAYER *p = &g.players[id];
+					if (!(p->active && p->hp > 0)) continue;
+					ox = p->pos.vx; oz = p->pos.vz; oy = p->pos.vy; orad = PLAYER_RADIUS;
+				} else {
+					if (!(mask & COL_ENEMIES)) continue;
+					const ENEMY *e = &g.enemies[id - ENT_ENEMY0];
+					if (!e->active) continue;
+					ox = e->pos.vx; oz = e->pos.vz; oy = e->pos.vy; orad = type_rad[e->type];
+				}
 				if (abs(oy - y) > JUMP_CLEAR) continue;     /* um está no ar */
 				if (circle_blocks(x, z, radius, ox, oz, orad, from_x, from_z))
 					return 1;

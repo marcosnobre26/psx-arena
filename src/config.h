@@ -87,6 +87,9 @@
 #define EV_JOB_TRIES     90          /* busca de lugar: passos no máximo */
 #define EV_PLANT_COUNT   5           /* mata fecha: árvores novas */
 #define EV_WAVE_COUNT    4           /* onda: inimigos */
+#ifndef SHADOW_SIMPLE_DIST
+#define SHADOW_SIMPLE_DIST 800        /* sombra vira 1 quad além disto da câmera (visual) */
+#endif
 #define REBUILD_QUEUE    9           /* blocos esperando remontagem (anel de raízes: até 3x3) */
 #define REBUILD_LINES    40          /* montagem em fatias: linhas por quadro, no máximo */
 #ifndef REBUILD_CPU_CAP

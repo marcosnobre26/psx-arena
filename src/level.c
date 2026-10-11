@@ -144,7 +144,6 @@ static void add_quad(CHUNK_GEOM *c, const int corner[4][3], int n, int uvset,
 		render_bake_light(&normals[n], vr, g * var >> 7, vb, &q->c[k]);
 	}
 	q->tex = tex;
-	q->n = n;
 	q->uv = uvset;
 	q->rot = rot;
 	q->zbias = zbias;
