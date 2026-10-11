@@ -144,7 +144,21 @@
 #endif
 #define ENEMY_HOP           27  /* pulo do inimigo sobre tronco caído (sobe ~120) */
 #define PLAYER_INVULN       60  /* quadros invulnerável após levar dano */
-#define ENERGY_REGEN_DELAY  20  /* a cada N quadros recupera 1 de energia */
+#define ENERGY_REGEN_DELAY  120 /* mana: +1 a cada 2 s ... */
+#define ENERGY_REGEN_CAP    25  /* ... só até 25% do máximo (acima, só poções/gemas) */
+#define MAX_ARROWS          20  /* munição máxima por jogador */
+#define MAX_BULLETS_AMMO    12
+#define ARROW_PICKUP        4   /* feixe de flechas (letra V) */
+#define BULLET_PICKUP       3   /* caixa de balas (letra M) */
+#define MAX_GROUND_ARROWS   6   /* flechas no chão (a mais antiga some) */
+#define ARROW_DROP_CHANCE   40  /* % de a flecha ficar no chão (g.rng) */
+#define BOW_CHARGE          45  /* passos para a carga cheia do arco */
+#define GUN_AIM_CONE        150 /* mira automática só das armas de fogo (~13 graus) */
+#define MAX_NOISES          4   /* barulhos guardados por passo (os mais fortes) */
+#define STEP_NOISE          3   /* passo andando (células); R2 segurado = 0 */
+#define CHOP_NOISE          8   /* golpe de machado em copa/raízes: barulho médio */
+#define FLASH_STUN          90  /* clarão: passos atordoado ... */
+#define FLASH_FLEE          180 /* ... e fugindo */
 
 /* ---------- Limites de objetos ---------- */
 #define MAX_PLAYERS     2       /* jogadores ao mesmo tempo (porta 1 e 2) */

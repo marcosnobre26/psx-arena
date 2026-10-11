@@ -145,6 +145,7 @@ void enemies_update(void) {
 		if (growl_wait == 0 && g.state == STATE_PLAY)
 			enemy_growl(e);
 	}
+	g.nnoise = 0;                  /* barulhos deste passo já foram ouvidos */
 }
 
 void enemies_draw(void) {

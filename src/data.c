@@ -1,10 +1,11 @@
 /*
- * data.c - Tabelas do jogo: PERSONAGENS, ARMAS, PODERES, INIMIGOS, SKINS e CENÁRIO
+ * data.c - Tabelas do jogo: PERSONAGENS, ARMAS, INIMIGOS, SKINS e CENÁRIO
  *
- * Quer uma arma nova? Copie uma linha de weapon_defs e mude os números.
+ * Quer uma arma nova? Copie uma linha de weapon_defs do mesmo TIPO (corpo a
+ * corpo, arco, magia, fogo) e mude os números (GUIA: "Criar uma arma").
  * Quer um inimigo novo? Adicione uma linha em enemy_defs com uma letra
  * nova e use essa letra no mapa (level.c).
- * Quer um poder novo? Escreva a função em powers.c e adicione aqui.
+ * (Os antigos "poderes" viraram magias: armas do tipo WK_MAGIC.)
  *
  * Ângulos: 4096 = 360 graus. Cores: 0..255.
  */
@@ -18,10 +19,10 @@
 /* tiver os 5 materiais do robô (corpo, cabeça, membros, visor, arma). */
 /* ------------------------------------------------------------------ */
 const CHARACTER_DEF character_defs[] = {
-	/* nome         descrição                      modelo        tamanho skins tex   vida vel pulo arma */
-	{ "ROBO",       "EQUILIBRADO. TROCA DE SKIN",  &player_mesh, ONE,    1,    NULL, 100, 14, 34,  0 },
-	{ "CAVALEIRO",  "LENTO, MUITA VIDA, CANHAO",   &knight_mesh, ONE,    0,    NULL, 160, 10, 28,  3 },
-	{ "BATEDOR",    "RAPIDO, POUCA VIDA, METRALHA", &scout_mesh, ONE,    0,    NULL,  70, 19, 42,  2 },
+	/* nome         descrição                      modelo        tamanho skins tex   vida vel pulo arma       arma 2  flechas */
+	{ "ROBO",       "EQUILIBRADO. ESPADA",         &player_mesh, ONE,    1,    NULL, 100, 14, 34,  W_SWORD,   -1,     0 },
+	{ "CAVALEIRO",  "LENTO, MUITA VIDA, MACHADO",  &knight_mesh, ONE,    0,    NULL, 160, 10, 28,  W_AXE,     -1,     0 },
+	{ "BATEDOR",    "RAPIDO, ESPADA E ARCO",       &scout_mesh,  ONE,    0,    NULL,  70, 19, 42,  W_SWORD,   W_BOW,  6 },
 };
 const int num_characters = sizeof(character_defs) / sizeof(character_defs[0]);
 
@@ -29,28 +30,19 @@ const int num_characters = sizeof(character_defs) / sizeof(character_defs[0]);
 /* ARMAS — a primeira já começa liberada; as outras vêm dos itens "W" */
 /* ------------------------------------------------------------------ */
 const WEAPON_DEF weapon_defs[] = {
-	/* nome            recarga vel  dano proj abert. impr. vida  tamanho    cor */
-	{ "BLASTER",          10,   44,   1,   1,    0,    0,   50, ONE,       { 255, 255, 120 } },
-	{ "ESPINGARDA",       32,   38,   1,   5,   90,   20,   20, ONE*3/4,   { 255, 150,  60 } },
-	{ "METRALHADORA",      4,   52,   1,   1,    0,   70,   40, ONE*2/3,   { 120, 255, 255 } },
-	{ "CANHAO",           50,   26,   8,   1,    0,    0,   90, ONE*5/2,   { 255,  80, 255 } },
+	/* A ORDEM é a do enum W_* (game.h). Números de ESCASSEZ (etapa 07):
+	 * corpo a corpo é a base; munição e mana são raras.
+	 *  nome           tipo       munição      magia        corta custo recarga dano alcance arco  janela   vel  proj aber barulho tamanho    cor */
+	{ "ESPADA",        WK_MELEE,  AMMO_NONE,   MAGIC_NONE,  0,  0,  22,  2,  240,  700,  5, 10,   0,  0,  0,  0,  ONE,       { 200, 210, 230 } },
+	{ "MACHADO",       WK_MELEE,  AMMO_NONE,   MAGIC_NONE,  1,  0,  40,  5,  260,  500, 12, 18,   0,  0,  0,  0,  ONE,       { 170, 120,  80 } },
+	{ "ARCO",          WK_BOW,    AMMO_ARROW,  MAGIC_NONE,  0,  1,  18,  4,   50,    0,  0,  0,  64,  1,  0,  3,  ONE*3/4,   { 220, 190, 120 } },
+	{ "BOLA DE FOGO",  WK_MAGIC,  AMMO_MANA,   MAGIC_FIRE,  0, 25,  30,  4,   45,    0,  0,  0,  36,  1,  0,  6,  ONE*3/2,   { 255, 140,  40 } },
+	{ "CLARAO",        WK_MAGIC,  AMMO_MANA,   MAGIC_FLASH, 0, 35,  60,  1,  900,    0,  0,  0,   0,  0,  0,  8,  ONE,       { 230, 240, 255 } },
+	{ "CURA",          WK_MAGIC,  AMMO_MANA,   MAGIC_HEAL,  0, 40,  60, 35,  600,    0,  0,  0,   0,  0,  0,  0,  ONE,       {  80, 255, 120 } },
+	{ "PISTOLA",       WK_GUN,    AMMO_BULLET, MAGIC_NONE,  0,  1,  16,  4,   40,    0,  0,  0,  64,  1,  0, 16,  ONE*2/3,   { 255, 255, 120 } },
+	{ "ESPINGARDA",    WK_GUN,    AMMO_BULLET, MAGIC_NONE,  0,  1,  44,  3,   22,    0,  0,  0,  52,  5, 90, 22,  ONE*3/4,   { 255, 150,  60 } },
 };
 const int num_weapons = sizeof(weapon_defs) / sizeof(weapon_defs[0]);
-
-/* ------------------------------------------------------------------ */
-/* PODERES — funções implementadas em powers.c                         */
-/* ------------------------------------------------------------------ */
-void power_shockwave(PLAYER *p);
-void power_dash(PLAYER *p);
-void power_heal(PLAYER *p);
-
-const POWER_DEF power_defs[] = {
-	/* nome               custo  função */
-	{ "ONDA DE CHOQUE",     40,  power_shockwave },
-	{ "DASH",               20,  power_dash },
-	{ "CURA",               50,  power_heal },
-};
-const int num_powers = sizeof(power_defs) / sizeof(power_defs[0]);
 
 /* ------------------------------------------------------------------ */
 /* INIMIGOS — todos usam o modelo grunt com tamanho/cores diferentes. */

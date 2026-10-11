@@ -14,9 +14,11 @@ static const CVECTOR pickup_colors[NUM_PICKUP_TYPES] = {
 	{ 190,  90, 255 },   /* PICK_QUEST  (item de missão, letra Q) */
 	{ 140, 255, 110 },   /* PICK_BATTERY (pilha da lanterna, letra L) */
 	{ 255, 150,  20 },   /* PICK_KEY    (chave da barreira de raízes, letra K) */
+	{ 210, 180, 110 },   /* PICK_ARROWS (feixe de flechas, letra V) */
+	{ 200, 200, 210 },   /* PICK_AMMO   (balas, letra M) */
 };
 static const int pickup_scale[NUM_PICKUP_TYPES] = { ONE, ONE * 3 / 4, ONE * 3 / 4, ONE * 3 / 2, ONE * 5 / 4, ONE * 2 / 3,
-                                                    ONE * 5 / 4 };
+                                                    ONE * 5 / 4, ONE * 3 / 4, ONE * 2 / 3 };
 
 /* ------------------------------------------------------------------ */
 /* Itens                                                               */
@@ -49,7 +51,17 @@ static void collect(PICKUP *it, PLAYER *p) {
 		break;
 	case PICK_ENERGY:
 		p->energy += 40;
-		show_message("+40 ENERGIA", 40);
+		show_message("+40 MANA", 40);
+		break;
+	case PICK_ARROWS:
+		p->arrows += ARROW_PICKUP;
+		if (p->arrows > MAX_ARROWS) p->arrows = MAX_ARROWS;
+		show_message("+FLECHAS", 40);
+		break;
+	case PICK_AMMO:
+		p->bullets += BULLET_PICKUP;
+		if (p->bullets > MAX_BULLETS_AMMO) p->bullets = MAX_BULLETS_AMMO;
+		show_message("+BALAS", 40);
 		break;
 	case PICK_BATTERY:
 		p->battery += BATTERY_PICKUP;
@@ -67,17 +79,22 @@ static void collect(PICKUP *it, PLAYER *p) {
 		show_message("ITEM DE MISSAO!", 50);
 		break;
 	case PICK_WEAPON: {
-		/* libera a próxima arma que o jogador ainda não tem */
-		int w;
-		for (w = 0; w < num_weapons; w++)
-			if (!(p->weapons_owned & (1 << w))) break;
-		if (w < num_weapons) {
-			p->weapons_owned |= 1 << w;
+		/* arma nova, na ordem: arco, machado, pistola, espingarda (fogo é
+		 * raro: vem por último), com um pouco de munição */
+		static const int order[] = { W_BOW, W_AXE, W_PISTOL, W_SHOTGUN };
+		int w = -1;
+		for (int k = 0; k < 4 && w < 0; k++)
+			if (!(p->weapons_owned & (1u << order[k]))) w = order[k];
+		if (w >= 0) {
+			p->weapons_owned |= 1u << w;
 			p->weapon = w;
+			p->swing = p->charge = 0;
 			show_message(weapon_defs[w].name, 70);
-		} else {
-			g.score += 500;
 		}
+		if (w == W_BOW || w < 0) p->arrows += 4;
+		if (w == W_PISTOL || w == W_SHOTGUN || w < 0) p->bullets += 3;
+		if (p->arrows > MAX_ARROWS) p->arrows = MAX_ARROWS;
+		if (p->bullets > MAX_BULLETS_AMMO) p->bullets = MAX_BULLETS_AMMO;
 		break;
 	}
 	}

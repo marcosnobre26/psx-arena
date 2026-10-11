@@ -360,6 +360,25 @@ int collide_solid_at(int x, int z, int r) {
 /* Inimigo atingido em (x,z): caixa de ((90 * escala) + pad) em volta do
  * centro. Entre vários, o de MENOR índice (o mesmo resultado de quando o
  * tiro percorria a lista inteira em ordem). */
+/* Inimigos cujo CENTRO pode estar a até r de (x, z), pela grade: bit i =
+ * g.enemies[i]. Quem chama testa a distância/ângulo exatos, na ordem dos
+ * bits (determinística). Golpe corpo a corpo, clarão (etapa 07). */
+uint32_t collide_enemies_near(int x, int z, int r) {
+	int x0 = (x - r) / TILE_SIZE, x1 = (x + r) / TILE_SIZE;
+	int z0 = (z - r) / TILE_SIZE, z1 = (z + r) / TILE_SIZE;
+	if (x0 < 0) x0 = 0;
+	if (z0 < 0) z0 = 0;
+	if (x1 >= MAP_MAX_W) x1 = MAP_MAX_W - 1;
+	if (z1 >= MAP_MAX_H) z1 = MAP_MAX_H - 1;
+	uint32_t m = 0;
+	for (int cz = z0; cz <= z1; cz++)
+		for (int cx = x0; cx <= x1; cx++)
+			for (int id = ent_head[cz][cx]; id >= 0; id = ent_next[id])
+				if (id >= ENT_ENEMY0 && g.enemies[id - ENT_ENEMY0].active)
+					m |= 1u << (id - ENT_ENEMY0);
+	return m;
+}
+
 ENEMY *collide_enemy_at(int x, int z, int pad) {
 	int reach = ent_max_r + pad;
 	int x0 = (x - reach) / TILE_SIZE, x1 = (x + reach) / TILE_SIZE;

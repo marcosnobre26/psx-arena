@@ -71,10 +71,15 @@ void player_spawn(PLAYER *p, int x, int z) {
 	p->energy = PLAYER_MAX_ENERGY / 2;
 	p->invuln = 0;
 	p->weapon = c->weapon;                   /* arma inicial do personagem */
-	p->weapons_owned = 1 | (1 << c->weapon); /* blaster + a arma inicial */
+	/* armas do personagem + as 3 magias (gastam mana: a escassez decide) */
+	p->weapons_owned = (1u << c->weapon) | MAGIC_BITS;
+	if (c->weapon2 >= 0) p->weapons_owned |= 1u << c->weapon2;
+	p->arrows = c->arrows;
+	p->bullets = 0;
+	p->swing = 0;
+	p->swing_hit = 0;
+	p->charge = 0;
 	p->cooldown = 0;
-	p->power = 0;
-	p->dash_timer = 0;
 	p->walk_anim = 0;
 	p->regen_timer = 0;
 	p->respawn_timer = 0;
@@ -164,6 +169,8 @@ void player_update(PLAYER *p, INPUT *in) {
 		int mag = dist2d(wx, wz);
 		if (mag > 127) mag = 127;
 		int speed = (cdef(p)->speed * mag) / 127;
+		int sneak = in->held & PAD_R2;        /* R2 segurado: devagar e em silêncio */
+		if (sneak) speed /= 2;
 
 		int dir = angle_of(wx, wz);
 		p->angle = turn_towards(p->angle, dir, 256);
@@ -176,17 +183,14 @@ void player_update(PLAYER *p, INPUT *in) {
 		 * unidades andadas. Alterna os dois sons de passo. Só lê o estado
 		 * (não cria campo novo em g). */
 		int step = (p->walk_anim * 6) >> 11;
-		if (p->on_ground && step != ((old_anim * 6) >> 11))
-			sound_play_at((step & 1) ? &sfx_passo2 : &sfx_passo1, p->pos.vx, p->pos.vz, VOL_PASSO);
+		if (p->on_ground && step != ((old_anim * 6) >> 11)) {
+			sound_play_at((step & 1) ? &sfx_passo2 : &sfx_passo1, p->pos.vx, p->pos.vz,
+			              sneak ? VOL_PASSO / 3 : VOL_PASSO);
+			if (!sneak)
+				noise_emit(p->pos.vx, p->pos.vz, STEP_NOISE);   /* passo: barulho pequeno */
+		}
 	} else {
 		p->walk_anim = 0;
-	}
-
-	/* ---- dash (poder) ---- */
-	if (p->dash_timer > 0) {
-		p->dash_timer--;
-		int sp = cdef(p)->speed * 3;
-		move(p, (isin(p->angle) * sp) >> 12, (icos(p->angle) * sp) >> 12);
 	}
 
 	/* ---- pulo e gravidade ---- */
@@ -202,12 +206,11 @@ void player_update(PLAYER *p, INPUT *in) {
 		p->on_ground = 1;
 	}
 
-	/* ---- armas ---- */
-	if (p->cooldown > 0) p->cooldown--;
-	if ((in->held & PAD_SQUARE) && p->cooldown == 0)
-		weapon_fire(p);
+	/* ---- armas (weapons.c: cada tipo age do seu jeito) ---- */
+	weapon_update(p, in);
 
-	if (in->pressed & PAD_TRIANGLE) {
+	if ((in->pressed & PAD_TRIANGLE) && p->swing == 0) {
+		p->charge = 0;                            /* trocar desfaz a carga do arco */
 		for (int i = 1; i <= num_weapons; i++) {     /* próxima arma que possui */
 			int w = (p->weapon + i) % num_weapons;
 			if (p->weapons_owned & (1 << w)) {
@@ -220,17 +223,10 @@ void player_update(PLAYER *p, INPUT *in) {
 		}
 	}
 
-	/* ---- poderes ---- */
-	if (in->pressed & PAD_R2) {
-		p->power = (p->power + 1) % num_powers;
-		pmsg(p, power_defs[p->power].name, 50);
-	}
-	if (in->pressed & PAD_CIRCLE)
-		power_use(p);
-
+	/* ---- mana: volta sozinha bem devagar, só até 25% (o resto, poções) ---- */
 	if (++p->regen_timer >= ENERGY_REGEN_DELAY) {
 		p->regen_timer = 0;
-		if (p->energy < PLAYER_MAX_ENERGY) p->energy++;
+		if (p->energy < PLAYER_MAX_ENERGY * ENERGY_REGEN_CAP / 100) p->energy++;
 	}
 
 	/* ---- lanterna (SELECT). A skin agora só muda na tela de seleção. ---- */
@@ -260,7 +256,7 @@ void player_damage(PLAYER *p, int amount, int from_x, int from_z) {
 #ifdef DEBUG_BENCHMARK
 	return;          /* benchmark: o jogador não pode morrer no meio da medição */
 #endif
-	if (!player_alive(p) || p->invuln > 0 || p->dash_timer > 0 || g.state != STATE_PLAY)
+	if (!player_alive(p) || p->invuln > 0 || g.state != STATE_PLAY)
 		return;
 	p->hp -= amount;
 	p->invuln = PLAYER_INVULN;
@@ -323,10 +319,8 @@ void player_draw(PLAYER *p) {
 		pos.vy -= (bob < 0 ? -bob : bob) >> 9;   /* sobe e desce 0..8 */
 		rot.vz = isin(p->walk_anim * 3) >> 6;
 	}
-	if (p->dash_timer > 0)
-		rot.vx = -300;           /* inclina para frente no dash */
-
 	player_draw_model(&pos, &rot, p->character, p->skin);
+	weapon_draw(p);                       /* arma na mão (etapa 07) */
 	shadow_draw(&p->pos, ONE * 3 / 4);
 
 	/* com 2 jogadores, um anel colorido no chão mostra quem é quem */

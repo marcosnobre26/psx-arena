@@ -43,26 +43,35 @@ void input_update(INPUT in[MAX_PLAYERS]);   /* lê as duas portas */
 /* ------------------------------------------------------------------ */
 /* Definições (tabelas em data.c)                                     */
 /* ------------------------------------------------------------------ */
+/* Armas (etapa 07): o TIPO decide como a arma age (weapons.c) */
+enum { WK_MELEE,     /* golpe em arco à frente, sem projétil, silencioso */
+       WK_BOW,       /* segurar carrega; solta a flecha (munição) */
+       WK_MAGIC,     /* gasta mana: bola de fogo, clarão, cura */
+       WK_GUN };     /* arma de fogo: munição rara, barulhenta, mira auto curta */
+enum { AMMO_NONE, AMMO_ARROW, AMMO_BULLET, AMMO_MANA };
+enum { MAGIC_NONE, MAGIC_FIRE, MAGIC_FLASH, MAGIC_HEAL };
+/* índices em weapon_defs (data.c, mesma ordem) */
+enum { W_SWORD, W_AXE, W_BOW, W_FIREBALL, W_FLASH, W_HEAL, W_PISTOL, W_SHOTGUN };
+#define MAGIC_BITS ((1u << W_FIREBALL) | (1u << W_FLASH) | (1u << W_HEAL))
 typedef struct {
-	const char *name;
-	int      cooldown;  /* quadros entre tiros */
-	int      speed;     /* velocidade do projétil */
-	int      damage;
-	int      pellets;   /* projéteis por disparo */
-	int      spread;    /* abertura entre projéteis (ângulo) */
-	int      jitter;    /* imprecisão aleatória (ângulo) */
-	int      life;      /* quadros até o projétil sumir */
-	int      scale;     /* tamanho do projétil (ONE = normal) */
-	CVECTOR  color;
+	const char  *name;
+	uint8_t      kind;      /* WK_* */
+	uint8_t      ammo;      /* AMMO_* gasto a cada uso */
+	uint8_t      magic;     /* MAGIC_* (só WK_MAGIC) */
+	uint8_t      chops;     /* 1 = corta copa de árvore caída e raízes (machado) */
+	int          cost;      /* munição/mana por uso */
+	int          cooldown;  /* passos entre usos */
+	int          damage;    /* dano (arco: com carga cheia) */
+	int          reach;     /* corpo a corpo: alcance; projétil: passos de vida */
+	int          arc;       /* corpo a corpo: meia abertura do golpe (ângulo) */
+	int          hit_from, hit_to;   /* corpo a corpo: janela de acerto (passos do golpe) */
+	int          speed;     /* projétil: velocidade (arco: com carga cheia) */
+	int          pellets;   /* projéteis por disparo */
+	int          spread;    /* abertura entre projéteis (ângulo) */
+	int          noise;     /* raio do barulho, em células (0 = silencioso) */
+	int          scale;     /* tamanho do projétil / do efeito */
+	CVECTOR      color;
 } WEAPON_DEF;
-
-struct PLAYER_S;   /* declarado mais abaixo */
-
-typedef struct {
-	const char *name;
-	int      cost;           /* energia gasta */
-	void   (*use)(struct PLAYER_S *p);  /* função do poder (powers.c) */
-} POWER_DEF;
 
 typedef struct {
 	const char   *name;
@@ -93,6 +102,8 @@ typedef struct {
 	int            speed;     /* velocidade de corrida */
 	int            jump;      /* força do pulo */
 	int            weapon;    /* arma inicial (índice em weapon_defs) */
+	int            weapon2;   /* segunda arma inicial (-1 = nenhuma) */
+	int            arrows;    /* flechas iniciais */
 } CHARACTER_DEF;
 
 /* Objeto de cenário: um modelo colocado no mapa por um dígito (1..9) */
@@ -106,8 +117,6 @@ typedef struct {
 
 extern const WEAPON_DEF weapon_defs[];
 extern const int        num_weapons;
-extern const POWER_DEF  power_defs[];
-extern const int        num_powers;
 extern const ENEMY_DEF  enemy_defs[];
 extern const int        num_enemy_types;
 extern const SKIN_DEF   skin_defs[];
@@ -155,7 +164,8 @@ extern const TREE_DEF tree_defs[];
 
 /* Geração procedural (mapgen.c): parâmetros de uma fase gerada */
 enum { GEN_HUNT, GEN_CROSS, GEN_COLLECT, GEN_SURVIVE };   /* onde ficam início/saída/... */
-enum { GEN_HEALTH, GEN_ENERGY, GEN_BATTERY, GEN_WEAPON, GEN_GEM, GEN_CRATE, GEN_ITEM_TYPES };
+enum { GEN_HEALTH, GEN_ENERGY, GEN_BATTERY, GEN_WEAPON, GEN_GEM, GEN_CRATE,
+       GEN_ARROWS, GEN_AMMO, GEN_ITEM_TYPES };   /* (novos no fim: o gerador sorteia na ordem) */
 typedef struct {
 	int w, h;                    /* tamanho em células (até 128) */
 	int layout;                  /* GEN_* */
@@ -253,11 +263,13 @@ typedef struct PLAYER_S {
 	int      weapon;        /* índice em weapon_defs */
 	uint32_t weapons_owned; /* bit N = possui a arma N */
 	int      cooldown;
-	int      power;         /* índice em power_defs */
+	int      arrows, bullets;   /* munição (cada jogador a sua) */
+	int      swing;         /* corpo a corpo: passos desde o começo do golpe (0 = parado) */
+	uint32_t swing_hit;     /* inimigos já atingidos neste golpe (bit = índice) */
+	int      charge;        /* arco: passos segurando (0 = sem carga) */
 	int      skin;
 	int      character;     /* índice em character_defs */
 	int      max_hp;
-	int      dash_timer;
 	int      walk_anim;
 	int      regen_timer;
 	int      lantern_on;    /* lanterna ligada (SELECT liga/desliga) */
@@ -277,6 +289,8 @@ typedef struct {
 	int     think;          /* contador para mudar de direção ao vagar */
 	int     hit_cooldown;
 	int     vy;             /* velocidade vertical (pulo por cima de tronco caído) */
+	int     stun;           /* passos atordoado (clarão): não anda */
+	int     flee;           /* passos fugindo (clarão / luz) */
 } ENEMY;
 
 typedef struct {
@@ -289,6 +303,7 @@ typedef struct {
 } BULLET;
 
 enum { PICK_GEM, PICK_HEALTH, PICK_ENERGY, PICK_WEAPON, PICK_QUEST, PICK_BATTERY, PICK_KEY,
+       PICK_ARROWS, PICK_AMMO,   /* etapa 07: feixe de flechas (V), balas (M) */
        NUM_PICKUP_TYPES };
 
 typedef struct {
@@ -373,6 +388,13 @@ typedef struct {
 
 	char    message[40];    /* mensagem temporária no centro da tela */
 	int     message_timer;
+
+	/* combate (etapa 07): barulhos deste passo (os MAX_NOISES mais fortes;
+	 * os inimigos leem e a lista é zerada) e flechas caídas no chão */
+	struct { int x, z, r; } noise[MAX_NOISES];
+	int     nnoise;
+	struct { int active, x, z, age; } garrow[MAX_GROUND_ARROWS];
+	int     garrow_next;          /* a próxima vaga (a mais antiga some) */
 
 	/* eventos da fase (events.c). Tudo aqui é LÓGICA: só g.in, passos e g.rng */
 	struct {
@@ -531,6 +553,7 @@ void collide_remove_obstacle(int x, int z);         /* árvore que caiu (etapa 0
 int  collide_cell_has_obstacle(int cx, int cz);
 void collide_track(const void *self);   /* posição mudou direto: atualiza a grade */
 ENEMY *collide_enemy_at(int x, int z, int pad);   /* tiro: inimigo atingido (ou NULL) */
+uint32_t collide_enemies_near(int x, int z, int r);   /* bits dos inimigos perto (grade) */
 int  collide_line_of_sight(int x0, int z0, int x1, int z1);   /* 1 = visão livre */
 int  collide_camera_clear(int x, int z, int ex, int ez);      /* câmera vê o jogador? */
 int  collide_seg_cells_take(void);      /* células percorridas pela câmera (custo) */
@@ -549,12 +572,13 @@ void enemy_damage(ENEMY *e, int amount, int push_x, int push_z);
 ENEMY *enemy_nearest_in_cone(int x, int z, int angle, int cone, int max_dist);
 
 /* weapons.c */
-void weapon_fire(PLAYER *p);
+void weapon_update(PLAYER *p, const INPUT *in);   /* ataque, carga, golpe (um passo) */
+void weapon_draw(const PLAYER *p);                 /* arma na mão */
+void noise_emit(int x, int z, int cells);          /* barulho (raio em células) */
+void ground_arrows_update(void);
+void ground_arrows_draw(void);
 void bullets_update(void);
 void bullets_draw(void);
-
-/* powers.c */
-void power_use(PLAYER *p);
 
 /* items.c */
 void pickup_spawn(int type, int x, int z);

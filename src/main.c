@@ -123,7 +123,7 @@ static void game_reset(int level, uint32_t seed) {
  * Calculado só a partir de g, então é igual nos dois consoles (modo link). */
 typedef struct {
 	int      valid;
-	int      hp, energy, weapon, power;
+	int      hp, energy, weapon, arrows, bullets;
 	uint32_t weapons_owned;
 	int      battery, lantern_on;
 } CARRY;
@@ -144,7 +144,8 @@ static void progress_save(void) {
 		c->hp            = p->hp > 0 ? p->hp : p->max_hp / 2;  /* caído volta com 50% */
 		c->energy        = p->energy;
 		c->weapon        = p->weapon;
-		c->power         = p->power;
+		c->arrows        = p->arrows;
+		c->bullets       = p->bullets;
 		c->weapons_owned = p->weapons_owned;
 		c->battery       = p->battery;
 		c->lantern_on    = p->lantern_on && p->battery > 0;
@@ -175,7 +176,8 @@ static void start_level(int level, uint32_t seed) {
 		p->hp            = c->hp < p->max_hp ? c->hp : p->max_hp;
 		p->energy        = c->energy;
 		p->weapon        = c->weapon;
-		p->power         = c->power;
+		p->arrows        = c->arrows;
+		p->bullets       = c->bullets;
 		p->weapons_owned = c->weapons_owned;
 		p->battery       = c->battery;
 		p->lantern_on    = c->lantern_on;
@@ -240,7 +242,7 @@ static void draw_player_hud(const PLAYER *p, int x) {
 	}
 	hud_print(x, 12, "HP");
 	draw_bar(x + 20, 13, 90, p->hp, p->max_hp, 230, 50, 60);
-	hud_print(x, 24, "EN");
+	hud_print(x, 24, "MP");                   /* mana (magias) */
 	draw_bar(x + 20, 25, 90, p->energy, PLAYER_MAX_ENERGY, 60, 150, 255);
 	/* bateria da lanterna: amarela; vermelha quando fraca; apagada = cinza */
 	hud_print(x, 36, "LT");
@@ -250,11 +252,16 @@ static void draw_player_hud(const PLAYER *p, int x) {
 		draw_bar(x + 20, 37, 90, p->battery, BATTERY_MAX, 230, 60, 40);
 	else
 		draw_bar(x + 20, 37, 90, p->battery, BATTERY_MAX, 240, 210, 80);
-	hud_print(x, 48, "%s", weapon_defs[p->weapon].name);
-	if (g.num_players > 1)   /* com 2 jogadores falta espaço: sem o custo */
-		hud_print(x, 58, "%s", power_defs[p->power].name);
-	else
-		hud_print(x, 58, "%s (%d)", power_defs[p->power].name, power_defs[p->power].cost);
+	/* arma + o que ela gasta (corpo a corpo: nada) */
+	const WEAPON_DEF *w = &weapon_defs[p->weapon];
+	switch (w->ammo) {
+	case AMMO_ARROW:  hud_print(x, 48, "%s %d", w->name, p->arrows); break;
+	case AMMO_BULLET: hud_print(x, 48, "%s %d", w->name, p->bullets); break;
+	case AMMO_MANA:   hud_print(x, 48, "%s (%d)", w->name, w->cost); break;
+	default:          hud_print(x, 48, "%s", w->name); break;
+	}
+	if (p->charge > 0)                          /* carga do arco */
+		draw_bar(x, 58, 60, p->charge, BOW_CHARGE, 220, 190, 120);
 }
 
 static void draw_hud(void) {
@@ -523,6 +530,7 @@ static void draw_world(int with_players) {
 	exit_draw();
 	crates_draw();
 	pickups_draw();
+	ground_arrows_draw();
 	prof_begin(PROF_ENEMIES);            /* (dentro do OTHER: o bench subtrai) */
 	enemies_draw();
 	prof_end(PROF_ENEMIES);
@@ -580,6 +588,7 @@ static void game_tick(void) {
 #endif
 		bullets_update();
 		pickups_update();
+		ground_arrows_update();
 		effects_update();
 		events_update();                 /* a floresta muda (etapa 06) */
 		camera_turn();                   /* lógica: só o ângulo (g.cam_yaw) */
@@ -1215,11 +1224,11 @@ static void replay_input(void) {
 	const int8_t *d = dirs[(t / 240) % 8];          /* direção muda a cada 4 s */
 	in->lx = d[0];
 	in->ly = d[1];
-	if ((t % 90) < 40)          in->held |= PAD_SQUARE;     /* atira */
+	if ((t % 90) < 40)          in->held |= PAD_SQUARE;     /* ataca (segurar/soltar: arco carrega) */
 	if ((t % 600) >= 300 && (t % 600) < 360) in->held |= PAD_R1;   /* gira a câmera */
+	if ((t % 480) >= 400)       in->held |= PAD_R2;         /* anda devagar (silêncio) */
 	if (t % 150 == 0)           in->pressed |= PAD_CROSS;   /* pula */
-	if (t % 400 == 200)         in->pressed |= PAD_CIRCLE;  /* poder */
-	if (t % 700 == 350)         in->pressed |= PAD_TRIANGLE;/* troca de arma */
+	if (t % 300 == 150)         in->pressed |= PAD_TRIANGLE;/* troca de arma (passa por todas) */
 	if (t % 900 == 450)         in->pressed |= PAD_SELECT;  /* lanterna */
 	in->held |= in->pressed;
 	switch (t) {                                    /* eventos forçados */
@@ -1335,7 +1344,10 @@ static void bench_input(void) {
 	for (int i = 0; i < MAX_PLAYERS; i++)
 		if (g.players[i].active && g.players[i].hp > 0) {
 			g.players[i].hp = g.players[i].max_hp;
-			g.players[i].energy = PLAYER_MAX_ENERGY;
+			g.players[i].energy = PLAYER_MAX_ENERGY;     /* pior caso: todas as armas, */
+			g.players[i].weapons_owned = (1u << num_weapons) - 1;   /* munição infinita */
+			g.players[i].arrows = MAX_ARROWS;
+			g.players[i].bullets = MAX_BULLETS_AMMO;
 		}
 }
 
