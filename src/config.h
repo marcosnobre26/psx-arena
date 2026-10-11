@@ -87,6 +87,9 @@
 #define EV_JOB_TRIES     90          /* busca de lugar: passos no máximo */
 #define EV_PLANT_COUNT   5           /* mata fecha: árvores novas */
 #define EV_WAVE_COUNT    4           /* onda: inimigos */
+#ifndef MAX_TICKS_PER_FRAME
+#define MAX_TICKS_PER_FRAME 4        /* passos de lógica por quadro, no máximo */
+#endif
 #ifndef SHADOW_SIMPLE_DIST
 #define SHADOW_SIMPLE_DIST 800        /* sombra vira 1 quad além disto da câmera (visual) */
 #endif

@@ -1077,6 +1077,7 @@ static int bench_walk_tick(void) {
 /* Uma fatia de 1 s da medição (série: o que cresce com o tempo) */
 typedef struct {
 	int16_t cpu, logic, en_log, pl_log, en_draw, chunks, trees, other, col, polis, ticks, frames, build, builds;
+	int16_t logic_ticks;                      /* passos de lógica rodados (60 = tempo real) */
 } BENCH_SEC;
 
 enum { BENCH_TELEPORT, BENCH_WAIT, BENCH_MEASURING, BENCH_DONE };
@@ -1103,7 +1104,7 @@ static struct {
 	int      ev_job, ev_impact, ev_check;         /* eventos: pior passo da busca / impacto / checagem */
 	int      cut_max;                             /* blocos+árvores cortados (buffer) */
 	int      col_frame;                           /* testes de colisão: pior passo do quadro */
-	int      walk_done, last_build;
+	int      walk_done, last_build, tick_count;
 	BENCH_SEC sec[BENCH_SECS];                    /* série por segundo */
 } bench;
 
@@ -1316,6 +1317,7 @@ static void bench_tick(void) {
 	if (bench.phase != BENCH_MEASURING) return;
 	int c = collide_tests_now();
 	if (c > bench.col_frame) bench.col_frame = c;
+	bench.tick_count++;
 	if (c > bench.col_max) bench.col_max = c;
 	bench.col_sum += c;
 	bench.col_ticks++;
@@ -1456,6 +1458,8 @@ static void bench_frame(int vs) {
 #undef BMAX
 			sc->ticks += vs;
 			sc->frames++;
+			sc->logic_ticks += bench.tick_count;
+			bench.tick_count = 0;
 			sc->builds += bench.last_build > 0;
 			bench.col_frame = 0;
 			bench_prof_players = bench_prof_enemies = 0;
@@ -1510,10 +1514,10 @@ static void bench_frame(int vs) {
 				const BENCH_SEC *sc = &bench.sec[si];
 				printf("BENCH serie ponto=%s medida=%s s=%d cpu_max=%d logica_max=%d passos=%d quadros=%d "
 				       "inim_logica=%d jog_logica=%d inim_desenho=%d blocos=%d arvores=%d resto=%d "
-				       "col_max=%d polis_max=%d montagem_max=%d montagens=%d\n",
+				       "col_max=%d polis_max=%d montagem_max=%d montagens=%d passos_logica=%d\n",
 				       bench.name, bench.stage == 1 ? "multidao" : "andar", si, sc->cpu, sc->logic,
 				       sc->ticks, sc->frames, sc->en_log, sc->pl_log, sc->en_draw, sc->chunks, sc->trees,
-				       sc->other, sc->col, sc->polis, sc->build, sc->builds);
+				       sc->other, sc->col, sc->polis, sc->build, sc->builds, sc->logic_ticks);
 			}
 
 		if (bench.stage == 9) {              /* andar: acabou o ponto */
@@ -1607,7 +1611,7 @@ int main(void) {
 #endif
 		last_vsync = now;
 		if (ticks < 1) ticks = 1;
-		if (ticks > 4) ticks = 4;
+		if (ticks > MAX_TICKS_PER_FRAME) ticks = MAX_TICKS_PER_FRAME;
 
 		input_update(g.in);
 		debug_input(&g.in[0]);         /* L2: overlay e atalhos (controle 1) */
