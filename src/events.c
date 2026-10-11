@@ -282,8 +282,10 @@ static int job_fall_step(void) {
 		}
 		int dir = (g.ev.job.dir0 + g.ev.job.j * 512) & 4095;
 		if (++g.ev.job.j >= 8) { g.ev.job.k++; g.ev.job.j = 0; }
-		uint16_t cells[REACH_MAX_BLOCK], blk[REACH_MAX_BLOCK];
-		uint8_t  crown[REACH_MAX_BLOCK];
+		/* zerados: o resto do vetor (além de n) é copiado para g.ev.fall;
+		 * lixo da pilha em g quebraria o hash do replay (e o modo link) */
+		uint16_t cells[REACH_MAX_BLOCK] = { 0 }, blk[REACH_MAX_BLOCK] = { 0 };
+		uint8_t  crown[REACH_MAX_BLOCK] = { 0 };
 		int n, nb = 0;
 		fits++;
 		if (!fall_fits(x, z, dir, scale, cells, crown, &n)) continue;

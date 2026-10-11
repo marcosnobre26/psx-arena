@@ -1229,6 +1229,21 @@ static void replay_after_tick(void) {
 	if (rp.t % REPLAY_HASH_AT == 0)
 		printf("BENCH REPLAY fase=%d t=%d estado=%d hash=%08x\n", replay_levels[rp.level] + 1,
 		       rp.t / 60, g.state, (unsigned)replay_hash());
+#ifdef REPLAY_DETAIL                             /* depuração: hash por parte de g */
+	if (rp.t % 60 == 0) {
+		const uint8_t (*c)[MAP_MAX_W] = level_cells();
+		uint32_t hc = 2166136261u;
+		for (int z = 0; z < level_height(); z++) hc = fnv(hc, c[z], level_width());
+		printf("BENCH DET f=%d s=%d jog=%08x inim=%08x rng=%08x ev=%08x tiros=%08x itens=%08x efe=%08x cam=%d cel=%08x\n",
+		       replay_levels[rp.level] + 1, rp.t / 60,
+		       (unsigned)fnv(2166136261u, g.players, sizeof(g.players)),
+		       (unsigned)fnv(2166136261u, g.enemies, sizeof(g.enemies)), (unsigned)g.rng.s,
+		       (unsigned)fnv(2166136261u, &g.ev, sizeof(g.ev)),
+		       (unsigned)fnv(2166136261u, g.bullets, sizeof(g.bullets)),
+		       (unsigned)fnv(2166136261u, g.pickups, sizeof(g.pickups)),
+		       (unsigned)fnv(2166136261u, g.effects, sizeof(g.effects)), g.cam_yaw, (unsigned)hc);
+	}
+#endif
 	if (rp.t >= REPLAY_TICKS) {
 		if (++rp.level >= REPLAY_NLEVELS) {
 			rp.done = 1;
