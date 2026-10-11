@@ -7,6 +7,7 @@
 #                        DuckStation Linux; o TTY vai para logs/partida-AAAAMMDD-HHMM.txt
 #   ./dev run --sem-registro [exe|cue]  build normal no emulador do dev.conf
 #   ./dev analisar-partida [arquivo]   resumo legível do último registro de partida
+#   ./dev economia [N]   munição/mana/cura x inimigos por fase, no PC (N sementes)
 #   ./dev models         exporta os .blend de assets/blender/ para models/ (Blender do Windows)
 #   ./dev watch          recompila sozinho sempre que você salvar um arquivo
 #   ./dev clean          apaga a pasta build/
@@ -510,6 +511,22 @@ cmd_replay_test() {
 	fi
 }
 
+# Economia de recursos por fase, no PC (etapa 07b): dano disponível x vida
+# dos inimigos, cura x dano esperado, N sementes por fase
+cmd_economia() {
+	local n="${1:-1000}"
+	[[ -f build/gen/assets_gen.c ]] || cmd_build >/dev/null || return 1
+	sdk sh -c "
+		I=$SDK_DIR/include/libpsn00b
+		gcc -O2 -w -DHOST_TEST -include stdlib.h -I src -I models -I build/gen -I \$I \\
+			-o build/economy_test tools/economy_test.c src/mapgen.c src/level.c src/levels.c \\
+			src/collision.c src/rng.c src/data.c src/mathutil.c src/reach.c build/gen/assets_gen.c \\
+			-Wl,--unresolved-symbols=ignore-all 2> build/economy_test.log ||
+			{ cat build/economy_test.log >&2; echo 'economia: a compilacao falhou' >&2; exit 1; }
+		./build/economy_test $n
+	"
+}
+
 case "${1:-build}" in
 	build)  cmd_build ;;
 	run)    shift; cmd_run "$@" ;;
@@ -526,5 +543,6 @@ case "${1:-build}" in
 	events-test) shift; cmd_events_test "$@" ;;
 	replay-test) shift; cmd_replay_test "$@" ;;
 	analisar-partida) shift; python3 "$ROOT/tools/analisar_partida.py" "$@" ;;
+	economia) shift; cmd_economia "$@" ;;
 	*)      sed -n '3,20p' "$0" | sed 's/^#//' ;;
 esac
