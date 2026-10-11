@@ -901,6 +901,7 @@ typedef struct {
 	int crowd;
 	int two;            /* 1 = com o jogador 2 no limite de distância */
 	int walk;           /* 1 = anda do início até a saída (remontagem ao andar) */
+	int combat;         /* 1 = multidão + o jogador atacando sem parar (etapa 07) */
 } BENCH_PT;
 #include "bench_seeds.h"                   /* ./dev mapgen-test --bench */
 
@@ -916,12 +917,13 @@ static const BENCH_PT bench_fixed[] = {
 #define BENCH_NFIXED ((int)(sizeof(bench_fixed) / sizeof(bench_fixed[0])))
 /* Depois: fases 1-4, cada uma nas 5 sementes de PIOR janela (no ponto 2 =
  * centro da janela mais densa), e o CERCO com 2 jogadores na pior delas */
-#define BENCH_POINTS (BENCH_NFIXED + 4 * 5 + 1 + 4 * 5 + 4 * 2 + 4)
+#define BENCH_POINTS (BENCH_NFIXED + 4 * 5 + 1 + 4 * 5 + 4 * 2 + 4 + 4)
 #define BENCH_CROWD_VS 600    /* multidão parada: 10 s (o pior aparece depois dos 3 s) */
 #define BENCH_WALK_VS  1500   /* andar: até 25 s (ou até o fim do caminho) */
 #define BENCH_SECS     26
 #ifdef BENCH_SUBSET                   /* -D BENCH_SUBSET: só os pontos mais pesados (iterações) */
-static const int bench_subset[] = { 2, 5, 15, 26, 27, 32, 33, 34, 35, 50, 55, 56, 57, 58 };
+static const int bench_subset[] = { 2, 5, 15, 26, 27, 32, 33, 34, 35, 50, 55, 56, 57, 58,
+                                    59, 60, 61, 62 };
 #define BENCH_RUN ((int)(sizeof(bench_subset) / sizeof(bench_subset[0])))
 #define BENCH_INDEX(i) bench_subset[i]
 #else
@@ -953,6 +955,12 @@ static BENCH_PT bench_point(int i, uint32_t *seed, char *name) {
 		p.two = 1;
 		*seed = bench_worst_seeds[3][0];
 		strcpy(name, "f4_pior1_2j");
+	} else if (i >= 53) {                         /* COMBATE: multidão + ataque sem parar */
+		i -= 53;
+		p.level = i;
+		p.combat = 1;
+		*seed = bench_worst_seeds[i][0];
+		sprintf(name, "f%d_combate", p.level + 1);
 	} else if (i >= 49) {                         /* ANDAR: início -> saída, pior semente */
 		i -= 49;
 		p.level = i;
@@ -1107,6 +1115,7 @@ static struct {
 	int      walk_done, last_build, tick_count;
 	BENCH_SEC sec[BENCH_SECS];                    /* série por segundo */
 } bench;
+static int bench_combat_t;                    /* passo do roteiro de combate */
 
 /* Lugar livre para um inimigo num anel em volta do jogador 1 */
 static int bench_ring_spot(int k, int n, int *x, int *z) {
@@ -1306,8 +1315,28 @@ static void bench_reset_stats(void) {
 	{ int d; level_build_stats(&d); }         /* zera o pior */
 	bench.cut_max = 0;
 	memset(bench.sec, 0, sizeof(bench.sec));
+	bench_combat_t = 0;
 	bench.walk_done = 0;
 	bench_prof_players = bench_prof_enemies = 0;
+}
+
+/* Antes de cada passo de lógica: entradas roteirizadas do ponto de COMBATE
+ * (o jogador ataca sem parar; ninguém morre, para a multidão não diminuir) */
+static void bench_input(void) {
+	if (!(bench.cur.combat && bench.stage == 1 && bench.phase == BENCH_MEASURING))
+		return;
+	int t = bench_combat_t++;
+	INPUT *in = &g.in[0];
+	in->held |= PAD_SQUARE;                          /* ataca sempre */
+	if (t % 120 == 0) in->pressed |= PAD_TRIANGLE;   /* troca de arma a cada 2 s */
+	if ((t % 240) < 60) in->held |= PAD_R1;          /* gira a câmera */
+	for (int i = 0; i < MAX_ENEMIES; i++)            /* (só no bench) */
+		if (g.enemies[i].active) g.enemies[i].hp = enemy_defs[g.enemies[i].type].hp;
+	for (int i = 0; i < MAX_PLAYERS; i++)
+		if (g.players[i].active && g.players[i].hp > 0) {
+			g.players[i].hp = g.players[i].max_hp;
+			g.players[i].energy = PLAYER_MAX_ENERGY;
+		}
 }
 
 /* Depois de cada passo de lógica: custo da colisão naquele passo */
@@ -1496,7 +1525,8 @@ static void bench_frame(int vs) {
 		       g.players[1].active ? dist2d(g.players[1].pos.vx - g.players[0].pos.vx,
 		                                    g.players[1].pos.vz - g.players[0].pos.vz) : 0,
 		       bench.cut_max,
-		       bench.stage == 0 ? "natural" : bench.stage == 1 ? "multidao" : bench.stage == 9 ? "andar" :
+		       bench.stage == 0 ? "natural" : bench.stage == 1 ? (bench.cur.combat ? "combate" : "multidao") :
+		       bench.stage == 9 ? "andar" :
 		       bench.stage == 2 ? "remontagem" : bench_event_names[bench.stage - 3],
 		       bench.build_max,
 		       bench.stage >= 3 ? g.ev.last == bench_events[bench.stage - 3] : -1,
@@ -1515,7 +1545,8 @@ static void bench_frame(int vs) {
 				printf("BENCH serie ponto=%s medida=%s s=%d cpu_max=%d logica_max=%d passos=%d quadros=%d "
 				       "inim_logica=%d jog_logica=%d inim_desenho=%d blocos=%d arvores=%d resto=%d "
 				       "col_max=%d polis_max=%d montagem_max=%d montagens=%d passos_logica=%d\n",
-				       bench.name, bench.stage == 1 ? "multidao" : "andar", si, sc->cpu, sc->logic,
+				       bench.name, bench.stage == 1 ? (bench.cur.combat ? "combate" : "multidao") : "andar",
+				       si, sc->cpu, sc->logic,
 				       sc->ticks, sc->frames, sc->en_log, sc->pl_log, sc->en_draw, sc->chunks, sc->trees,
 				       sc->other, sc->col, sc->polis, sc->build, sc->builds, sc->logic_ticks);
 			}
@@ -1546,6 +1577,10 @@ static void bench_frame(int vs) {
 			bench.stage++;
 			bench.timer = 10;                /* espera o printf (lento) sair do quadro */
 			bench.phase = BENCH_WAIT;
+		} else if (bench.stage == 1 && bench.cur.combat) {   /* combate: só a multidão */
+			bench.point++;
+			bench.dirty = 1;
+			bench.phase = BENCH_TELEPORT;
 		} else if (bench.stage == 1) {       /* remontagem: o bloco do jogador */
 #ifdef BENCH_NO_EVENTS                       /* iterações: só natural + multidão */
 			bench.point++;
@@ -1622,6 +1657,9 @@ int main(void) {
 		for (int t = 0; t < ticks; t++) {
 #ifdef BENCH_REPLAY
 			replay_input();
+#endif
+#ifdef DEBUG_BENCHMARK
+			bench_input();
 #endif
 			game_tick();
 #ifdef BENCH_REPLAY
