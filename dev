@@ -403,6 +403,43 @@ cmd_events_test() {
 	"
 }
 
+# Partida roteirizada com hash (etapa 10a): mesma semente + mesmas entradas
+# = mesmo jogo. Roda o build de bench com -D BENCH_REPLAY e compara os hashes
+# de g a cada 10 s com tools/replay_ref.txt. Rode SEMPRE que mexer na lógica.
+#   ./dev replay-test           compara com a referência
+#   ./dev replay-test --save    grava a referência atual (só se a mudança de
+#                               lógica foi intencional e explicada)
+cmd_replay_test() {
+	local save=0 extra=()
+	while [[ $# -gt 0 ]]; do
+		case "$1" in
+			--save) save=1; shift ;;
+			-D) extra+=(-D "$2"); shift 2 ;;
+			-D*) extra+=("$1"); shift ;;
+			*) c_err "Uso: ./dev replay-test [--save] [-D NOME=VALOR]"; return 1 ;;
+		esac
+	done
+	cmd_bench -D BENCH_REPLAY=1 "${extra[@]}" > build-replay.log 2>&1 ||
+		{ cat build-replay.log; c_err "O replay não terminou (log: build-replay.log)"; return 1; }
+	local got ref="$ROOT/tools/replay_ref.txt"
+	got="$(grep '^BENCH REPLAY' "$ROOT/build-bench-var/bench.txt" | sed 's/^BENCH REPLAY //')"
+	rm -f build-replay.log
+	if [[ -z "$got" ]]; then c_err "Nenhuma linha de hash saiu do replay."; return 1; fi
+	if (( save )); then
+		printf '%s\n' "$got" > "$ref"
+		c_ok "Referência gravada: tools/replay_ref.txt ($(wc -l < "$ref") hashes)"
+		return 0
+	fi
+	if [[ ! -f "$ref" ]]; then c_err "Sem referência: rode ./dev replay-test --save"; return 1; fi
+	if diff <(printf '%s\n' "$got") "$ref" > /dev/null; then
+		c_ok "REPLAY IGUAL: $(wc -l < "$ref") hashes conferem (a lógica não mudou)"
+	else
+		c_err "REPLAY DIFERENTE: a lógica mudou. Primeira diferença (atual | referência):"
+		diff <(printf '%s\n' "$got") "$ref" | head -6
+		return 1
+	fi
+}
+
 case "${1:-build}" in
 	build)  cmd_build ;;
 	run)    shift; cmd_run "$@" ;;
@@ -416,5 +453,6 @@ case "${1:-build}" in
 	bench)  shift; cmd_bench "$@" ;;
 	mapgen-test) shift; cmd_mapgen_test "$@" ;;
 	events-test) shift; cmd_events_test "$@" ;;
+	replay-test) shift; cmd_replay_test "$@" ;;
 	*)      sed -n '3,20p' "$0" | sed 's/^#//' ;;
 esac

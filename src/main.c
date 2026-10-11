@@ -1150,10 +1150,107 @@ static void bench_survive_fill(void) {
 	}
 }
 
+#ifdef BENCH_REPLAY
+/* ------------------------------------------------------------------ */
+/* Partida ROTEIRIZADA com hash (./dev replay-test): entradas sintéticas */
+/* que dependem só do número do passo, eventos forçados em passos fixos, */
+/* e o hash de g (+ mapa: células, árvores, alcance) a cada 10 s. Mesma  */
+/* semente + mesmas entradas = mesmo hash, qualquer que seja o FPS: é a  */
+/* prova de que uma otimização não mudou a lógica.                       */
+/* ------------------------------------------------------------------ */
+#define REPLAY_TICKS   3600                /* 60 s por fase */
+#define REPLAY_HASH_AT 600                 /* hash a cada 10 s */
+static struct { int level, t, done; } rp;
+static const int replay_levels[] = { 0, 1, 2, 3, 4 };
+#define REPLAY_NLEVELS ((int)(sizeof(replay_levels) / sizeof(replay_levels[0])))
+
+static uint32_t fnv(uint32_t h, const void *p, int n) {
+	const uint8_t *b = (const uint8_t *)p;
+	for (int i = 0; i < n; i++) h = (h ^ b[i]) * 16777619u;
+	return h;
+}
+
+static uint32_t replay_hash(void) {
+	uint32_t h = fnv(2166136261u, &g, sizeof(g));
+	const uint8_t (*c)[MAP_MAX_W] = level_cells();
+	for (int z = 0; z < level_height(); z++)
+		h = fnv(h, c[z], level_width());
+	int x, z, t;
+	for (int i = 0; (t = level_tree_get(i, &x, &z)) >= 0; i++) {
+		int v[3] = { t, x, z };
+		h = fnv(h, v, sizeof(v));
+	}
+	for (int zz = 0; zz < level_height(); zz++)
+		for (int xx = 0; xx < level_width(); xx++)
+			h = (h ^ (uint32_t)reach_get(xx, zz)) * 16777619u;
+	return h;
+}
+
+static void replay_begin_level(void) {
+	int lv = replay_levels[rp.level];
+	start_level(lv, lv == 4 ? BENCH_SEED : 0x51ED0000u + (uint32_t)lv);
+	g.state = STATE_PLAY;
+	rp.t = 0;
+}
+
+/* Entradas do passo rp.t (antes de CADA game_tick) */
+static void replay_input(void) {
+	if (rp.done) return;
+	static const int8_t dirs[][2] = { { 0, -127 }, { 90, -90 }, { -127, 0 }, { 0, -127 },
+	                                  { 127, 30 }, { -60, -110 }, { 0, 127 }, { 110, -60 } };
+	const int t = rp.t;
+	INPUT *in = &g.in[0];
+	memset(&g.in[0], 0, sizeof(g.in));
+	in->connected = 1;
+	const int8_t *d = dirs[(t / 240) % 8];          /* direção muda a cada 4 s */
+	in->lx = d[0];
+	in->ly = d[1];
+	if ((t % 90) < 40)          in->held |= PAD_SQUARE;     /* atira */
+	if ((t % 600) >= 300 && (t % 600) < 360) in->held |= PAD_R1;   /* gira a câmera */
+	if (t % 150 == 0)           in->pressed |= PAD_CROSS;   /* pula */
+	if (t % 400 == 200)         in->pressed |= PAD_CIRCLE;  /* poder */
+	if (t % 700 == 350)         in->pressed |= PAD_TRIANGLE;/* troca de arma */
+	if (t % 900 == 450)         in->pressed |= PAD_SELECT;  /* lanterna */
+	in->held |= in->pressed;
+	switch (t) {                                    /* eventos forçados */
+	case 900:  events_debug(EV_TREE_FALL);    break;
+	case 1500: events_debug(EV_CLOSE_BEHIND); break;
+	case 2100: events_debug(EV_WAVE);         break;
+	case 2400: events_debug(EV_OPEN_PATH);    break;
+	case 2700: events_debug(EV_FOG);          break;
+	case 3000: events_debug(EV_SILENCE);      break;
+	}
+}
+
+/* Depois de CADA game_tick */
+static void replay_after_tick(void) {
+	if (rp.done) return;
+	rp.t++;
+	if (rp.t % REPLAY_HASH_AT == 0)
+		printf("BENCH REPLAY fase=%d t=%d estado=%d hash=%08x\n", replay_levels[rp.level] + 1,
+		       rp.t / 60, g.state, (unsigned)replay_hash());
+	if (rp.t >= REPLAY_TICKS) {
+		if (++rp.level >= REPLAY_NLEVELS) {
+			rp.done = 1;
+			printf("BENCH FIM\n");
+			return;
+		}
+		replay_begin_level();
+	}
+}
+#endif
+
 static void bench_start(void) {
 	sel[0].joined = 1; sel[0].ready = 1; sel[0].character = 0; sel[0].skin = 0;
 	sel[1].joined = 0;
 	memset(&progress, 0, sizeof(progress));
+#ifdef BENCH_REPLAY
+	memset(&rp, 0, sizeof(rp));
+	printf("BENCH INICIO replay fases=%d passos=%d\n", REPLAY_NLEVELS, REPLAY_TICKS);
+	replay_begin_level();
+	bench.phase = BENCH_DONE;                /* sem os pontos do bench */
+	return;
+#endif
 	start_level(BENCH_LEVEL, BENCH_SEED);
 	g.state = STATE_PLAY;                    /* pula a introdução */
 	memset(&bench, 0, sizeof(bench));
@@ -1497,7 +1594,13 @@ int main(void) {
 		uint16_t t_logic = TIMER_VALUE(1);     /* perfil: tempo da lógica do quadro */
 #endif
 		for (int t = 0; t < ticks; t++) {
+#ifdef BENCH_REPLAY
+			replay_input();
+#endif
 			game_tick();
+#ifdef BENCH_REPLAY
+			replay_after_tick();
+#endif
 #ifdef DEBUG_BENCHMARK
 			bench_tick();
 #endif

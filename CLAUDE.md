@@ -30,6 +30,7 @@ modificação: `docs/GUIA.md`.
 ./dev bench -D TREE_LOD_DIST=1300   # variante sem mexer no config.h
 ./dev mapgen-test 1000 [--bench] [-D N=V]   # gerador no PC (N sementes/fase); --bench grava src/bench_seeds.h
 ./dev events-test 1000                       # eventos simulados no PC (alcance, ninguém preso, determinismo)
+./dev replay-test                            # partida roteirizada: hash de g igual à referência?
 ./dev clean          # apaga build/
 VERBOSE=1 ./dev build
 ```
@@ -111,6 +112,11 @@ Gerados no build (não edite): `build/gen/assets_gen.{h,c}` (declara
   um gerador separado e não afeta `g`.
 - Nada de ler o controle direto do hardware dentro da lógica (use `g.in[]`).
 - Todo campo novo é inicializado em `*_spawn`/reset (o `memset` de `g` zera o resto).
+- **`./dev replay-test` sempre que mexer na lógica** (inimigos, jogador,
+  colisão, eventos, objetivo, gerador). Partida roteirizada de 60 s por fase
+  (entradas por passo, eventos forçados), hash de `g` + mapa a cada 10 s,
+  comparado com `tools/replay_ref.txt`. Otimização tem que dar IGUAL. Mudança
+  de lógica intencional: explique ao Marcos e regrave com `--save`.
 - **Gerador de mapas:** só usa o RNG local semeado por `g.seed` + fase +
   tentativa (nunca `g.rng`, tempo ou `VSync`); deixa `g.rng` como estava.
   Mesma semente = mesmo mapa (o `./dev mapgen-test` compara o hash da grade).

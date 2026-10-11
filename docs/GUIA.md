@@ -507,6 +507,30 @@ depois do `near` ela já engrossa rápido.
 
 ---
 
+### Conferir que a lógica não mudou (`./dev replay-test`)
+
+Toda mudança que **não deveria** mudar o jogo (otimização, limpeza) e toda
+mudança na lógica (inimigos, jogador, colisão, eventos, objetivo, gerador)
+passa por:
+
+```bash
+./dev replay-test            # REPLAY IGUAL / REPLAY DIFERENTE
+./dev replay-test --save     # grava a referência nova (só se a mudança foi de propósito)
+```
+
+Ele roda uma partida **roteirizada** de 60 s em cada fase (1–5): o jogador
+anda em direções que mudam a cada 4 s, atira, pula, usa poder, troca de
+arma, liga a lanterna, gira a câmera, e os eventos são forçados em passos
+fixos (árvore cai aos 15 s, mata fecha 25 s, onda 35 s, raízes 40 s, névoa
+45 s, silêncio 50 s). A cada 10 s imprime o **hash** de `g` mais o mapa
+(células, árvores, alcance) e compara com `tools/replay_ref.txt`.
+
+As entradas dependem só do **número do passo**, então o resultado não
+depende do FPS: um teste com desenho mais pesado (`-D TREE_LOD_DIST=3000`)
+dá IGUAL; uma mudança de lógica (`-D REACH_MAX_VISIT=60`) dá DIFERENTE.
+Se der DIFERENTE sem você ter mudado a lógica de propósito, há um bug de
+determinismo (algo visual, de tempo ou de VSync entrando na lógica).
+
 ## 4. Modelar no Blender
 
 Regras do PS1 que o exportador espera:

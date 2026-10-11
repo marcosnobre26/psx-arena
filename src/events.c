@@ -627,8 +627,8 @@ void events_update(void) {
 			if (g.ev.queue[i].force) goto run; /* depuração passa */
 		return;
 	}
-#ifndef DEBUG_BENCHMARK
-	check_triggers();                           /* bench: só os forçados */
+#if !defined(DEBUG_BENCHMARK) || defined(BENCH_REPLAY)
+	check_triggers();                           /* bench: só os forçados (replay: todos) */
 #endif
 run:
 	if (g.ev.nq == 0) return;
