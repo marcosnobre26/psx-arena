@@ -298,6 +298,13 @@ static void stream_update(void) {
 		ensure(bx, bz);
 }
 
+/* Memória de rascunho para a geração do mapa: a do CACHE DE BLOCOS, que
+ * está livre dentro do level_load antes de os blocos serem montados (o
+ * mapgen roda nesse intervalo). Fora dele, NÃO use: o cache está em uso. */
+void *level_scratch(int bytes) {
+	return bytes <= (int)sizeof(slot_geom) ? (void *)slot_geom : NULL;
+}
+
 /* Mapa mudou na célula (cx, cz): o bloco dela é remontado (etapa 06) */
 void level_invalidate(int cx, int cz) {
 	int bx = cx / CHUNK_CELLS, bz = cz / CHUNK_CELLS;
@@ -648,22 +655,41 @@ int level_placed(int i, char *ch, int *cx, int *cz) {
 	return num_placed;
 }
 
+/* Começo de uma montagem de fase: sem árvores, sem colocados, grade de
+ * colisão vazia (o mapgen chama a cada tentativa) */
+void level_reset_objects(void) {
+	num_trees = 0;
+	num_placed = num_failed = 0;
+	collide_reset();
+}
+
 static int load_lines;                 /* tempo do último level_load (linhas) */
+
+/* Contador de linhas do PS1 (timer 1). No teste do PC (HOST_TEST) não há
+ * esse hardware: vale 0. */
+#ifdef HOST_TEST
+#define LINE_TIMER() 0
+#else
+#define LINE_TIMER() TIMER_VALUE(1)
+#endif
 
 int level_load_lines(void) {
 	return load_lines;
 }
 
 void level_load(int index) {
-	uint16_t t_load = TIMER_VALUE(1);  /* perfil: quanto a carga leva no console */
+	uint16_t t_load = LINE_TIMER();    /* perfil: quanto a carga leva no console */
 	const LEVEL_DEF *ld = &level_defs[index];
 	cur_level = index;
 	level_apply_look();               /* a luz entra na cor dos blocos */
 
-	num_trees = 0;
-	num_placed = num_failed = 0;
-	collide_reset();                  /* grade espacial vazia antes de criar objetos */
-	ld->build();                      /* a fase monta a grade e os objetos (levels.c) */
+	if (ld->gen) {
+		mapgen_build(index);          /* gera (com novas tentativas e plano B) */
+	} else {
+		level_reset_objects();        /* grade espacial vazia antes de criar objetos */
+		ld->build();                  /* fase fixa (levels.c) */
+		mapgen_mark_fixed();
+	}
 	trees_finish();
 
 	/* textura de cada tipo de terreno */
@@ -693,7 +719,7 @@ void level_load(int index) {
 	for (int dz = -CHUNK_LOAD_RADIUS; dz <= CHUNK_LOAD_RADIUS; dz++)
 		for (int dx = -CHUNK_LOAD_RADIUS; dx <= CHUNK_LOAD_RADIUS; dx++)
 			ensure(fcx + dx, fcz + dz);
-	load_lines = (uint16_t)(TIMER_VALUE(1) - t_load);   /* < 65536 linhas (~4 s) */
+	load_lines = (uint16_t)(LINE_TIMER() - t_load);     /* < 65536 linhas (~4 s) */
 }
 
 /* Névoa, céu e luz da fase atual (também chamado ao voltar dos menus) */

@@ -151,6 +151,32 @@ typedef struct {
 } TREE_DEF;
 extern const TREE_DEF tree_defs[];
 
+/* Geração procedural (mapgen.c): parâmetros de uma fase gerada */
+enum { GEN_HUNT, GEN_CROSS, GEN_COLLECT, GEN_SURVIVE };   /* onde ficam início/saída/... */
+enum { GEN_HEALTH, GEN_ENERGY, GEN_BATTERY, GEN_WEAPON, GEN_GEM, GEN_CRATE, GEN_ITEM_TYPES };
+typedef struct {
+	int w, h;                    /* tamanho em células (até 128) */
+	int layout;                  /* GEN_* */
+	int dens_min, dens_max;      /* árvores por mil células (pelo ruído) */
+	int chunk_cap;               /* árvores no máximo por bloco 8x8 */
+	int window_cap;              /* "árvores" no máximo numa janela 3x3 blocos
+	                                (mata conta 1/4 por célula) */
+	int clear_min, clear_max;    /* clareiras sorteadas */
+	int clear_rmin, clear_rmax;  /* raio delas */
+	int survive_r;               /* GEN_SURVIVE: raio da clareira do cerco */
+	int logs;                    /* troncos caídos */
+	int enemies;                 /* orçamento de inimigos */
+	int enemy_min_dist;          /* distância mínima do início (células) */
+	int items[GEN_ITEM_TYPES];   /* vida, energia, pilha, arma, gema, caixa */
+} GEN_PARAMS;
+
+typedef struct {
+	uint32_t seed;               /* semente usada (base + tentativas - 1) */
+	int tries, fallback;         /* tentativas; 1 = usou o plano B */
+	int trees, dens_permil, max_chunk;
+	int win_weight, win_bx, win_bz;   /* janela 3x3 mais pesada (peso: árvore = 4) */
+} MAPGEN_STATS;
+
 /* Ponto fixo para o teleporte de depuração (célula + direção da câmera) */
 typedef struct {
 	int cx, cz;
@@ -173,6 +199,7 @@ typedef struct {
 	const char        *obj_text;     /* frase da introdução (ASCII, sem acentos) */
 	void             (*build)(void); /* monta a grade e os objetos (por código) */
 	const DEBUG_POINT *debug_pts;    /* 4 pontos de teleporte (L2 + direcional) */
+	const GEN_PARAMS  *gen;          /* != NULL: mapa GERADO por g.seed (build = plano B) */
 } LEVEL_DEF;
 extern const LEVEL_DEF  level_defs[];
 extern const int        num_levels;       /* fases da sequência normal */
@@ -356,6 +383,15 @@ void exit_draw(void);
 
 /* level.c */
 void level_load(int index);
+void level_reset_objects(void);         /* sem árvores/colocados, colisão vazia */
+void *level_scratch(int bytes);         /* rascunho (só dentro do level_load) */
+
+/* mapgen.c */
+int  mapgen_build(int index);           /* 1 = gerou; 0 = plano B */
+const MAPGEN_STATS *mapgen_stats(void);
+const DEBUG_POINT *mapgen_points(int index);   /* teleporte: gerados ou fixos */
+int  mapgen_active(void);
+void mapgen_mark_fixed(void);
 int  level_load_lines(void);            /* tempo do último level_load em linhas (~63,5 us) */
 void level_begin(int w, int h);         /* mapa por código: tamanho (tudo vazio) */
 void level_set_cell(int cx, int cz, int type);   /* CELL_* (solidez automática) */

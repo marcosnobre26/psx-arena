@@ -26,7 +26,7 @@
  */
 #include "game.h"
 
-#define FOREST_BORDER  4
+#define FOREST_BORDER  FOREST_EDGE
 
 /* Hash de posição COM SEMENTE. Cada fase usa uma semente fixa própria
  * (florestas diferentes, sempre iguais). Na etapa 05 o gerador deve passar
@@ -288,6 +288,25 @@ static void build_f4(void) {
 }
 static const DEBUG_POINT f4_pts[4] = { { 31, 31, 0 }, { 31, 31, 1024 }, { 31, 31, 512 }, { 24, 24, 2560 } };
 
+/* ------------------------------------------------------------------ */
+/* Parâmetros da GERAÇÃO de cada fase (mapgen.c; etapa 05)              */
+/* ------------------------------------------------------------------ */
+/* As florestas fixas acima (build_f1..f4) viram o PLANO B: só são usadas se
+ * MAPGEN_TRIES sementes seguidas gerarem mapas inválidos. Orçamentos de
+ * inimigos/itens iguais aos da 04e. Tetos de densidade: escolhidos pelo
+ * ./dev bench (o pior mapa não pode passar do pior caso da 04e). */
+#ifndef GEN_WINDOW_CAP
+#define GEN_WINDOW_CAP 40       /* "árvores" numa janela 3x3 blocos (o que a câmera vê) */
+#endif
+#ifndef GEN_CHUNK_CAP
+#define GEN_CHUNK_CAP  8        /* árvores num bloco 8x8 */
+#endif
+/*                                       tam      layout       dens   tetos                         clareiras   cerco troncos inim. dist  vida ener pilha arma gema caixa */
+static const GEN_PARAMS f1_gen = { 64, 64,   GEN_HUNT,    20, 90, GEN_CHUNK_CAP, GEN_WINDOW_CAP, 3, 5, 3, 6, 0,    6,      12,   12, { 2, 1, 2, 1, 3, 3 } };
+static const GEN_PARAMS f2_gen = { 128, 128, GEN_CROSS,   20, 90, GEN_CHUNK_CAP, GEN_WINDOW_CAP, 5, 8, 4, 8, 0,    15,     14,   16, { 2, 1, 3, 1, 3, 2 } };
+static const GEN_PARAMS f3_gen = { 64, 64,   GEN_COLLECT, 20, 90, GEN_CHUNK_CAP, GEN_WINDOW_CAP, 2, 4, 3, 5, 0,    6,      8,    10, { 1, 1, 2, 0, 1, 2 } };
+static const GEN_PARAMS f4_gen = { 64, 64,   GEN_SURVIVE, 20, 90, GEN_CHUNK_CAP, GEN_WINDOW_CAP, 2, 3, 3, 5, 11,   6,      3,    6,  { 1, 1, 2, 0, 0, 2 } };
+
 /* Teleporte de depuração (L2 + direcional com o overlay aberto): sempre
  * os mesmos lugares e a mesma direção de câmera, para medir FPS/POLIS.
  * Ordem: esquerda, direita, cima, baixo. Ângulo: 0 = sul (+Z), 1024 = leste. */
@@ -311,19 +330,19 @@ const LEVEL_DEF level_defs[] = {
 	{ "CACADA",
 	  10, 12, 24,        1300, 3200,     40, 40, 56,   0,
 	  OBJ_KILL_ALL,   0,         0,             "DERROTE TODOS OS INIMIGOS",
-	  build_f1, f1_pts },
+	  build_f1, f1_pts, &f1_gen },
 	{ "TRAVESSIA",
 	  6, 14, 10,        1200, 2800,     30, 40, 34,   0,
 	  OBJ_REACH_EXIT, 0,         0,             "ATRAVESSE A FLORESTA",
-	  build_f2, f2_pts },
+	  build_f2, f2_pts, &f2_gen },
 	{ "RELIQUIAS",
 	  16,  8, 20,        1300, 3000,     40, 30, 48,   0,
 	  OBJ_COLLECT,    4,         0,             "PEGUE 4 RELIQUIAS E SAIA",
-	  build_f3, f3_pts },
+	  build_f3, f3_pts, &f3_gen },
 	{ "CERCO",
 	  20,  8,  8,        1400, F4_FOG_FAR, 48, 32, 32,   0,
 	  OBJ_SURVIVE,    60,        F4_MAX_ENEMIES, "SOBREVIVA 60 SEGUNDOS",
-	  build_f4, f4_pts },
+	  build_f4, f4_pts, &f4_gen },
 	/* SÓ TESTE (fora da sequência normal): DEBUG_START_LEVEL 5 e ./dev bench */
 	{ "FLORESTA (TESTE)",
 	  8, 12, 10,        1300, FOREST_FOG_FAR, 36, 40, 36,   0,

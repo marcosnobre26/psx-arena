@@ -560,8 +560,8 @@ static void game_tick(void) {
 		enemies_update();
 		effects_update();
 		if (any_pressed(PAD_START) >= 0) {
-			if (g.state == STATE_DEAD) {              /* recomeça a fase (semente nova) */
-				start_level(g.level, g.frame);
+			if (g.state == STATE_DEAD) {              /* recomeça a fase: MESMO mapa */
+				start_level(g.level, g.seed);     /* mesma semente = mesma floresta */
 			} else if (g.level + 1 < num_levels) {    /* próxima fase, levando tudo */
 				progress_save();
 				start_level(g.level + 1, g.frame);
@@ -712,7 +712,7 @@ static void teleport_to(const DEBUG_POINT *pt) {
 }
 
 static void debug_teleport(int i) {
-	const DEBUG_POINT *pts = level_defs[g.level].debug_pts;
+	const DEBUG_POINT *pts = mapgen_points(g.level);   /* do mapa gerado ou fixos */
 	if (!pts || (g.state != STATE_PLAY && g.state != STATE_PAUSE))
 		return;
 	teleport_to(&pts[i]);
@@ -1016,7 +1016,7 @@ static void bench_frame(int vs) {
 			}
 			g.state = STATE_PLAY;                /* pula a introdução */
 			if (bp->pt >= 0)
-				teleport_to(&level_defs[bp->level].debug_pts[bp->pt]);
+				teleport_to(&mapgen_points(bp->level)[bp->pt]);
 			else
 				teleport_to(&bench_extra[-bp->pt - 1]);
 			if (bp->two)
