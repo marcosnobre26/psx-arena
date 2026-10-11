@@ -624,3 +624,12 @@ automatizar testes visuais.
   continua determinístico (lógica por passo), mas o "tempo" do jogo deixa de
   acompanhar o relógio quando um console sobrecarrega (no lockstep, o mais
   lento já dita o ritmo). RAM: 875 218 → 877 874 bytes (+2 656).
+- 2026-10-11 — Decisão (10a): **`MAX_TICKS_PER_FRAME` = 2** (antes 4). Por
+  quê: com 4, um único quadro acima de ~525 linhas fazia rodar 3 passos de
+  lógica no seguinte (+35 linhas) e o jogo podia ficar preso em 20 FPS
+  (biestável). Com 2, ele volta a 30 FPS sozinho; se a cena não couber nem
+  com 2 passos, o jogo fica em **câmera lenta** (ex.: 67% da velocidade a
+  20 FPS) em vez de travar em 20 FPS em tempo real. Timers, sobrevivência e
+  eventos contam em passos, então atrasam junto. `./dev replay-test`: IGUAL
+  (a lógica é por passo). Bench dos 14 pontos mais pesados: iguais aos de
+  antes (±5 linhas), todos a 30 FPS, pior 460 (fase 5) e 450 (f2_fixo_arv).

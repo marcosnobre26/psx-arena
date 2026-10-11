@@ -220,9 +220,11 @@ uma branch. As regras do ROADMAP (determinismo, orçamentos de desempenho,
   C antes da GTE (pré-descarte de costas) é MAIS LENTA que deixar a GTE
   projetar e descartar; o caro é projetar o que está fora da tela
   (descarte por esfera em blocos/sub-blocos/modelos) e chamada de função
-  por célula/vizinho em laço quente. `MAX_TICKS_PER_FRAME` = 4 (2 tira da
-  armadilha dos 20 FPS, mas com sobrecarga forte o jogo fica em câmera
-  lenta e muda o "tempo" do modo link: decisão do Marcos, não aplicado).
+  por célula/vizinho em laço quente. `MAX_TICKS_PER_FRAME` = **2** (decisão do
+  Marcos, 10a): um quadro lento não vira 3 passos de lógica, então o jogo
+  não prende em 20 FPS; sob sobrecarga forte ele fica em CÂMERA LENTA (o
+  tempo do jogo atrasa em relação ao relógio) em vez de travar em 20 FPS.
+  A lógica é por passo: determinismo e replay não mudam.
 - Desempenho: ~30 FPS na fase com os limites atuais; confira com **L2** no
   jogo (`SEED`, `POLIS` = polígonos enviados à GPU, FPS e bytes de primitivas;
   `PACKET_LEN` = 96 KB por buffer).
