@@ -305,6 +305,9 @@ static inline int bad_xy(int x, int y) {
 	return (x < -600 || x > SCREEN_W + 600 || y < -400 || y > SCREEN_H + 400);
 }
 
+#ifdef YAW_CHECK
+int yaw_mismatch, yaw_checks;        /* conferência (bench): deve ser 0 */
+#endif
 int render_mesh(const MESH *m, const VECTOR *pos, const SVECTOR *rot,
                  int scale, const DRAWOPT *opt) {
 	static const DRAWOPT defopt = { 0 };
@@ -359,6 +362,33 @@ int render_mesh(const MESH *m, const VECTOR *pos, const SVECTOR *rot,
 			MulMatrix0(&light_dir, &model, &lmtx);
 		}
 		GTE_BARRIER();                       /* mv/lmtx acabaram de ser escritas */
+	} else if (rot->vx == 0 && rot->vz == 0) {
+		/* SÓ em torno do eixo vertical (árvores, inimigos, jogadores): a
+		 * matriz sai direto de isin/icos, sem RotMatrix de 3 ângulos
+		 * (etapa 10a). Conferida igual à do RotMatrix (-D YAW_CHECK). */
+		int sn = isin(rot->vy), cs = icos(rot->vy);
+		model.m[0][0] = cs;  model.m[0][1] = 0;   model.m[0][2] = sn;
+		model.m[1][0] = 0;   model.m[1][1] = ONE; model.m[1][2] = 0;
+		model.m[2][0] = -sn; model.m[2][1] = 0;   model.m[2][2] = cs;
+#ifdef YAW_CHECK
+		{
+			MATRIX ref;
+			RotMatrix((SVECTOR *)rot, &ref);
+			for (int i = 0; i < 3; i++)
+				for (int j = 0; j < 3; j++)
+					if (ref.m[i][j] != model.m[i][j]) yaw_mismatch++;
+			yaw_checks++;
+		}
+#endif
+		GTE_BARRIER();
+		if (lit)
+			MulMatrix0(&light_dir, &model, &lmtx);   /* luz no espaço do modelo */
+		if (scale != ONE) {
+			VECTOR s = { scale, scale, scale };
+			ScaleMatrix(&model, &s);
+		}
+		model.t[0] = pos->vx; model.t[1] = pos->vy; model.t[2] = pos->vz;
+		CompMatrixLV(&view, &model, &mv);        /* mundo -> câmera */
 	} else {
 		RotMatrix((SVECTOR *)rot, &model);
 		if (lit)

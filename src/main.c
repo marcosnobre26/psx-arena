@@ -1501,6 +1501,10 @@ static void bench_frame(int vs) {
 #ifdef SUBCULL_CHECK
 		{ extern int subcull_lost; printf("BENCH subcull ponto=%s perdidos=%d\n", bench.name, subcull_lost); subcull_lost = 0; }
 #endif
+#ifdef YAW_CHECK
+		{ extern int yaw_mismatch, yaw_checks;
+		  printf("BENCH yaw ponto=%s diferentes=%d de=%d\n", bench.name, yaw_mismatch, yaw_checks); }
+#endif
 		if (bench.stage == 1 || bench.stage == 9)   /* a série, 1 linha por segundo */
 			for (int si = 0; si < BENCH_SECS && bench.sec[si].frames; si++) {
 				const BENCH_SEC *sc = &bench.sec[si];
