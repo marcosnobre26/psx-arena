@@ -144,6 +144,7 @@ static void add_quad(CHUNK_GEOM *c, const int corner[4][3], int n, int uvset,
 		render_bake_light(&normals[n], vr, g * var >> 7, vb, &q->c[k]);
 	}
 	q->tex = tex;
+	q->n = n;
 	q->uv = uvset;
 	q->rot = rot;
 	q->zbias = zbias;
@@ -154,6 +155,17 @@ static void build_chunk_begin(CHUNK_GEOM *c, int ccx, int ccz) {
 	c->origin.vy = 0;
 	c->origin.vz = ccz * CHUNK_CELLS * TILE_SIZE;
 	c->nquads = 0;
+	memset(c->sub_start, 0, sizeof(c->sub_start));
+}
+
+/* Ordem de montagem: sub-bloco 4x4 por sub-bloco (etapa 10a). Assim os
+ * quads de cada quarto do bloco ficam juntos e o desenho pula de uma vez
+ * um quarto inteiro fora da tela (sub_start). k = 0..63. */
+static void chunk_cell_order(CHUNK_GEOM *c, int k, int *lx, int *lz) {
+	int q = k >> 4, i = k & 15;
+	if (i == 0) c->sub_start[q] = c->nquads;
+	*lx = (q & 1) * 4 + (i & 3);
+	*lz = (q >> 1) * 4 + (i >> 2);
 }
 
 /* Quads de UMA célula (lx, lz) do bloco (ccx, ccz). A montagem inteira e a
@@ -201,9 +213,12 @@ static void build_chunk_cell(CHUNK_GEOM *c, int ccx, int ccz, int lx, int lz) {
 
 static void build_chunk(CHUNK_GEOM *c, int ccx, int ccz) {
 	build_chunk_begin(c, ccx, ccz);
-	for (int lz = 0; lz < CHUNK_CELLS; lz++)
-		for (int lx = 0; lx < CHUNK_CELLS; lx++)
-			build_chunk_cell(c, ccx, ccz, lx, lz);
+	for (int k = 0; k < CHUNK_CELLS * CHUNK_CELLS; k++) {
+		int lx, lz;
+		chunk_cell_order(c, k, &lx, &lz);
+		build_chunk_cell(c, ccx, ccz, lx, lz);
+	}
+	c->sub_start[4] = c->nquads;
 }
 
 /* ------------------------------------------------------------------ */
@@ -457,7 +472,9 @@ static void rebuild_step(void) {
 		uint16_t t0 = LINE_TIMER();
 		do {
 			uint16_t tc = LINE_TIMER();
-			build_chunk_cell(&rebuild_geom, job_bx, job_bz, rebuild_cell % CHUNK_CELLS, rebuild_cell / CHUNK_CELLS);
+			int lx, lz;
+			chunk_cell_order(&rebuild_geom, rebuild_cell, &lx, &lz);
+			build_chunk_cell(&rebuild_geom, job_bx, job_bz, lx, lz);
 			int c = (uint16_t)(LINE_TIMER() - tc);
 			if (c > cell_cost) cell_cost = c;
 			rebuild_cell++;
@@ -467,6 +484,7 @@ static void rebuild_step(void) {
 		if (bl > build_lines_max) build_lines_max = bl;
 	}
 	if (rebuild_cell < CHUNK_CELLS * CHUNK_CELLS) return;
+	rebuild_geom.sub_start[4] = rebuild_geom.nquads;
 	if (job_kind == 1) {
 		slot_geom[slot_of[job_bz][job_bx]] = rebuild_geom;   /* pronto: troca */
 	} else {

@@ -1498,6 +1498,9 @@ static void bench_frame(int vs) {
 		       bench.stage >= 3 ? g.ev.last == bench_events[bench.stage - 3] : -1,
 		       bench.logic_max, bench.ev_job, bench.ev_impact, bench.ev_check);
 
+#ifdef SUBCULL_CHECK
+		{ extern int subcull_lost; printf("BENCH subcull ponto=%s perdidos=%d\n", bench.name, subcull_lost); subcull_lost = 0; }
+#endif
 		if (bench.stage == 1 || bench.stage == 9)   /* a série, 1 linha por segundo */
 			for (int si = 0; si < BENCH_SECS && bench.sec[si].frames; si++) {
 				const BENCH_SEC *sc = &bench.sec[si];

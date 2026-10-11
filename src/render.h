@@ -58,11 +58,14 @@ typedef struct {
 	uint8_t  rot;         /* chão: rotação da textura 0..3 (variedade) */
 	uint8_t  corners;     /* canto da textura de cada vértice (2 bits cada) */
 	int8_t   zbias;
+	uint8_t  n;           /* normal: 0 = cima, 1 = -Z, 2 = +Z, 3 = -X, 4 = +X
+	                         (ocupa o byte de alinhamento: não cresce) */
 } CHUNK_QUAD;
 
 typedef struct {
 	VECTOR      origin;   /* canto (x0, 0, z0) do bloco no mundo */
 	int         nquads;
+	uint16_t    sub_start[5];   /* quads de cada sub-bloco 4x4 (etapa 10a): [q, q+1) */
 	CHUNK_QUAD  quads[CHUNK_MAX_QUADS];
 } CHUNK_GEOM;
 

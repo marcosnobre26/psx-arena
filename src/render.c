@@ -341,23 +341,43 @@ int render_mesh(const MESH *m, const VECTOR *pos, const SVECTOR *rot,
 
 	/* Matriz do modelo = rotação + escala + posição */
 	MATRIX model, mv, lmtx;
-	SVECTOR zero = { 0 };
-	RotMatrix(rot ? (SVECTOR *)rot : &zero, &model);
-	MulMatrix0(&light_dir, &model, &lmtx);   /* luz no espaço do modelo */
-	if (scale != ONE) {
-		VECTOR s = { scale, scale, scale };
-		ScaleMatrix(&model, &s);
+	int lit = !(opt->flags & DRAW_UNLIT);
+	if (!rot) {
+		/* SEM rotação (sombras, pilar): mundo -> câmera direto, vista
+		 * escalada + translação, sem RotMatrix/CompMatrixLV (etapa 10a:
+		 * a sombra é desenhada para cada inimigo e o preparo custava mais
+		 * que os 6 triângulos dela) */
+		for (int i = 0; i < 3; i++) {
+			for (int j = 0; j < 3; j++)
+				mv.m[i][j] = (view.m[i][j] * scale) >> 12;
+			mv.t[i] = view.t[i] + ((view.m[i][0] * pos->vx + view.m[i][1] * pos->vy +
+			                        view.m[i][2] * pos->vz) >> 12);
+		}
+		if (lit) {
+			SVECTOR zero = { 0 };
+			RotMatrix(&zero, &model);
+			MulMatrix0(&light_dir, &model, &lmtx);
+		}
+		GTE_BARRIER();                       /* mv/lmtx acabaram de ser escritas */
+	} else {
+		RotMatrix((SVECTOR *)rot, &model);
+		if (lit)
+			MulMatrix0(&light_dir, &model, &lmtx);   /* luz no espaço do modelo */
+		if (scale != ONE) {
+			VECTOR s = { scale, scale, scale };
+			ScaleMatrix(&model, &s);
+		}
+		model.t[0] = pos->vx; model.t[1] = pos->vy; model.t[2] = pos->vz;
+		CompMatrixLV(&view, &model, &mv);        /* mundo -> câmera */
 	}
-	model.t[0] = pos->vx; model.t[1] = pos->vy; model.t[2] = pos->vz;
-	CompMatrixLV(&view, &model, &mv);        /* mundo -> câmera */
 
 	gte_SetRotMatrix(&mv);
 	gte_SetTransMatrix(&mv);
-	gte_SetLightMatrix(&lmtx);
+	if (lit)
+		gte_SetLightMatrix(&lmtx);
 
 	uint32_t *ot   = fb[cur].ot;
 	uint8_t  *end  = fb[cur].pkt + PACKET_LEN - 64;
-	int       lit  = !(opt->flags & DRAW_UNLIT);
 	int       semi = (opt->flags & DRAW_SEMITRANS) ? 1 : 0;
 
 	for (int i = 0; i < m->nfaces; i++) {
@@ -521,7 +541,12 @@ static const uint8_t chunk_uv[2][4][2] = {
 
 #define CHUNK_HALF    (CHUNK_CELLS * TILE_SIZE / 2)
 #define CHUNK_RADIUS  (CHUNK_HALF * 3 / 2 + THICKET_HEIGHT / 2)   /* esfera que cobre o bloco */
+#define SUB_SIZE      (CHUNK_CELLS / 2 * TILE_SIZE)                 /* sub-bloco 4x4 células */
+#define SUB_RADIUS    (SUB_SIZE / 2 * 3 / 2 + THICKET_HEIGHT / 2)   /* esfera que cobre o sub-bloco */
 
+#ifdef SUBCULL_CHECK
+int subcull_lost;                    /* quads visíveis que o sub-bloco pulou (deve ser 0) */
+#endif
 void render_chunk(const CHUNK_GEOM *c) {
 	if (!c->nquads || !chunk_verts)
 		return;
@@ -541,20 +566,78 @@ void render_chunk(const CHUNK_GEOM *c) {
 	if (vx > lim || vx < -lim)
 		return;
 
+	/* sub-blocos 4x4 (etapa 10a): o mesmo teste de esfera para cada quarto.
+	 * Um bloco que aparece só em parte tinha ~60% dos quads projetados à
+	 * toa (fora da tela); agora o quarto todo fora é pulado. Conservador:
+	 * nada visível some. */
+	int vis = 0;
+	for (int qd = 0; qd < 4; qd++) {
+		const int sr = SUB_RADIUS;
+		int sdx = c->origin.vx + (qd & 1) * SUB_SIZE + SUB_SIZE / 2 - cam_pos.vx;
+		int sdz = c->origin.vz + (qd >> 1) * SUB_SIZE + SUB_SIZE / 2 - cam_pos.vz;
+		int svz = (view.m[2][0] * sdx + view.m[2][1] * dy + view.m[2][2] * sdz) >> 12;
+		if (svz < NEAR_Z - sr || svz - sr > fog_base.far) continue;
+		int svx = (view.m[0][0] * sdx + view.m[0][1] * dy + view.m[0][2] * sdz) >> 12;
+		int sl = (svz * (SCREEN_W / 2)) / FOV_H + ((sr * 3) >> 1);
+		if (svx > sl || svx < -sl) continue;
+		int svy = (view.m[1][0] * sdx + view.m[1][1] * dy + view.m[1][2] * sdz) >> 12;
+		sl = (svz * (SCREEN_H / 2)) / FOV_H + ((sr * 3) >> 1);
+		if (svy > sl || svy < -sl) continue;
+		vis |= 1 << qd;
+	}
+	if (!vis) return;
+
 	fog_use(&fog_base);              /* blocos não usam a névoa da lanterna */
 	load_translation(c->origin.vx, 0, c->origin.vz);
 
 	uint32_t *ot  = fb[cur].ot;
 	uint8_t  *end = fb[cur].pkt + PACKET_LEN - 64;
 	const int far = fog_base.far;
+	/* câmera no espaço do bloco: o descarte de face de costas das faces
+	 * alinhadas aos eixos vira uma comparação inteira, ANTES da GTE (etapa
+	 * 10a: ~metade das laterais de mata estão de costas e pagavam a
+	 * projeção à toa). Exato: é o mesmo critério do nclip para esses planos. */
+	const int lcx = cam_pos.vx - c->origin.vx, lcy = cam_pos.vy, lcz = cam_pos.vz - c->origin.vz;
 
+	int qd = 0;
 	for (int i = 0; i < c->nquads; i++) {
+		while (qd < 4 && i >= c->sub_start[qd + 1]) qd++;   /* em que quarto está */
+		if (qd < 4 && !(vis & (1 << qd))) {                 /* quarto fora: pula */
+#ifdef SUBCULL_CHECK
+			/* conferência (bench): projeta mesmo assim e conta quad que
+			 * teria vértice DENTRO da tela, na frente e antes da névoa */
+			for (int k = i; k < c->sub_start[qd + 1]; k++) {
+				const CHUNK_QUAD *qq = &c->quads[k];
+				for (int vtx = 0; vtx < 4; vtx++) {
+					DVECTOR sxy; int32_t sz;
+					gte_ldv0(&chunk_verts[qq->v[vtx]]);
+					gte_rtps();
+					gte_stsxy(&sxy);
+					gte_stsz(&sz);
+					if (sz >= NEAR_Z && sz <= far && sxy.vx >= 0 && sxy.vx < SCREEN_W &&
+					    sxy.vy >= 0 && sxy.vy < SCREEN_H) { subcull_lost++; break; }
+				}
+			}
+#endif
+			i = c->sub_start[qd + 1] - 1;
+			continue;
+		}
 		const CHUNK_QUAD *q = &c->quads[i];
 		int p, otz;
 		int32_t z0, z1, z2, z3;
 
 		if (nextpri >= end)
 			break;
+		{
+			const SVECTOR *v0 = &chunk_verts[q->v[0]];
+			switch (q->n) {
+			case 0: if (lcy >= v0->vy) continue; break;   /* topo: câmera acima (Y para baixo) */
+			case 1: if (lcz >= v0->vz) continue; break;   /* face -Z */
+			case 2: if (lcz <= v0->vz) continue; break;   /* face +Z */
+			case 3: if (lcx >= v0->vx) continue; break;   /* face -X */
+			case 4: if (lcx <= v0->vx) continue; break;   /* face +X */
+			}
+		}
 
 		gte_ldv3(&chunk_verts[q->v[0]], &chunk_verts[q->v[1]], &chunk_verts[q->v[2]]);
 		gte_rtpt();
