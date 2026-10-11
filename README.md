@@ -549,6 +549,19 @@ tronco em pé bloqueiam; tronco caído e chão vazio não; pessoas não. A IA ai
   fatias (`level_rebuild_chunk`, orçamento adaptativo pela folga do quadro anterior).
 - Tremor: offset de desenho da GPU (`DRAWENV.ofs`), não a câmera.
 
+### Combate (`weapons.c`, `enemies.c`; etapa 07)
+
+- **Armas por tipo** (`WEAPON_DEF.kind`): corpo a corpo (espada, machado: golpe em arco com
+  janela de acerto pela grade, silencioso; o machado corta copa de árvore caída e raízes),
+  arco (carga, flecha = munição, às vezes fica no chão), magias (bola de fogo, clarão, cura;
+  substituem os poderes) e armas de fogo raras (pistola, espingarda: mira automática curta,
+  barulho alto). Munição e mana por jogador; mana volta só até 25%.
+- **Barulho**: `noise_emit` guarda os 4 mais fortes do passo em `g`; os inimigos ouvem.
+- **Inimigos de terror**: estados vagar/investigar/perseguir/procurar; visão a cada 8 passos
+  (escuridão, lanterna x2, cone, linha de visão pela grade); rastejador, caçador (foge da
+  lanterna), grande (raro, passos pesados, só aparece de perto).
+- Modelos e sons procedurais (`tools/make_combat_models.py`, `make_combat_sounds.py`).
+
 ### Entidades e dados
 
 - Estado global único `GAME g` (em `main.c`), zerado a cada partida; a seleção de personagens fica
@@ -569,7 +582,7 @@ tronco em pé bloqueiam; tronco caído e chão vazio não; pessoas não. A IA ai
 | `.text` | ~135 KB | código do jogo + bibliotecas do SDK usadas |
 | `.data` | ~118 KB | modelos, texturas e sons embutidos, tabelas |
 | `.bss` | ~602 KB | 2 × 96 KB de primitivas, 2 × OT, cache de 36 blocos (~277 KB; também é a memória do BFS do gerador) + 1 de reserva (remontagem em fatias), grade 128×128 (16 KB), alcance (2 KB) e janela da checagem (~5 KB), árvores, pools |
-| **Total** | **~857 KB** (877 874 bytes) de 2 MB | orçamento do roteiro: 1,2 MB |
+| **Total** | **~894 KB** (915 066 bytes) de 2 MB | orçamento do roteiro: 1,2 MB |
 
 Medido com `mipsel-linux-gnu-size build/arena.elf` (dentro do `./dev shell`).
 

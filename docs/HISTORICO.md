@@ -633,3 +633,42 @@ automatizar testes visuais.
   eventos contam em passos, então atrasam junto. `./dev replay-test`: IGUAL
   (a lógica é por passo). Bench dos 14 pontos mais pesados: iguais aos de
   antes (±5 linhas), todos a 30 FPS, pior 460 (fase 5) e 450 (f2_fixo_arv).
+- 2026-10-11 — Etapa 07 (combate de sobrevivência). Armas por tipo
+  (`WEAPON_DEF.kind`): espada e machado (corpo a corpo, golpe em arco com
+  janela de acerto pela grade, silencioso; machado corta copa de árvore
+  caída em 3 golpes e raízes em 4, com barulho médio), arco (carga; flecha
+  = munição; 40% fica no chão, pool de 6), magias (bola de fogo, clarão =
+  atordoa/assusta, cura; os poderes e o dash saíram), pistola e espingarda
+  (raras, mira automática ~13°, barulho alto). Munição e mana por jogador,
+  sem fogo amigo; mana +1/2 s só até 25%. Controles: □ ataca (segurar
+  carrega o arco), △ próxima arma, R2 segurado = devagar e em silêncio,
+  ○ livre. Inimigos de terror: vagar/investigar/perseguir/procurar; visão a
+  cada 8 passos (escuridão, lanterna x2, cone, linha de visão); audição
+  pelos 4 barulhos mais fortes do passo; rastejador, caçador (foge da
+  lanterna), grande (1 por mapa, 2 na fase 2; pisadas; só aparece a < 6
+  células). Arma na mão (a arma embutida nos modelos dos personagens some).
+  Modelos e sons procedurais (`make_combat_models.py`,
+  `make_combat_sounds.py`), nada de terceiros. `./dev replay-test`
+  regravado a cada mudança intencional de lógica (armas; machado; IA) e
+  IGUAL nos passos só visuais/som. `./dev events-test` corta tudo com o
+  machado: 0 objetivos inalcançáveis.
+
+  **Desempenho** (bench completo; meta 450 / 480 em evento): pior quadro
+  normal 432 (f2_fixo_arv), evento 446, **combate 401** (f4: multidão
+  perseguindo + ataque sem parar com todas as armas + o grande + 6 flechas
+  no chão + clarão); lógica dos inimigos ≤ 70 linhas; fase 5 a 30 FPS. Os
+  modelos novos começaram com 40 faces (+25–30 linhas) e foram enxugados
+  (20–28 faces, armas ≤ 14). RAM 877 874 → 915 066 bytes (+37 192); SPU
+  +21 KB (total ~107 KB de 450); VRAM sem textura nova.
+
+  **Balanceamento inicial** (para o Marcos jogar e ajustar):
+
+  | Item | Valor | Item | Valor |
+  |---|---|---|---|
+  | espada | dano 2, 22 passos, alcance 240 | arco | dano 1–4 (carga 0,75 s), 18 passos |
+  | machado | dano 5, 40 passos, alcance 260 | flechas | começa 0 (Batedor 6), máx. 20, `V` +4 |
+  | bola de fogo | 25 mana, dano 4 | pistola | dano 4, 16 passos, `M` +3 balas, máx. 12 |
+  | clarão | 35 mana, atordoa 1,5 s, foge 3 s | espingarda | 5 × dano 3, 44 passos |
+  | cura | 40 mana, +35 vida | mana | começa 50, volta só até 25 |
+  | rastejador | vida 8, vel. 4, dano 14, visão 4 | caçador | vida 3, vel. 11, dano 9, visão 7 |
+  | grande | vida 25, vel. 6, dano 30, visão 5 | soltos | vida 12%, mana 8%, pilha 6%, flechas 6% |

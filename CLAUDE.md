@@ -62,7 +62,9 @@ VERBOSE=1 ./dev build
 | `level.c` | grade 128×128 (tipo + bit sólido), blocos 8×8 montados sob demanda num cache de 36, colisão com a grade |
 | `objective.c` | objetivo da fase (`objective_update/text`), saída `X`, reforços `S` |
 | `player.c` | até 2 jogadores (`g.players[2]`, `g.in[2]`), respawn |
-| `enemies.c` / `weapons.c` / `powers.c` / `items.c` | inimigos, tiros, poderes, itens/caixas/efeitos/cenário |
+| `enemies.c` | inimigos de terror: percepção (visão a cada 8 passos com linha de visão, audição pelos barulhos de `g.noise`), estados |
+| `weapons.c` | armas por TIPO (corpo a corpo, arco, magia, fogo), projéteis, barulho (`noise_emit`), flechas no chão, arma na mão |
+| `items.c` | itens/caixas/efeitos/cenário, sombras |
 | `collision.c` | **grade espacial**: obstáculos fixos e entidades por célula; `collide_move()`, `collide_track()`, `collide_solid_at()`, `collide_line_of_sight()` |
 | `render.c` | motor 3D: GTE, Ordering Table, `render_mesh()`, HUD |
 | `input.c` | controles das portas 1 e 2 |
@@ -83,8 +85,9 @@ Gerados no build (não edite): `build/gen/assets_gen.{h,c}` (declara
 - `*_update()` só muda estado; `*_draw()` só desenha. A câmera é calculada em
   `camera_update` (lógica) e aplicada em `camera_apply` (desenho).
 - Lógica roda por passo (`game_tick`), não por quadro. Timers em passos de 1/60 s.
-- Funções que agem sobre um jogador recebem `PLAYER *p` (inclusive poderes:
-  `void power_x(PLAYER *p)`). Nunca use um "jogador global".
+- Funções que agem sobre um jogador recebem `PLAYER *p` (inclusive magias).
+  Nunca use um "jogador global". Munição e mana são POR jogador; sem fogo
+  amigo (golpes e projéteis só acertam inimigos).
 - Movimento de qualquer entidade passa por `collide_move()`.
 - Texto na tela: **ASCII sem acentos** (fonte do sistema). Comentários do
   código em português, explicando o porquê.
@@ -192,6 +195,16 @@ uma branch. As regras do ROADMAP (determinismo, orçamentos de desempenho,
   `level_remove_tree` (o vetor fica ordenado por bloco). Tremor = offset de
   desenho (`render_set_shake`), nunca mexer na câmera nem na saída de vídeo.
   Bench: cada ponto mede um controle (180 quadros sem evento) e cada evento.
+- **Combate (etapa 07):** `weapon_defs` na ordem do enum `W_*`; o tipo
+  (`WK_*`) decide o comportamento. Barulho = `noise_emit(x, z, células)`
+  (lista dos 4 mais fortes do passo em `g`; zerada no fim de
+  `enemies_update`). Visão dos inimigos: a cada 8 passos por inimigo
+  (escalonada), nunca todo passo (linha de visão é cara). Modelos de arma e
+  inimigo enxutos (desenhados todo quadro): armas ≤ 14 faces, inimigos ~20–30.
+  Nomes fixos dos modelos: `espada machado arco pistola espingarda flecha
+  rastejador cacador grande` (`tools/make_combat_models.py`). Bench:
+  `f{N}_combate` (multidão perseguindo + ataque sem parar + o grande +
+  flechas no chão + clarão) ≤ 450.
 - Carga de fase: `start_level` desenha um quadro `CARREGANDO...` antes. Se a
   geração passar de ~1 s, divida-a entre quadros SEM rodar `game_tick` até
   o mapa ficar pronto (resultado idêntico ao de uma vez).

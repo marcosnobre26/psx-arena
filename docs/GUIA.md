@@ -20,9 +20,9 @@ Depois de qualquer mudança: `./dev run` (compila e abre no emulador) ou
 5. [Novo personagem jogável](#5-novo-personagem-jogável)
 6. [Texturas](#6-texturas)
 7. [Objetos de cenário](#7-objetos-de-cenário)
-8. [Nova arma](#8-nova-arma)
-9. [Novo poder](#9-novo-poder)
-10. [Novo inimigo](#10-novo-inimigo)
+8. [Criar uma arma de cada tipo](#8-criar-uma-arma-de-cada-tipo)
+9. [Magias (os antigos poderes)](#9-magias-os-antigos-poderes)
+10. [Criar um inimigo com percepção](#10-criar-um-inimigo-com-percepção)
 11. [Nova skin](#11-nova-skin)
 12. [Números aleatórios](#12-números-aleatórios)
 13. [Sons e música](#13-sons-e-música)
@@ -38,10 +38,10 @@ Depois de qualquer mudança: `./dev run` (compila e abre no emulador) ou
 |---|---|
 | D-pad / analógico esquerdo | andar (relativo à câmera) |
 | **X** | pular — no ar você passa por cima dos inimigos |
-| **Quadrado** (segure) | atirar, com mira automática no inimigo à frente |
-| **Triângulo** | trocar de arma |
-| **Círculo** | usar poder (gasta energia) |
-| **R2** | trocar de poder |
+| **Quadrado** | atacar com a arma na mão. Arco: **segure** para carregar e **solte** para atirar |
+| **Triângulo** | próxima arma (corpo a corpo, arco, magias, armas de fogo que você tem) |
+| **R2** (segure) | andar devagar e **em silêncio** (os inimigos não ouvem seus passos) |
+| **Círculo** | (livre; menu do START na etapa 08) |
 | **L1 / R1** ou analógico direito | girar a câmera |
 | **Select** | liga/desliga a **lanterna** (a skin muda só na tela de seleção) |
 | **Start** | pausar |
@@ -57,8 +57,9 @@ Depois de qualquer mudança: `./dev run` (compila e abre no emulador) ou
 entra apertando **Start**; com dois jogadores, a partida começa quando os
 dois confirmam.
 
-**Objetivo:** derrotar todos os inimigos. Gemas dão pontos e energia; caixas
-podem soltar vida ou energia; o item branco (`W`) libera uma arma nova. Com
+**Objetivo:** o da fase. Gemas dão pontos e mana; caixas podem soltar vida
+ou mana; `W` dá a próxima arma (arco, machado, pistola, espingarda), `V`
+flechas e `M` balas. A mana volta sozinha bem devagar só até 25%. Com
 2 jogadores, quem cai volta em 5 s ao lado do parceiro; se os dois caírem,
 é game over. Na tela final, **Start** joga de novo e **Select** volta à
 seleção.
@@ -124,11 +125,12 @@ nasce ao lado do `P`, dentro do `MAX_PLAYER_SEPARATION`.
 | `N` | energia | `W` | arma nova |
 | `X` | **saída** da fase | `Q` | **item de missão** |
 | `S` | **ponto de reforço** (SURVIVE; em célula livre, nunca na mata) | `L` | **pilha** da lanterna |
-| `E` `B` `F` | inimigos (`enemy_defs`) | `1`…`9` | objetos de cenário (`prop_defs`) |
-| `K` | **chave** (abre a barreira de raízes; etapa 06) | | |
+| `E` `F` `B` | inimigos: rastejador, caçador, grande (`enemy_defs`) | `1`…`9` | objetos de cenário (`prop_defs`) |
+| `K` | **chave** (abre a barreira de raízes; etapa 06) | `V` | feixe de **flechas** (etapa 07) |
+| `M` | **balas** (etapa 07) | | |
 
 Ao criar inimigo ou cenário novo, **não use letras reservadas**: `P C G H N
-W X Q S L K` e `A` (reservada para o ATIRADOR).
+W X Q S L K V M` e as dos inimigos `E F B`.
 
 **2. Acrescente a linha na tabela** (antes da fase de teste) e aumente
 `num_levels`:
@@ -641,45 +643,72 @@ textura `folhas.png`) → `./dev models` → linha em `prop_defs` → `3` no map
 
 ---
 
-## 8. Nova arma
+## 8. Criar uma arma de cada tipo
 
-Em `weapon_defs` (`data.c`):
+As armas ficam em `weapon_defs` (`data.c`), **na ordem do enum `W_*`**
+(`game.h`). O **tipo** decide como ela age (`weapons.c`); a linha só tem
+números. Copie uma linha do mesmo tipo:
+
 ```c
-/* nome     recarga vel  dano proj abert. impr. vida  tamanho  cor */
-{ "LASER",       6,  70,   2,   1,    0,    0,   30,  ONE/2,  { 255, 40, 40 } },
+/*  nome      tipo      munição     magia       corta custo recarga dano alcance arco janela  vel proj aber barulho tamanho  cor            modelo */
+/* corpo a corpo: golpe em arco à frente, janela de acerto em passos, silencioso */
+{ "LANCA",    WK_MELEE, AMMO_NONE,  MAGIC_NONE, 0, 0, 30, 3, 320, 300, 8, 12,  0, 0, 0,  0, ONE,  { 200,200,210 }, &lanca_mesh },
+/* arco: segurar carrega (30% -> 100% de dano e velocidade); 1 flecha por tiro */
+{ "BESTA",    WK_BOW,   AMMO_ARROW, MAGIC_NONE, 0, 1, 40, 6,  60,   0, 0,  0, 80, 1, 0,  2, ONE,  { 160,140,100 }, &arco_mesh },
+/* magia: gasta mana (custo); a magia é MAGIC_FIRE/FLASH/HEAL */
+{ "FOGO MAIOR",WK_MAGIC,AMMO_MANA,  MAGIC_FIRE, 0,40, 50, 8,  45,   0, 0,  0, 30, 1, 0,  8, ONE*2,{ 255,100, 20 }, NULL },
+/* arma de fogo: bala por tiro, mira automática curta, MUITO barulho */
+{ "REVOLVER", WK_GUN,   AMMO_BULLET,MAGIC_NONE, 0, 1, 24, 6,  40,   0, 0,  0, 70, 1, 0, 18, ONE*2/3,{255,255,120 }, &pistola_mesh },
 ```
-- **recarga**: quadros entre tiros (60 = 1 s). **proj**: projéteis por disparo.
-- **abert.**: abertura do leque (ângulo). **impr.**: imprecisão aleatória.
-- Cada `W` do mapa libera a próxima arma da lista que o jogador ainda não tem.
+
+- **alcance**: corpo a corpo = distância do golpe; projétil = passos de vida.
+- **arco** (meia abertura do golpe, 4096 = 360°) e **janela** (passos do
+  golpe em que ele acerta) só valem no corpo a corpo. **corta** = machado
+  (copa de árvore caída, raízes).
+- **barulho**: raio em células que os inimigos ouvem (0 = silencioso).
+- Acrescente o nome no enum `W_*` (mesma posição) e, se for achável no mapa,
+  na lista de `PICK_WEAPON` em `items.c`.
+- Modelo na mão: `models/<nome>.h` (Blender, coleção `PSX`, ou
+  `tools/make_combat_models.py`); origem na mão, apontando para −Y do
+  Blender. Nomes atuais: `espada`, `machado`, `arco`, `pistola`,
+  `espingarda`, `flecha`.
+- **Rode `./dev replay-test`**: arma nova muda a lógica (regrave com
+  `--save` se for de propósito) e meça o ponto `f{N}_combate` no bench.
 
 ---
 
-## 9. Novo poder
+## 9. Magias (os antigos poderes)
 
-1. Em `src/powers.c`:
-   ```c
-   void power_super_pulo(PLAYER *p) {
-       p->vy = -70;
-       p->on_ground = 0;
-   }
-   ```
-2. Em `src/data.c`, declare `void power_super_pulo(PLAYER *p);` e adicione
-   `{ "SUPER PULO", 15, power_super_pulo },` em `power_defs`.
-
-O parâmetro `p` é quem usou o poder — funciona igual para o jogador 1 e o 2.
-**R2** já alterna para o poder novo e **Círculo** usa.
+Os poderes viraram armas do tipo `WK_MAGIC` (etapa 07): **bola de fogo**
+(projétil), **clarão** (atordoa e assusta quem está em volta) e **cura**.
+Todos os personagens começam com as três; a **mana** é a munição (poções
+`N`, gemas). Uma magia nova de efeito diferente: acrescente um `MAGIC_*` e
+um `case` em `magic_cast()` (`weapons.c`), recebendo `PLAYER *p`.
 
 ---
 
-## 10. Novo inimigo
+## 10. Criar um inimigo com percepção
 
-Em `enemy_defs` (`data.c`), uma linha com uma **letra nova**, e use a letra no mapa:
+Em `enemy_defs` (`data.c`), uma linha com uma **letra nova**:
+
 ```c
-/* nome    letra vida vel dano tamanho pontos modelo       paleta (corpo, chifres, olhos) */
-{ "CHEFE", 'K',  60,  3,  40,  ONE*3,  2000, &grunt_mesh, { {255,40,40}, {60,0,0}, {255,255,0} } },
+/* nome      letra vida vel dano tamanho pontos modelo         paleta (corpo, sombra, olhos)          visão audição foge_luz pesado */
+{ "VULTO",   'U',   5,   9,  12, ONE,     200, &cacador_mesh, { {40,40,50}, {20,20,25}, {255,0,0} },  9,    120,   1,       0 },
 ```
-Para um modelo seu, troque `&grunt_mesh`. A paleta troca as cores por slot
-de material (como as skins).
+
+- **visão** (células) no escuro; com a lanterna do jogador ligada vale o
+  dobro, até a névoa. Só vê no cone à frente (se ainda não persegue) e com
+  **linha de visão** livre (árvores, mata e troncos tapam).
+- **audição** = % do raio de um barulho que ele ouve (tiro 16–22 células,
+  arco 3, passo 3, golpe de machado em madeira 8; corpo a corpo e R2 nada).
+- **foge_luz** = foge da lanterna apontada para ele; **pesado** = passos
+  que se ouvem de longe e só aparece a menos de 6 células.
+- Estados (`enemies.c`): vagar → investigar o barulho → perseguir quem viu
+  → procurar onde viu por último → vagar. Apanhou = persegue.
+- A visão é testada a cada 8 passos por inimigo (escalonada): é o que deixa
+  a IA barata. Meça a lógica no bench (`f{N}_combate`) e rode o replay.
+- Modelo: `models/<nome>.h` com 3 materiais (corpo, sombra, olhos); mantenha
+  ~20–30 faces (cada inimigo é desenhado todo quadro).
 
 ---
 
