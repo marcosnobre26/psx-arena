@@ -655,6 +655,16 @@ void pl_big_escape(void);
 #define PL(call) ((void)0)
 #endif
 
+/* robot.c: jogador robô (só com DEBUG_ROBOT; ./dev robo). Escreve g.in[0]
+ * lendo g, como um controle; nunca muda g nem usa g.rng */
+#ifdef DEBUG_ROBOT
+int  robot_match(int k, int *level, uint32_t *seed, int *character);
+int  robot_limit_ticks(int level);
+void robot_begin(uint32_t salt);
+void robot_input(INPUT *in);
+void robot_report(const char *reason);
+#endif
+
 /* events.c */
 void events_start(void);              /* fim do game_reset */
 void events_update(void);             /* um passo de lógica (STATE_PLAY) */

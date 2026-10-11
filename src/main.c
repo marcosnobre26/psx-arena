@@ -1629,6 +1629,45 @@ static void bench_frame(int vs) {
 }
 #endif
 
+#ifdef DEBUG_ROBOT
+/* ------------------------------------------------------------------ */
+/* Jogador robô (./dev robo): roda as partidas da lista (robot.c) uma  */
+/* atrás da outra, cada uma do zero (sem o progresso da fase anterior, */
+/* como no ./dev economia). Fim: vitória, morte ou tempo esgotado.     */
+/* ------------------------------------------------------------------ */
+static int robot_k = -1, robot_over = 0;
+
+static void robot_next(void) {
+	int level, character, r;
+	uint32_t seed;
+	while ((r = robot_match(++robot_k, &level, &seed, &character)) == 0) {}
+	if (r < 0) {
+		robot_over = 1;
+		printf("ROBO FIM\n");
+		return;
+	}
+	sel[0].joined = 1; sel[0].ready = 1; sel[0].character = character; sel[0].skin = 0;
+	sel[1].joined = 0;
+	memset(&progress, 0, sizeof(progress));
+	start_level(level, seed);
+	g.state = STATE_PLAY;                    /* pula a introdução */
+	robot_begin((uint32_t)robot_k);
+}
+
+/* Depois de CADA game_tick (o pl_tick já fechou vitória/morte) */
+static void robot_after_tick(void) {
+	if (robot_over) return;
+	const char *why = g.state == STATE_WIN ? "vitoria" : g.state == STATE_DEAD ? "morte" : NULL;
+	if (!why && g.play_frames < robot_limit_ticks(g.level)) return;
+	if (!why) {
+		why = "tempo";
+		pl_end(why);
+	}
+	robot_report(why);
+	robot_next();
+}
+#endif
+
 /* Loops de ambiente (vozes 0 e 1): tocam enquanto há uma partida na tela
  * (jogo, pausa, vitória, derrota) e param no título e na seleção. */
 static void ambience_update(void) {
@@ -1661,6 +1700,10 @@ int main(void) {
 #ifdef DEBUG_BENCHMARK
 	bench_start();
 #endif
+#ifdef DEBUG_ROBOT
+	printf("ROBO INICIO\n");
+	robot_next();
+#endif
 
 	int last_vsync = VSync(-1);
 
@@ -1687,11 +1730,17 @@ int main(void) {
 #ifdef BENCH_REPLAY
 			replay_input();
 #endif
+#ifdef DEBUG_ROBOT
+			robot_input(&g.in[0]);
+#endif
 #ifdef DEBUG_BENCHMARK
 			bench_input();
 #endif
 			game_tick();
 			PL(pl_tick());
+#ifdef DEBUG_ROBOT
+			robot_after_tick();
+#endif
 #ifdef BENCH_REPLAY
 			replay_after_tick();
 #endif
@@ -1704,6 +1753,9 @@ int main(void) {
 
 #ifdef DEBUG_BENCHMARK
 		bench.logic_last = (uint16_t)(TIMER_VALUE(1) - t_logic);
+#endif
+#ifdef DEBUG_ROBOT
+		continue;                      /* robô: ninguém olha; só a lógica (bem mais rápido) */
 #endif
 		/* câmera visual: segue o grupo depois da lógica (fora de g) */
 		if (g.state != STATE_TITLE && g.state != STATE_SELECT)

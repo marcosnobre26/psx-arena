@@ -10,7 +10,8 @@
  * Saída no TTY (o ./dev run grava em logs/partida-AAAAMMDD-HHMM.txt):
  *   PLAYLOG RESUMO fase=1 t=30 ...     a cada 30 s de jogo (em passos)
  *   PLAYLOG FIM_FASE fase=1 motivo=vitoria|morte|pulou ...
- * Formato chave=valor numa linha só (o ./dev analisar-partida lê).
+ * Formato chave=valor; cada registro em várias linhas (PLAYLOG MAIS ...),
+ * porque o DuckStation corta linhas longas do TTY.
  */
 #ifdef DEBUG_PLAYLOG
 #include <stdio.h>
@@ -29,7 +30,7 @@ static struct {
 	int kills[NE][NUM_WEAPON_SLOTS + 1];       /* por tipo x arma (+1 = outro) */
 	int big_escapes;
 	int battery_min, batteries;
-	int dmg_taken;
+	int dmg_taken, dmg_by[NE];                 /* dano recebido: total e por tipo de inimigo */
 	int last_summary;
 } pl;
 static int attack_weapon = -1;                 /* arma do golpe/tiro em andamento */
@@ -72,6 +73,7 @@ void pl_damage(const PLAYER *p, int amount) {
 	damage_source = -1;
 	if (p->index != 0) return;                 /* 1 jogador (etapa 07b) */
 	pl.dmg_taken += amount;
+	if (enemy_type >= 0 && enemy_type < NE) pl.dmg_by[enemy_type] += amount;
 	if (p->hp < pl.hp_min) pl.hp_min = p->hp < 0 ? 0 : p->hp;
 	if (p->hp <= 0) {
 		pl.deaths++;
@@ -116,30 +118,39 @@ void pl_kill(int enemy_type) {
 
 void pl_big_escape(void) { pl.big_escapes++; }
 
-/* Uma linha com tudo (resumo ou fim de fase) */
+/* Resumo ou fim de fase. O DuckStation corta linhas longas do TTY, então
+ * sai em várias linhas curtas: a primeira com o tipo, as outras com
+ * "PLAYLOG MAIS" (o ./dev analisar-partida junta tudo num registro só). */
 static void dump(const char *kind, const char *reason) {
 	const PLAYER *p = &g.players[0];
-	char buf[96];
 	printf("PLAYLOG %s fase=%d t=%d%s%s vida=%d vida_min=%d dano=%d mortes=%d",
 	       kind, pl.level + 1, g.play_frames / 60, reason ? " motivo=" : "", reason ? reason : "",
 	       p->hp, pl.hp_min, pl.dmg_taken, pl.deaths);
 	for (int t = 0; t < num_enemy_types && t < NE; t++)
 		if (pl.killed_by[t]) printf(" morto_por_%s=%d", key(enemy_defs[t].name), pl.killed_by[t]);
-	printf(" curas_magia=%d curas_item=%d", pl.heals_magic, pl.heals_item);
-	printf(" flechas_achadas=%d flechas_usadas=%d flechas_sobra=%d flechas_recolhidas=%d",
+	for (int t = 0; t < num_enemy_types && t < NE; t++)
+		if (pl.dmg_by[t]) printf(" dano_de_%s=%d", key(enemy_defs[t].name), pl.dmg_by[t]);
+	printf(" curas_magia=%d curas_item=%d\n", pl.heals_magic, pl.heals_item);
+
+	printf("PLAYLOG MAIS flechas_achadas=%d flechas_usadas=%d flechas_sobra=%d flechas_recolhidas=%d",
 	       pl.found[0], pl.used[0], p->arrows, pl.arrows_picked);
 	printf(" balas_achadas=%d balas_usadas=%d balas_sobra=%d", pl.found[1], pl.used[1], p->bullets);
-	printf(" mana_achada=%d mana_usada=%d mana_sobra=%d", pl.found[2], pl.used[2], p->energy);
+	printf(" mana_achada=%d mana_usada=%d mana_sobra=%d\n", pl.found[2], pl.used[2], p->energy);
+
+	printf("PLAYLOG MAIS");
 	for (int w = 0; w < num_weapons; w++) {
 		if (pl.uses[w]) printf(" usos_%s=%d", key(weapon_defs[w].name), pl.uses[w]);
 		if (pl.mana_spent[w]) printf(" mana_%s=%d", key(weapon_defs[w].name), pl.mana_spent[w]);
 	}
+	printf("\nPLAYLOG MAIS");
 	for (int t = 0; t < num_enemy_types && t < NE; t++)
 		for (int w = 0; w <= num_weapons; w++)
 			if (pl.kills[t][w])
 				printf(" mortos_%s_%s=%d", key(enemy_defs[t].name), w < num_weapons ? key(weapon_defs[w].name) : "OUTRO",
 				       pl.kills[t][w]);
-	printf(" fugas_do_grande=%d pilha=%d pilha_min=%d pilhas=%d", pl.big_escapes, p->battery,
+	printf(" inimigos_vivos=%d\n", g.enemies_left);
+
+	printf("PLAYLOG MAIS fugas_do_grande=%d pilha=%d pilha_min=%d pilhas=%d", pl.big_escapes, p->battery,
 	       pl.battery_min, pl.batteries);
 	int left[NUM_PICKUP_TYPES] = { 0 };            /* itens que ficaram no mapa */
 	for (int i = 0; i < MAX_PICKUPS; i++)
@@ -148,8 +159,7 @@ static void dump(const char *kind, const char *reason) {
 		"gema", "vida", "mana", "arma", "missao", "pilha", "chave", "flechas", "balas" };
 	for (int k = 0; k < NUM_PICKUP_TYPES; k++)
 		if (left[k]) printf(" nao_pegos_%s=%d", pick_names[k], left[k]);
-	snprintf(buf, sizeof(buf), " inimigos_vivos=%d", g.enemies_left);
-	printf("%s\n", buf);
+	printf("\n");
 }
 
 /* Um passo (depois do game_tick): mínimo da vida/pilha, resumo a cada 30 s */

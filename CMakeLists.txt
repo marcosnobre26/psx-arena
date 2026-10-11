@@ -70,6 +70,14 @@ if(ARENA_PLAYLOG)
 	target_compile_definitions(arena PRIVATE DEBUG_PLAYLOG)
 endif()
 
+# Jogador robô (./dev robo): g.in[0] vem do robot.c, com o registro ligado
+# e sem desenhar (só lógica: mais partidas por minuto). Pasta build-robo/.
+option(ARENA_ROBOT "Compila com DEBUG_ROBOT (o robô joga sozinho; implica DEBUG_PLAYLOG)" OFF)
+set(ARENA_ROBOT_DEFS "" CACHE STRING "Definições extras do robô (ex.: ROBOT_SEEDS=20)")
+if(ARENA_ROBOT)
+	target_compile_definitions(arena PRIVATE DEBUG_ROBOT DEBUG_PLAYLOG ${ARENA_ROBOT_DEFS})
+endif()
+
 # ---------------------------------------------------------------------------
 # Texturas: PNG -> TIM (tools/build_textures.py escolhe a posição na VRAM)
 # ---------------------------------------------------------------------------

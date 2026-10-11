@@ -8,6 +8,7 @@
 #   ./dev run --sem-registro [exe|cue]  build normal no emulador do dev.conf
 #   ./dev analisar-partida [arquivo]   resumo legível do último registro de partida
 #   ./dev economia [N]   munição/mana/cura x inimigos por fase, no PC (N sementes)
+#   ./dev robo [N]       o robô joga N sementes x 4 fases x 3 personagens (sem janela)
 #   ./dev models         exporta os .blend de assets/blender/ para models/ (Blender do Windows)
 #   ./dev watch          recompila sozinho sempre que você salvar um arquivo
 #   ./dev clean          apaga a pasta build/
@@ -527,6 +528,108 @@ cmd_economia() {
 	"
 }
 
+# ---------------------------------------------------------------------------
+# Jogador robô (etapa 07b): build-robo/ com DEBUG_ROBOT (+ registro), sem
+# desenhar. N sementes x 4 fases x 3 personagens, divididas em FATIAS que
+# rodam em paralelo, cada uma numa cópia do DuckStation portátil (hardlinks:
+# não ocupa disco; a sua instalação nunca é tocada). Cada fatia é o mesmo
+# .exe com o marcador ROBOSHARD=k/N trocado. Resultado: logs/robo-*.txt.
+#   ./dev robo [N] [-D NOME=VALOR ...]     (ROBO_FATIAS=4 ./dev robo: fatias)
+# ---------------------------------------------------------------------------
+cmd_robo() {
+	local n=20 defs="" t; t="$(target_triple)"
+	while [[ $# -gt 0 ]]; do
+		case "$1" in
+			-D) defs="$defs;$2"; shift 2 ;;
+			-D*) defs="$defs;${1#-D}"; shift ;;
+			[0-9]*) n="$1"; shift ;;
+			*) c_err "Uso: ./dev robo [N] [-D NOME=VALOR ...]"; return 1 ;;
+		esac
+	done
+	local shards="${ROBO_FATIAS:-$(( $(nproc) / 2 ))}"
+	(( shards > 9 )) && shards=9
+	(( shards < 1 )) && shards=1
+	local bdir="build-robo"
+	c_info "Compilando o robô em $bdir/ ($n sementes x 4 fases x 3 personagens)..."
+	# reconfigura só se as definições mudaram (senão recompila tudo)
+	local want="ROBOT_SEEDS=$n$defs"
+	sdk sh -c "
+		if [ ! -f $bdir/build.ninja ] || [ \"\$(cat $bdir/defs.txt 2>/dev/null)\" != '$want' ]; then
+			cmake --preset default -B $bdir -DPSN00BSDK_TARGET=$t -DARENA_ROBOT=ON -DARENA_ROBOT_DEFS='$want' > $bdir-config.log 2>&1 || { cat $bdir-config.log; exit 1; }
+			rm -f $bdir-config.log
+			echo '$want' > $bdir/defs.txt
+		fi
+		cmake --build ./$bdir
+	" 2>&1 | quiet_filter || { c_err "A compilação do robô falhou."; return 1; }
+
+	portable_ds bench > /dev/null || return 1      # garante build-bench/duckstation
+	local src="$ROOT/build-bench/duckstation"
+	local before; before="$(ls -laR --time-style=full-iso "$DUCKSTATION_DATA" 2>/dev/null | md5sum)"
+	local pids=() k
+	c_info "Rodando $shards fatias em paralelo (sem janela)..."
+	for (( k = 0; k < shards; k++ )); do
+		local ds="$ROOT/$bdir/ds-$k"
+		if [[ ! -e "$ds/AppRun" ]]; then
+			cp -al "$src" "$ds" || return 1
+			local ed; ed="$(dirname "$(readlink -f "$ds/AppRun")")"
+			# o que o emulador pode escrever vira cópia de verdade (não hardlink)
+			for f in settings.ini playtime.dat; do
+				[[ -e "$ed/$f" ]] && { rm -f "$ed/$f"; cp -a "$(dirname "$(readlink -f "$src/AppRun")")/$f" "$ed/$f"; }
+			done
+			for d in cache memcards savestates gamesettings inputprofiles screenshots; do
+				[[ -e "$ed/$d" ]] && { rm -rf "$ed/$d"; mkdir -p "$ed/$d"; }
+			done
+		fi
+		local ed; ed="$(dirname "$(readlink -f "$ds/AppRun")")"
+		rm -f "$ed/settings.ini"
+		python3 "$ROOT/tools/bench_settings.py" "$DUCKSTATION_DATA/settings.ini" "$ed/settings.ini" \
+			"$DUCKSTATION_DATA/bios" || return 1
+		python3 - "$ROOT/$bdir/arena.exe" "$ROOT/$bdir/fatia-$k.exe" "$k" "$shards" <<'PY' || return 1
+import sys
+src, dst, k, n = sys.argv[1], sys.argv[2], sys.argv[3], sys.argv[4]
+data = open(src, "rb").read()
+old = b"ROBOSHARD=0/1;"
+if data.count(old) != 1:
+    sys.exit("marcador ROBOSHARD não encontrado no .exe")
+open(dst, "wb").write(data.replace(old, ("ROBOSHARD=%s/%s;" % (k, n)).encode()))
+PY
+		"$ds/AppRun" -earlyconsole -batch -fastboot -nogui -- "$ROOT/$bdir/fatia-$k.exe" \
+			> "$ROOT/$bdir/fatia-$k.log" 2>&1 &
+		pids+=($!)
+	done
+
+	local timeout="${ROBO_TIMEOUT:-3600}" waited=0 done_n=0
+	while (( waited < timeout )); do
+		done_n=0
+		for (( k = 0; k < shards; k++ )); do
+			if grep -qE "ROBO FIM([^_]|$)" "$ROOT/$bdir/fatia-$k.log" 2>/dev/null || ! kill -0 "${pids[$k]}" 2>/dev/null; then
+				done_n=$((done_n + 1))
+			fi
+		done
+		(( done_n == shards )) && break
+		if (( waited % 30 == 0 )); then
+			local partidas; partidas="$(cat "$ROOT/$bdir"/fatia-*.log 2>/dev/null | grep -c "ROBO FIM_PARTIDA" || true)"
+			printf '  %4ds: %s/%s partidas\n' "$waited" "$partidas" "$((n * 12))"
+		fi
+		sleep 1; waited=$((waited + 1))
+	done
+	for p in "${pids[@]}"; do kill -9 "$p" 2>/dev/null || true; done
+	wait 2>/dev/null || true
+	if [[ "$(ls -laR --time-style=full-iso "$DUCKSTATION_DATA" 2>/dev/null | md5sum)" != "$before" ]]; then
+		c_err "AVISO: algo mudou em $DUCKSTATION_DATA durante o robô (deveria ficar intacto)."
+	fi
+
+	mkdir -p "$ROOT/logs"
+	local log; log="$ROOT/logs/robo-$(date +%Y%m%d-%H%M).txt"
+	for (( k = 0; k < shards; k++ )); do
+		sed 's/\x1b\[[0-9;]*m//g' "$ROOT/$bdir/fatia-$k.log" | grep -oE "(PLAYLOG|ROBO) .*" | tr -d '\r'
+	done > "$log"
+	local got; got="$(grep -c "ROBO FIM_PARTIDA" "$log" || true)"
+	(( got < n * 12 )) && c_err "Só $got de $((n * 12)) partidas terminaram (tempo esgotado? ROBO_TIMEOUT=$timeout)."
+	c_ok "Registro do robô: ${log#$ROOT/}  ($got partidas, ${waited}s)"
+	python3 "$ROOT/tools/analisar_partida.py" "$log"
+}
+
 case "${1:-build}" in
 	build)  cmd_build ;;
 	run)    shift; cmd_run "$@" ;;
@@ -544,5 +647,6 @@ case "${1:-build}" in
 	replay-test) shift; cmd_replay_test "$@" ;;
 	analisar-partida) shift; python3 "$ROOT/tools/analisar_partida.py" "$@" ;;
 	economia) shift; cmd_economia "$@" ;;
-	*)      sed -n '3,20p' "$0" | sed 's/^#//' ;;
+	robo)   shift; cmd_robo "$@" ;;
+	*)      sed -n '3,22p' "$0" | sed 's/^#//' ;;
 esac
