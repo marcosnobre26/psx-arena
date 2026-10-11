@@ -30,6 +30,7 @@ modificação: `docs/GUIA.md`.
 ./dev run --sem-registro   # build normal no emulador do dev.conf
 ./dev analisar-partida     # resumo do último logs/partida-*.txt
 ./dev economia 1000        # munição/mana/cura x inimigos por fase, no PC
+./dev robo 20 [-D ROBOT_SKILL=80]   # robô joga 20 sementes x 4 fases x 3 personagens (~2 min)
 ./dev models         # exporta assets/blender/*.blend -> models/*.h (Blender do Windows)
 ./dev vram           # mapa das texturas na VRAM
 ./dev bench          # benchmark automático (FPS/POLIS/COL/CPU nos pontos da fase 5)
@@ -76,6 +77,7 @@ VERBOSE=1 ./dev build
 | `input.c` | controles das portas 1 e 2 |
 | `sound.c` | efeitos no SPU: `sound_play`, `sound_play_at` (posicional), loops de ambiente nas vozes 0–1 |
 | `rng.c` | gerador aleatório determinístico: `g.rng` (lógica) e `fx_range` (visual) |
+| `playlog.c` / `robot.c` | só em builds de depuração: registro de partida (`DEBUG_PLAYLOG`) e jogador robô (`DEBUG_ROBOT`, `./dev robo`) |
 
 Gerados no build (não edite): `build/gen/assets_gen.{h,c}` (declara
 `<nome>_mesh` para cada `models/<nome>.h` e `tex_<nome>_t` para cada
@@ -204,7 +206,16 @@ uma branch. As regras do ROADMAP (determinismo, orçamentos de desempenho,
 - **Registro de partida (etapa 07b):** ganchos `PL(...)` nos pontos de
   lógica, contadores em `playlog.c` FORA de `g` (some sem `DEBUG_PLAYLOG`).
   Mexeu em dano/munição/golpes? Mantenha os ganchos e rode
-  `./dev replay-test -D DEBUG_PLAYLOG=1` (tem que dar IGUAL).
+  `./dev replay-test -D DEBUG_PLAYLOG=1` (tem que dar IGUAL). O DuckStation
+  corta linhas longas do TTY: registro novo sai em linhas curtas
+  (`PLAYLOG MAIS ...` continua a anterior).
+- **Robô (etapa 07b, `src/robot.c`, `DEBUG_ROBOT`):** só LÊ `g` (e mapa,
+  colisão, alcance) e escreve `g.in[0]`; sorteio próprio (nunca `g.rng`).
+  Não é onisciente: explora até ver saída/relíquias/itens, percebe inimigos
+  pelo escuro/lanterna/linha de visão, reage com atraso (`ROBOT_SKILL`, 50 =
+  mediano). Build do robô não desenha (só lógica). Mesmas sementes do
+  `./dev economia` (`0x3000 + k*7919`): dá para cruzar mapa a mapa. Mudou
+  arma/inimigo/item? Rode `./dev robo 20` antes e depois e compare.
 - **Combate (etapa 07):** `weapon_defs` na ordem do enum `W_*`; o tipo
   (`WK_*`) decide o comportamento. Barulho = `noise_emit(x, z, células)`
   (lista dos 4 mais fortes do passo em `g`; zerada no fim de

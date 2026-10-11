@@ -549,6 +549,33 @@ magia, munição achada/usada/sobrando, flechas recolhidas, golpes por arma,
 inimigos mortos por tipo e arma, fugas do grande, itens não pegos e pilha.
 Ele não muda a lógica (os contadores ficam fora de `g`).
 
+### O robô joga por você (balanceamento sem jogar)
+
+```bash
+./dev robo 20                      # 20 sementes x 4 fases x 3 personagens = 240 partidas (~2 min)
+./dev robo 20 -D ROBOT_SKILL=80    # jogador "bom" (padrão 50 = mediano; 0..100)
+./dev analisar-partida --robo      # resumo de novo (o mais novo de logs/robo-*.txt)
+./dev analisar-partida --detalhe logs/robo-....txt   # + cada partida
+```
+
+O robô é um controle: lê o estado do jogo e aperta botões (`src/robot.c`).
+Anda pelos caminhos da grade, explora até ver a saída/as relíquias, pega
+itens e flechas por perto, luta com a melhor arma (de longe se tiver
+munição; contra o GRANDE, bate e recua), cura abaixo de 35% de vida, foge
+do grande com a vida baixa, liga a lanterna no escuro. Para não ser
+perfeito demais, só vê o que uma pessoa veria, reage com atraso, erra a
+mira e às vezes não recua (`ROBOT_SKILL`). Cada partida começa do zero
+(sem o que sobrou da fase anterior), como no `./dev economia`, e usa as
+mesmas sementes: um mapa apertado na economia pode ser conferido no robô.
+
+Use antes e depois de mexer numa tabela (`data.c`, itens das fases) e
+compare: vitórias/mortes por fase e personagem, quem mata, quanto sobra de
+munição e mana. O ajuste fino é sempre no teste jogando de verdade.
+
+Limites do robô: não anda agachado (R2), não usa o clarão a não ser contra
+o grande, só abre caixa com arco (ou bola de fogo com mana quase cheia), não
+pula por cima de inimigos.
+
 ## 4. Modelar no Blender
 
 Regras do PS1 que o exportador espera:

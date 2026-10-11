@@ -696,3 +696,33 @@ automatizar testes visuais.
   inimigo acerta 2 vezes). Ajustes só depois de o Marcos jogar com o
   registro (passo 3). **Pendente:** economia com 2 jogadores (munição
   dividida, mesmos inimigos) fica para depois.
+- 2026-10-11 — Etapa 07b, passo do **robô jogador** (`./dev robo [N]`,
+  `src/robot.c`, `DEBUG_ROBOT`). O Marcos não vai jogar agora: o robô joga
+  por ele. É um controle (lê `g`, escreve `g.in[0]`, sorteio próprio);
+  `./dev replay-test` IGUAL com e sem `DEBUG_PLAYLOG`. Build `build-robo/`
+  sem desenho (só lógica) e fatias em paralelo em cópias do DuckStation
+  portátil (hardlinks): 240 partidas em ~2 min. Primeira versão era
+  onisciente e perfeita (vencia tudo sem dano: inútil para balancear);
+  ficou "humana": explora até ver objetivo/itens (~9 células), percebe
+  inimigos pelo escuro (4 células), lanterna (7) e linha de visão, reage
+  com atraso, erra a mira e às vezes não recua do grande (`ROBOT_SKILL`,
+  50 = mediano). Achado de ferramenta: o DuckStation corta linhas longas do
+  TTY; o registro passou a sair em linhas curtas (`PLAYLOG MAIS`), e ganhou
+  `dano_de_<INIMIGO>`. Resultado (20 sementes, vitórias de 20; cada partida
+  começa do zero):
+
+  | Fase | Robô hab. 50 | Cavaleiro 50 | Batedor 50 | Robô 80 | Cavaleiro 80 | Batedor 80 |
+  |---|---|---|---|---|---|---|
+  | f1 Caçada | 14 | 14 (5 tempo) | 8 | 19 | 14 (4 tempo) | 9 |
+  | f2 Travessia | 19 | 17 | 18 | 20 | 19 | 19 |
+  | f3 Relíquias | 13 | 18 | 9 | 16 | 15 | 12 |
+  | f4 Cerco | 15 | 20 | 12 | 20 | 20 | 19 |
+
+  O GRANDE causa 64% das mortes (hab. 50) e 82% (hab. 80); o Batedor (70 de
+  vida) cai em 3 golpes dele. Balas quase nunca têm arma (o W dá arco e
+  machado antes da pistola). Simulação sem commit com o dano do grande 30 →
+  22: mortes 55 → 26 em 240 partidas. Proposta de ajustes entregue ao
+  Marcos (nada aplicado sem aprovação). **O ajuste fino será feito no teste
+  final do Marcos, jogando de verdade**; o robô só aponta os extremos.
+  Mesmas sementes da economia: o mapa f3 `00021ef0` (dos mais apertados na
+  economia) foi o único em que ninguém venceu com hab. 80.

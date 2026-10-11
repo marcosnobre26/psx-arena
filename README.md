@@ -193,7 +193,11 @@ troque para `Debug` em [`CMakePresets.json`](CMakePresets.json) (`-Og`).
 | Comando | Faz |
 |---|---|
 | `build` | compila (padrão) |
-| `run [exe\|cue]` | compila e abre no emulador configurado |
+| `run [exe\|cue]` | compila COM o registro de partida (`build-debug/`) e abre numa cópia portátil do DuckStation Linux; o TTY vai para `logs/partida-*.txt` |
+| `run --sem-registro` | build normal no emulador do `dev.conf` |
+| `analisar-partida [--robo] [--detalhe] [arquivo]` | resumo do registro mais novo de `logs/` (partida de uma pessoa ou do robô) |
+| `economia [N]` | munição/mana/cura x vida dos inimigos de N mapas por fase, no PC |
+| `robo [N] [-D N=V]` | o robô joga N sementes x 4 fases x 3 personagens sem janela (build `build-robo/`, fatias em paralelo), grava `logs/robo-*.txt` e mostra o resumo |
 | `models` | exporta todos os `.blend` de `assets/blender/` para `models/` (Blender do Windows ou Linux) |
 | `watch` | recompila a cada arquivo salvo em `src/`, `models/`, `assets/` |
 | `vram` | mostra a posição de cada textura na VRAM |
