@@ -13,8 +13,10 @@ static const CVECTOR pickup_colors[NUM_PICKUP_TYPES] = {
 	{ 255, 255, 255 },   /* PICK_WEAPON */
 	{ 190,  90, 255 },   /* PICK_QUEST  (item de missão, letra Q) */
 	{ 140, 255, 110 },   /* PICK_BATTERY (pilha da lanterna, letra L) */
+	{ 255, 150,  20 },   /* PICK_KEY    (chave da barreira de raízes, letra K) */
 };
-static const int pickup_scale[NUM_PICKUP_TYPES] = { ONE, ONE * 3 / 4, ONE * 3 / 4, ONE * 3 / 2, ONE * 5 / 4, ONE * 2 / 3 };
+static const int pickup_scale[NUM_PICKUP_TYPES] = { ONE, ONE * 3 / 4, ONE * 3 / 4, ONE * 3 / 2, ONE * 5 / 4, ONE * 2 / 3,
+                                                    ONE * 5 / 4 };
 
 /* ------------------------------------------------------------------ */
 /* Itens                                                               */
@@ -54,6 +56,10 @@ static void collect(PICKUP *it, PLAYER *p) {
 		if (p->battery > BATTERY_MAX) p->battery = BATTERY_MAX;
 		p->lantern_dying = 0;
 		show_message("+PILHA", 40);
+		break;
+	case PICK_KEY:
+		g.ev.keys++;                      /* do grupo, como os itens de missão */
+		show_message("CHAVE! ABRE AS RAIZES", 90);
 		break;
 	case PICK_QUEST:
 		g.quest++;

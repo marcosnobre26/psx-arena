@@ -47,14 +47,16 @@ int  enemy_radius(const ENEMY *e) { return (90 * enemy_defs[e->type].scale) >> 1
 /* ---- checagem independente ---- */
 static unsigned char seen[MAP_MAX_H][MAP_MAX_W];
 static int qx[MAP_MAX_W * MAP_MAX_H], qz[MAP_MAX_W * MAP_MAX_H];
+static int open_barrier;          /* 1 = barreira de raízes conta como aberta */
 static int walk(int x, int z) {
 	if (x < 0 || z < 0 || x >= level_width() || z >= level_height()) return 0;
+	if (open_barrier && level_cell_type(x, z) == CELL_BARRIER) return 1;
 	if (level_cell_solid(x, z) && !level_cell_low(x, z)) return 0;
 	return !collide_cell_has_obstacle(x, z);
 }
-static int check_map(int lv, uint32_t seed) {
+static void bfs(void) {
 	memset(seen, 0, sizeof(seen));
-	int sx = g.spawn_x / 256, sz = g.spawn_z / 256, h = 0, t = 0, bad = 0;
+	int sx = g.spawn_x / 256, sz = g.spawn_z / 256, h = 0, t = 0;
 	seen[sz][sx] = 1; qx[t] = sx; qz[t++] = sz;
 	while (h < t) {
 		int x = qx[h], z = qz[h++];
@@ -65,16 +67,30 @@ static int check_map(int lv, uint32_t seed) {
 			seen[nz][nx] = 1; qx[t] = nx; qz[t++] = nz;
 		}
 	}
-	char ch; int cx, cz;
-	int n = level_placed(0, &ch, &cx, &cz);
-	for (int i = 0; i < n; i++) {
-		level_placed(i, &ch, &cx, &cz);
-		if (ch == 'C') continue;
-		if (!seen[cz][cx] || level_cell_type(cx, cz) == CELL_THICKET) {
-			if (bad < 3) printf("    PROBLEMA fase %d semente %08x: '%c' em (%d,%d)\n", lv + 1, seed, ch, cx, cz);
-			bad++;
+}
+/* Tudo alcançável do início com a barreira FECHADA, menos o prêmio atrás
+ * dela; o prêmio, com a barreira ABERTA (etapa 06) */
+static int n_barriers;
+static int check_map(int lv, uint32_t seed) {
+	int bcx, bcz, br, has_bar = mapgen_barrier(&bcx, &bcz, &br), bad = 0;
+	n_barriers += has_bar;
+	for (open_barrier = 0; open_barrier <= has_bar; open_barrier++) {
+		bfs();
+		char ch; int cx, cz;
+		int n = level_placed(0, &ch, &cx, &cz);
+		for (int i = 0; i < n; i++) {
+			level_placed(i, &ch, &cx, &cz);
+			if (ch == 'C') continue;
+			int inside = has_bar && (cx - bcx) * (cx - bcx) + (cz - bcz) * (cz - bcz) <= (br + 1) * (br + 1);
+			if (inside != open_barrier) continue;  /* fechada: os de fora; aberta: o prêmio */
+			if (!seen[cz][cx] || level_cell_type(cx, cz) == CELL_THICKET) {
+				if (bad < 3) printf("    PROBLEMA fase %d semente %08x: '%c' em (%d,%d)%s\n", lv + 1, seed,
+				                    ch, cx, cz, open_barrier ? " (atras das raizes)" : "");
+				bad++;
+			}
 		}
 	}
+	open_barrier = 0;
 	return bad;
 }
 static uint32_t grid_hash(void) {
@@ -111,6 +127,7 @@ int main(int argc, char **argv) {
 	for (int lv = 0; lv < num_levels; lv++) {
 		if (!level_defs[lv].gen) continue;
 		int fallback = 0, problems = 0, nondet = 0, max_tries = 0, tries_hist[5] = { 0 };
+		n_barriers = 0;
 		int dmin = 1 << 30, dmax = 0, dsum = 0, cmax = 0, wmax = 0, wsum = 0;
 		int kmin = 1 << 30, kmax = 0, ksum = 0;      /* mata alta */
 		int smax = 0, ssum = 0;                      /* contorno por janela */
@@ -166,6 +183,7 @@ int main(int argc, char **argv) {
 		printf("fase %d %-10s %3dx%-3d  invalidos(plano B) %d  tentativas 1:%d 2:%d 3:%d 4+:%d (max %d)  problemas %d  nao-deterministicos %d\n",
 		       lv + 1, level_defs[lv].name, level_defs[lv].gen->w, level_defs[lv].gen->h, fallback,
 		       tries_hist[0], tries_hist[1], tries_hist[2], tries_hist[3] + tries_hist[4], max_tries, problems, nondet);
+		printf("        barreira de raizes + chave em %d de %d mapas\n", n_barriers, N);
 		printf("        densidade (arvores/mil) min %d med %d max %d   maior bloco %d arvores   janela 3x3 (arvores eq.) max %d med %d\n",
 		       dmin, ok ? dsum / ok : 0, dmax, cmax, wmax / 4, ok ? wsum / ok / 4 : 0);
 		printf("        mata alta no interior (celulas/mil) min %d med %d max %d   contorno por janela max %d med %d\n",

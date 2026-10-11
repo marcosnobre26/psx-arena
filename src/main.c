@@ -263,6 +263,8 @@ static void draw_hud(void) {
 
 	hud_print(12, 224, "PONTOS %05d  GEMAS %d/%d  %s",
 	          g.score, g.gems, g.gems_total, objective_text());
+	if (g.ev.keys > 0)
+		hud_print(236, 212, "CHAVE x%d", g.ev.keys);
 
 	if (g.message_timer > 0)
 		draw_center(70, g.message);
@@ -512,6 +514,7 @@ static void draw_world(int with_players) {
 	lanterns_draw(with_players);   /* antes dos modelos: eles consultam as lanternas */
 	level_draw();
 	prof_begin(PROF_OTHER);
+	events_draw();                 /* árvore caindo (etapa 06) */
 	props_draw();
 	exit_draw();
 	crates_draw();

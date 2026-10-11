@@ -132,6 +132,7 @@ enum {
 	CELL_LEAVES,    /* chão de folhas */
 	CELL_ROOTS,     /* terra com raízes */
 	CELL_THICKET,   /* mata densa (3 m), sólida */
+	CELL_BARRIER,   /* barreira de raízes (1,5 m), sólida; abre com a chave (etapa 06) */
 };
 #define CELL_TYPE_MASK  0x3f
 #define CELL_LOW        0x40   /* sólido BAIXO (tronco caído): pula-se por cima, não tapa a visão */
@@ -287,7 +288,8 @@ typedef struct {
 	int     weapon;
 } BULLET;
 
-enum { PICK_GEM, PICK_HEALTH, PICK_ENERGY, PICK_WEAPON, PICK_QUEST, PICK_BATTERY, NUM_PICKUP_TYPES };
+enum { PICK_GEM, PICK_HEALTH, PICK_ENERGY, PICK_WEAPON, PICK_QUEST, PICK_BATTERY, PICK_KEY,
+       NUM_PICKUP_TYPES };
 
 typedef struct {
 	int     active;
@@ -387,6 +389,18 @@ typedef struct {
 		int      silence;         /* passos de silêncio (sons de ambiente parados) */
 		int      shake;           /* passos de tremor (a câmera visual só lê) */
 		int      last;            /* última ação aplicada (EV_*), para o overlay */
+		int      barrier_open;    /* a barreira de raízes já foi aberta */
+		/* busca de lugar em andamento (árvore cai / mata fecha): no máximo 1
+		 * checagem de alcance por passo, para não pesar num quadro só */
+		struct { int action, arg, k, j, tries, placed, dir0, start; } job;
+		/* árvore caindo: aviso (estalo), tombo, impacto */
+		struct {
+			int      timer;           /* 0 = nenhuma */
+			int      x, z, dir, scale;
+			int      n;
+			uint16_t cells[REACH_MAX_BLOCK];   /* x | z << 8 */
+			uint8_t  crown[REACH_MAX_BLOCK];   /* 1 = copa (sólida); 0 = tronco (baixo) */
+		} fall;
 	} ev;
 } GAME;
 
@@ -440,6 +454,7 @@ const MAPGEN_STATS *mapgen_stats(void);
 const DEBUG_POINT *mapgen_points(int index);   /* teleporte: gerados ou fixos */
 const DEBUG_POINT *mapgen_tree_point(void);     /* centro da janela com mais árvores */
 const DEBUG_POINT *mapgen_worst_point(void);    /* centro da janela mais pesada */
+int mapgen_barrier(int *cx, int *cz, int *r);   /* anel de raízes do mapa (0 = não tem) */
 #ifdef DEBUG_BENCHMARK
 extern int bench_force_fixed;                   /* bench: carrega a floresta fixa (plano B) */
 #endif
@@ -456,6 +471,7 @@ int  level_chunk_standing(int bx, int bz);
 void level_remove_tree(int i);
 void level_trees_changed(void);                   /* depois de level_add_tree no jogo */
 int  level_tree_room(void);
+int  level_chunk_trees(int bx, int bz, int *start);
 void level_set_flags(int cx, int cz, int flags);  /* só bits (sólido/baixo): não remonta */
 void level_rebuild_chunk(int cx, int cz);         /* remonta em fatias (tipo mudou) */
 void level_place(char ch, int cx, int cz);       /* cria o que a letra representa */
@@ -554,19 +570,22 @@ void props_draw(void);
 void show_message(const char *text, int frames);
 
 /* reach.c: alcance durante a partida (mapa de bits + checagem local) */
-enum { REACH_OK, REACH_CUT, REACH_WINDOW };
+enum { REACH_OK, REACH_CUT, REACH_WINDOW, REACH_LIMIT };   /* LIMIT: só nas estatísticas */
 void reach_clear(void);
 void reach_set(int cx, int cz, int on);
 int  reach_get(int cx, int cz);
 int  reach_walkable(int cx, int cz);
 int  reach_local_ok(int cx, int cz, const uint16_t *blk, int n);
-void reach_stats(int *ok, int *cut, int *window);
+void reach_stats(int *ok, int *cut, int *window, int *limit);
+int  reach_last_visits(void);
 
 /* events.c */
 void events_start(void);              /* fim do game_reset */
 void events_update(void);             /* um passo de lógica (STATE_PLAY) */
 void events_debug(int action);        /* atalho de depuração: na hora, sem regras */
 void events_enemy_killed(void);
+void events_draw(void);               /* árvore caindo (só desenho: lê g) */
+int  ev_fall_footprint(int x, int z, int dir, int scale, uint16_t *cells, uint8_t *crown);
 const char *event_name(int action);
 
 #endif

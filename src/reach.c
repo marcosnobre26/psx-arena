@@ -51,9 +51,14 @@ int reach_walkable(int cx, int cz) {
 /* ------------------------------------------------------------------ */
 
 #define REACH_HALF (REACH_WIN / 2)
+/* win_walk: 0 = ainda não avaliada, 1 = andável depois, 2 = bloqueada.
+ * Avaliada só quando a inundação chega nela (preguiçosa): a checagem típica
+ * visita poucas dezenas de células. */
+static uint8_t  win_walk[REACH_WIN * REACH_WIN];
 static uint8_t  win_vis[REACH_WIN * REACH_WIN];
+static int      win_visits;                   /* custo da última checagem */
 static uint16_t win_queue[REACH_WIN * REACH_WIN];
-static int      stats[3];                    /* REACH_OK / CUT / WINDOW */
+static int      stats[4];                    /* REACH_OK / CUT / WINDOW / LIMIT */
 
 static int in_list(int x, int z, const uint16_t *blk, int n) {
 	uint16_t c = (uint16_t)(x | (z << 8));
@@ -67,28 +72,47 @@ static int walk_after(int x, int z, const uint16_t *blk, int n) {
 	return reach_walkable(x, z) && !in_list(x, z, blk, n);
 }
 
-/* Inunda a janela a partir de 'seed' marcando 'mark'; devolve 1 se
- * encostou na borda da janela (o componente pode continuar lá fora) */
-static int flood_win(uint16_t seed, int mark, int x0, int z0, const uint16_t *blk, int n) {
+static int walk_memo(int lx, int lz, int x0, int z0, const uint16_t *blk, int n) {
+	int idx = lz * REACH_WIN + lx;
+	if (!win_walk[idx])
+		win_walk[idx] = walk_after(x0 + lx, z0 + lz, blk, n) ? 1 : 2;
+	return win_walk[idx] == 1;
+}
+
+/* Inunda a janela a partir de 'seed' marcando 'mark' até achar todas as
+ * 'want' sementes (parada antecipada; nwant = 0: inunda tudo) ou visitar
+ * REACH_MAX_VISIT células.
+ * Devolve: 1 = achou todas; 0 = acabou sem achar (*edge = encostou na
+ * borda da janela); -1 = passou do teto de visitas. */
+static int flood_win(uint16_t seed, int mark, int x0, int z0, const uint16_t *blk, int n,
+                     const uint16_t *want, int nwant, int *edge) {
 	static const int d[4][2] = { { 1, 0 }, { -1, 0 }, { 0, 1 }, { 0, -1 } };
-	int head = 0, tail = 0, edge = 0;
+	int head = 0, tail = 0, found = 0;
+	*edge = 0;
 	int sx = (seed & 0xff) - x0, sz = (seed >> 8) - z0;
 	win_vis[sz * REACH_WIN + sx] = mark;
 	win_queue[tail++] = (uint16_t)(sz * REACH_WIN + sx);
+	for (int i = 0; i < nwant; i++)
+		if (want[i] == seed) found++;
 	while (head < tail) {
+		if (nwant > 0 && found >= nwant) return 1;
+		if (++win_visits > REACH_MAX_VISIT) return -1;
 		int c = win_queue[head++], lx = c % REACH_WIN, lz = c / REACH_WIN;
 		if (lx == 0 || lz == 0 || lx == REACH_WIN - 1 || lz == REACH_WIN - 1)
-			edge = 1;
+			*edge = 1;
 		for (int k = 0; k < 4; k++) {
 			int nx = lx + d[k][0], nz = lz + d[k][1];
 			if (nx < 0 || nz < 0 || nx >= REACH_WIN || nz >= REACH_WIN) continue;
 			int idx = nz * REACH_WIN + nx;
-			if (win_vis[idx] || !walk_after(x0 + nx, z0 + nz, blk, n)) continue;
+			if (win_vis[idx] || !walk_memo(nx, nz, x0, z0, blk, n)) continue;
 			win_vis[idx] = mark;
 			win_queue[tail++] = (uint16_t)idx;
+			uint16_t cell = (uint16_t)((x0 + nx) | ((z0 + nz) << 8));
+			for (int i = 0; i < nwant; i++)
+				if (want[i] == cell) found++;
 		}
 	}
-	return edge;
+	return nwant > 0 && found >= nwant;
 }
 
 /* blk: células que vão ficar bloqueadas, empacotadas x | z << 8 (o mapa vai
@@ -116,24 +140,35 @@ int reach_local_ok(int cx, int cz, const uint16_t *blk, int n) {
 	if (ns <= 1) { stats[REACH_OK]++; return REACH_OK; }
 
 	memset(win_vis, 0, sizeof(win_vis));
-	int edge0 = flood_win(seeds[0], 1, x0, z0, blk, n);
+	memset(win_walk, 0, sizeof(win_walk));
+	win_visits = 0;
+	int edge0, edge1;
+	int r = flood_win(seeds[0], 1, x0, z0, blk, n, seeds, ns, &edge0);
+	if (r == 1) { stats[REACH_OK]++; return REACH_OK; }
+	if (r < 0) { stats[REACH_LIMIT]++; return REACH_WINDOW; }
+	/* não ligou todas. Se o outro lado também fica fechado dentro da
+	 * janela, corta de verdade; se os dois encostam na borda, o caminho
+	 * poderia passar por fora: "não sei" (o evento não acontece ali) */
 	for (int i = 1; i < ns; i++) {
 		int x = seeds[i] & 0xff, z = seeds[i] >> 8;
 		if (win_vis[(z - z0) * REACH_WIN + (x - x0)] == 1) continue;
-		/* não chegou. Se os DOIS lados ficam fechados dentro da janela, corta
-		 * de verdade; se algum encosta na borda, o caminho poderia passar por
-		 * fora e a resposta é "não sei" (o evento não acontece ali) */
-		int edge1 = flood_win(seeds[i], 2, x0, z0, blk, n);
-		int r = (edge0 && edge1) ? REACH_WINDOW : REACH_CUT;
+		r = flood_win(seeds[i], 2, x0, z0, blk, n, seeds, 0, &edge1);
+		if (r < 0) { stats[REACH_LIMIT]++; return REACH_WINDOW; }
+		r = (edge0 && edge1) ? REACH_WINDOW : REACH_CUT;
 		stats[r]++;
 		return r;
 	}
-	stats[REACH_OK]++;
-	return REACH_OK;
+	stats[REACH_CUT]++;
+	return REACH_CUT;
 }
 
-void reach_stats(int *ok, int *cut, int *window) {
+int reach_last_visits(void) {
+	return win_visits;
+}
+
+void reach_stats(int *ok, int *cut, int *window, int *limit) {
 	*ok = stats[REACH_OK];
 	*cut = stats[REACH_CUT];
 	*window = stats[REACH_WINDOW];
+	*limit = stats[REACH_LIMIT];
 }

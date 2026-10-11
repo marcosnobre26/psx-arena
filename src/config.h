@@ -78,10 +78,19 @@
 #define EV_FOG_RAMP      (5 * 60)    /* névoa: 5 s descendo, ... */
 #define EV_FOG_TOTAL     (40 * 60)   /* ... e volta ao normal depois de ~40 s */
 #define EV_SILENCE_TIME  (12 * 60)
+#define EV_FALL_WARN     50          /* árvore: estalo antes de cair (passos) */
+#define EV_FALL_TIME     36          /* ... e o tombo */
+#define EV_FALL_LEN      1024        /* comprimento do pinheiro deitado (escala ONE) */
+#define EV_SHAKE_TIME    24          /* tremor da câmera no impacto */
+#define EV_JOB_TRIES     90          /* busca de lugar: passos no máximo */
+#define EV_PLANT_COUNT   5           /* mata fecha: árvores novas */
+#define EV_WAVE_COUNT    4           /* onda: inimigos */
+#define REBUILD_QUEUE    9           /* blocos esperando remontagem (anel de raízes: até 3x3) */
 #define REBUILD_LINES    12          /* remontagem em fatias: linhas por quadro, no máximo */
 #define REBUILD_CPU_CAP  500         /* ... e só se o quadro anterior deixou folga até aqui */
 #define REACH_WIN        33          /* janela da checagem local (células) */
 #define REACH_MAX_BLOCK  12          /* células bloqueadas por evento, no máximo */
+#define REACH_MAX_VISIT  600         /* checagem local: visitas no máximo (custo limitado) */
 #ifndef MAPGEN_TRIES
 #define MAPGEN_TRIES    16      /* mapa gerado inválido: tenta semente + 1 até aqui */
 #endif
@@ -92,6 +101,7 @@
 #define TREE_OCCLUDE_TICKS 18   /* árvore que tapou o jogador fica 50% por ~0,3 s */
 #define WALL_SLICE      192     /* paredes são montadas em fatias desta altura */
 #define THICKET_HEIGHT  768     /* mata densa: 3 m (4 fatias) */
+#define BARRIER_HEIGHT  384     /* barreira de raízes: 1,5 m (2 fatias; etapa 06) */
 #define GRAVITY         3       /* aceleração para baixo por quadro */
 
 /* ---------- Câmera ---------- */
@@ -150,6 +160,9 @@
 #define VOL_MORTE       0x3fff
 #define VOL_ITEM        0x3000
 #define VOL_ROSNADO     0x3800
+#define VOL_ESTALO      0x3400  /* eventos (etapa 06) */
+#define VOL_QUEDA       0x3fff
+#define VOL_RAIZES      0x3000
 #define VOL_VENTO       0x1400  /* loops de ambiente durante a partida */
 #define VOL_GRILOS      0x0c00
 /* rosnado: inimigo perto e fora da tela "se denuncia" de vez em quando */

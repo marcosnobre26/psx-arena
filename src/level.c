@@ -44,6 +44,7 @@ static int cell_type(int cx, int cz) {
 static int type_slices(int t) {
 	switch (t) {
 	case CELL_THICKET: return THICKET_HEIGHT / WALL_SLICE;
+	case CELL_BARRIER: return BARRIER_HEIGHT / WALL_SLICE;
 	case CELL_OUTSIDE: return 99;
 	}
 	return 0;
@@ -54,7 +55,7 @@ static int type_has_floor(int t) {
 }
 
 static int type_solid(int t) {
-	return t == CELL_VOID || t == CELL_THICKET;
+	return t == CELL_VOID || t == CELL_THICKET || t == CELL_BARRIER;
 }
 
 /* Textura de cada tipo (índice na tabela world_tex) */
@@ -65,6 +66,7 @@ static int type_tex(int t) {
 	switch (t) {
 	case CELL_LEAVES:  return WT_LEAVES;
 	case CELL_ROOTS:   return WT_ROOTS;
+	case CELL_BARRIER: return WT_ROOTS;      /* parede de raízes */
 	case CELL_THICKET: return WT_THICKET;
 	}
 	return WT_DIRT;
@@ -362,7 +364,7 @@ void level_set_flags(int cx, int cz, int flags) {
 /* na lógica: só o desenho atrasa alguns quadros).                       */
 /* ------------------------------------------------------------------ */
 static CHUNK_GEOM rebuild_geom;              /* buffer reserva */
-static int8_t     rebuild_q[4][2];           /* blocos na fila */
+static int8_t     rebuild_q[REBUILD_QUEUE][2];   /* blocos na fila */
 static int        rebuild_n, rebuild_cell = -1;
 
 void level_rebuild_chunk(int cx, int cz) {
@@ -370,7 +372,7 @@ void level_rebuild_chunk(int cx, int cz) {
 	if (cx < 0 || cz < 0 || bx >= ncx || bz >= ncz) return;
 	for (int i = 0; i < rebuild_n; i++)
 		if (rebuild_q[i][0] == bx && rebuild_q[i][1] == bz) return;
-	if (rebuild_n >= 4) {                      /* fila cheia: o jeito antigo */
+	if (rebuild_n >= REBUILD_QUEUE) {          /* fila cheia: o jeito antigo */
 		level_invalidate(cx, cz);
 		return;
 	}
@@ -551,6 +553,13 @@ void level_remove_tree(int i) {
 /* Depois de level_add_tree em tempo de jogo: reordena por bloco */
 void level_trees_changed(void) {
 	trees_finish();
+}
+
+/* Árvores do bloco (bx, bz): índice da primeira e quantas */
+int level_chunk_trees(int bx, int bz, int *start) {
+	if (bx < 0 || bz < 0 || bx >= MAX_CCX || bz >= MAX_CCZ) { *start = 0; return 0; }
+	*start = tree_start[bz][bx];
+	return tree_count[bz][bx];
 }
 
 int level_tree_room(void) {
@@ -738,6 +747,7 @@ void level_place(char ch, int cx, int cz) {
 	case 'W': pickup_spawn(PICK_WEAPON, wx, wz); break;
 	case 'Q': pickup_spawn(PICK_QUEST, wx, wz);  break;   /* item de missão */
 	case 'L': pickup_spawn(PICK_BATTERY, wx, wz); break;  /* pilha da lanterna */
+	case 'K': pickup_spawn(PICK_KEY, wx, wz);     break;  /* chave (barreira de raízes) */
 	case 'X': g.has_exit = 1; g.exit_x = wx; g.exit_z = wz; break;  /* saída */
 	case 'S':                                         /* ponto de reforço */
 		if (g.num_spawn_pts < MAX_SPAWN_PTS) {

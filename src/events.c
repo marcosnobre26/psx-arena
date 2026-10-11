@@ -16,6 +16,7 @@
  * LÊ g.ev, nunca escreve.
  */
 #include <stdio.h>
+#include <stdlib.h>
 #include <string.h>
 #include "game.h"
 
@@ -34,6 +35,7 @@ void events_start(void) {
 	g.ev.fog_far = cur()->fog_far;
 	g.ev.next_random = -1;                     /* sorteado no primeiro passo */
 	g.ev.last = -1;
+	g.ev.job.action = -1;
 }
 
 void events_enemy_killed(void) {
@@ -82,12 +84,386 @@ static int act_silence(int arg) {
 	return 1;                                  /* sem texto: o silêncio é a pista */
 }
 
-static int apply(int action, int arg) {
-	switch (action) {
-	case EV_FOG:     return act_fog(arg);
-	case EV_SILENCE: return act_silence(arg);
+/* ---------- ajudas: grupo, visão (lógica), entidades ---------- */
+
+/* Centro do grupo (jogadores vivos), em células; 0 se ninguém vivo */
+static int group_cell(int *cx, int *cz) {
+	int n = 0, x = 0, z = 0;
+	for (int i = 0; i < MAX_PLAYERS; i++)
+		if (player_alive(&g.players[i])) {
+			x += g.players[i].pos.vx; z += g.players[i].pos.vz; n++;
+		}
+	if (!n) return 0;
+	*cx = x / n / TILE_SIZE;
+	*cz = z / n / TILE_SIZE;
+	return 1;
+}
+
+/* A câmera veria (x, z)? Mesmo critério dos reforços (objective.c): cone de
+ * g.cam_yaw a partir do grupo, até a névoa ATUAL (g.ev.fog_far). Só g. */
+static int seen_by_camera(int x, int z) {
+	int gx, gz;
+	if (!group_cell(&gx, &gz)) return 0;
+	int dx = x - (gx * TILE_SIZE + TILE_SIZE / 2), dz = z - (gz * TILE_SIZE + TILE_SIZE / 2);
+	int rel = angle_diff(g.cam_yaw, angle_of(dx, dz));
+	return rel > -700 && rel < 700 && dist2d(dx, dz) < g.ev.fog_far;
+}
+
+/* Algo (jogador, inimigo, item, caixa, prop, saída, início, ponto S) está
+ * na célula (cx, cz) ou encostando nela? Árvore nova / copa não pode cair
+ * em cima. Jogadores e inimigos contam com o raio (margem de meia célula). */
+static int cell_busy(int cx, int cz) {
+	const int m = TILE_SIZE / 2;
+	int x0 = cx * TILE_SIZE - m, x1 = (cx + 1) * TILE_SIZE + m;
+	int z0 = cz * TILE_SIZE - m, z1 = (cz + 1) * TILE_SIZE + m;
+#define INSIDE(px, pz) ((px) >= x0 && (px) < x1 && (pz) >= z0 && (pz) < z1)
+	for (int i = 0; i < MAX_PLAYERS; i++)
+		if (g.players[i].active && INSIDE(g.players[i].pos.vx, g.players[i].pos.vz)) return 1;
+	for (int i = 0; i < MAX_ENEMIES; i++)
+		if (g.enemies[i].active && INSIDE(g.enemies[i].pos.vx, g.enemies[i].pos.vz)) return 1;
+	for (int i = 0; i < MAX_PICKUPS; i++)
+		if (g.pickups[i].active && INSIDE(g.pickups[i].pos.vx, g.pickups[i].pos.vz)) return 1;
+	for (int i = 0; i < MAX_CRATES; i++)
+		if (g.crates[i].active && g.crates[i].cx == cx && g.crates[i].cz == cz) return 1;
+	for (int i = 0; i < MAX_PROPS; i++)
+		if (g.props[i].active && g.props[i].cx == cx && g.props[i].cz == cz) return 1;
+	for (int i = 0; i < g.num_spawn_pts; i++)
+		if (g.spawn_pts[i].x / TILE_SIZE == cx && g.spawn_pts[i].z / TILE_SIZE == cz) return 1;
+#undef INSIDE
+	/* saída e início: nem a célula nem as vizinhas */
+	if (g.has_exit && abs(g.exit_x / TILE_SIZE - cx) <= 1 && abs(g.exit_z / TILE_SIZE - cz) <= 1) return 1;
+	if (abs(g.spawn_x / TILE_SIZE - cx) <= 1 && abs(g.spawn_z / TILE_SIZE - cz) <= 1) return 1;
+	int bcx, bcz, br;                          /* nem no anel de raízes nem dentro */
+	if (mapgen_barrier(&bcx, &bcz, &br) &&
+	    (cx - bcx) * (cx - bcx) + (cz - bcz) * (cz - bcz) <= (br + 3) * (br + 3))
+		return 1;
+	return 0;
+}
+
+static int in_cells(int cx, int cz, const uint16_t *cells, int n) {
+	uint16_t c = (uint16_t)(cx | (cz << 8));
+	for (int i = 0; i < n; i++)
+		if (cells[i] == c) return i;
+	return -1;
+}
+
+/* Tira (x, z) de dentro das células: vai para a célula andável mais perto
+ * fora delas (anéis de até 4). Devolve 1 se mudou. */
+static int push_out(VECTOR *pos, const uint16_t *cells, int n) {
+	int cx = pos->vx / TILE_SIZE, cz = pos->vz / TILE_SIZE;
+	if (in_cells(cx, cz, cells, n) < 0) return 0;
+	for (int r = 1; r <= 4; r++)
+		for (int dz = -r; dz <= r; dz++)
+			for (int dx = -r; dx <= r; dx++) {
+				int x = cx + dx, z = cz + dz;
+				if ((abs(dx) != r && abs(dz) != r) || in_cells(x, z, cells, n) >= 0) continue;
+				if (!reach_get(x, z) || !reach_walkable(x, z)) continue;
+				pos->vx = x * TILE_SIZE + TILE_SIZE / 2;
+				pos->vz = z * TILE_SIZE + TILE_SIZE / 2;
+				return 1;
+			}
+	return 0;
+}
+
+/* ---------- árvore cai ---------- */
+
+/* Células que o pinheiro deitado ocupa, de (x, z) na direção dir. Tronco
+ * (primeiros 45%): sólido BAIXO (pula-se); copa: sólida, com ~3 células de
+ * largura no meio. Sem a célula da base. Devolve quantas (0 = não cabe). */
+int ev_fall_footprint(int x, int z, int dir, int scale, uint16_t *cells, uint8_t *crown) {
+	int len = (EV_FALL_LEN * scale) >> 12;
+	int sx = isin(dir), sz = icos(dir);
+	int n = 0, bx = x / TILE_SIZE, bz = z / TILE_SIZE;
+	for (int t = 160; t <= len; t += 112) {
+		int is_crown = t > len * 45 / 100;
+		int px = x + ((sx * t) >> 12), pz = z + ((sz * t) >> 12);
+		for (int side = -1; side <= 1; side++) {
+			if (side && (!is_crown || t < len * 55 / 100 || t > len * 90 / 100)) continue;
+			int qx = px + ((sz * 160 * side) >> 12), qz = pz - ((sx * 160 * side) >> 12);
+			int cx = qx / TILE_SIZE, cz = qz / TILE_SIZE;
+			if (qx < 0 || qz < 0 || (cx == bx && cz == bz)) continue;
+			int i = in_cells(cx, cz, cells, n);
+			if (i >= 0) { crown[i] |= is_crown; continue; }
+			if (n >= REACH_MAX_BLOCK) return 0;
+			cells[n] = (uint16_t)(cx | (cz << 8));
+			crown[n] = is_crown;
+			n++;
+		}
+	}
+	return n;
+}
+
+/* A árvore i pode cair na direção dir agora? (sem a checagem de alcance) */
+static int fall_fits(int x, int z, int dir, int scale, uint16_t *cells, uint8_t *crown, int *n) {
+	*n = ev_fall_footprint(x, z, dir, scale, cells, crown);
+	if (*n == 0) return 0;
+	for (int i = 0; i < *n; i++) {
+		int cx = cells[i] & 0xff, cz = cells[i] >> 8;
+		if (cx < FOREST_EDGE || cz < FOREST_EDGE ||
+		    cx >= level_width() - FOREST_EDGE || cz >= level_height() - FOREST_EDGE)
+			return 0;
+		/* cai em chão aberto e alcançável (trilha, clareira), sem nada em cima */
+		if (!reach_get(cx, cz) || !reach_walkable(cx, cz) || cell_busy(cx, cz))
+			return 0;
+	}
+	return 1;
+}
+
+/* Um passo da busca: um candidato (árvore, direção). Só a copa entra na
+ * checagem de alcance (o tronco é baixo: passa-se pulando). */
+static int job_fall_step(void) {
+	int gx, gz;
+	if (!group_cell(&gx, &gz)) return -1;
+	int bx0 = gx / CHUNK_CELLS - 2, bz0 = gz / CHUNK_CELLS - 2, total = 0, start;
+	for (int bz = bz0; bz < bz0 + 5; bz++)
+		for (int bx = bx0; bx < bx0 + 5; bx++)
+			total += level_chunk_trees(bx, bz, &start);
+	if (total == 0) return -1;
+	for (int scans = 0; scans < 40; scans++) {      /* candidatos baratos por passo */
+		if (g.ev.job.k >= total || g.ev.job.k >= 48) return -1;
+		int want = (g.ev.job.start + g.ev.job.k) % total, idx = -1;
+		for (int bz = bz0; bz < bz0 + 5 && idx < 0; bz++)
+			for (int bx = bx0; bx < bx0 + 5 && idx < 0; bx++) {
+				int c = level_chunk_trees(bx, bz, &start);
+				if (want < c) idx = start + want;
+				else want -= c;
+			}
+		int x, z, type, scale, ang;
+		level_tree_info(idx, &x, &z, &type, &scale, &ang);
+		int dx = x / TILE_SIZE - gx, dz = z / TILE_SIZE - gz, d2 = dx * dx + dz * dz;
+		/* um pinheiro À FRENTE do grupo, a 4..12 células: o jogador vê cair */
+		if (type != TREE_PINE || d2 < 4 * 4 || d2 > 12 * 12 ||
+		    abs(angle_diff(g.cam_yaw, angle_of(dx, dz))) > 1200) {
+			g.ev.job.k++; g.ev.job.j = 0;
+			continue;
+		}
+		int dir = (g.ev.job.dir0 + g.ev.job.j * 512) & 4095;
+		if (++g.ev.job.j >= 8) { g.ev.job.k++; g.ev.job.j = 0; }
+		uint16_t cells[REACH_MAX_BLOCK], blk[REACH_MAX_BLOCK];
+		uint8_t  crown[REACH_MAX_BLOCK];
+		int n, nb = 0;
+		if (!fall_fits(x, z, dir, scale, cells, crown, &n)) continue;
+		for (int i = 0; i < n; i++)
+			if (crown[i]) blk[nb++] = cells[i];
+		/* 1 checagem por passo: o resto da busca fica para o próximo */
+		if (reach_local_ok(x / TILE_SIZE, z / TILE_SIZE, blk, nb) != REACH_OK)
+			return 0;
+		/* achou: tira a árvore em pé e começa o aviso (estalo) */
+		level_remove_tree(idx);
+		int bxc = x / TILE_SIZE, bzc = z / TILE_SIZE;
+		if (reach_get(bxc + 1, bzc) || reach_get(bxc - 1, bzc) || reach_get(bxc, bzc + 1) || reach_get(bxc, bzc - 1))
+			reach_set(bxc, bzc, 1);            /* a base fica livre */
+		g.ev.fall.timer = EV_FALL_WARN + EV_FALL_TIME;
+		g.ev.fall.x = x; g.ev.fall.z = z; g.ev.fall.dir = dir; g.ev.fall.scale = scale;
+		g.ev.fall.n = n;
+		memcpy(g.ev.fall.cells, cells, sizeof(cells));
+		memcpy(g.ev.fall.crown, crown, sizeof(crown));
+		sound_play_at(&sfx_estalo, x, z, VOL_ESTALO);
+		return 1;
 	}
 	return 0;
+}
+
+/* Impacto: marca as células (só bits: o bloco não é remontado), empurra
+ * quem entrou nelas durante o aviso, põe o pinheiro deitado na lista */
+static void fall_impact(void) {
+	const int n = g.ev.fall.n;
+	const uint16_t *cells = g.ev.fall.cells;
+	for (int i = 0; i < n; i++) {
+		int cx = cells[i] & 0xff, cz = cells[i] >> 8;
+		level_set_flags(cx, cz, g.ev.fall.crown[i] ? CELL_SOLID : CELL_SOLID | CELL_LOW);
+		if (g.ev.fall.crown[i]) reach_set(cx, cz, 0);
+	}
+	for (int i = 0; i < MAX_PLAYERS; i++)
+		if (g.players[i].active && push_out(&g.players[i].pos, cells, n))
+			collide_track(&g.players[i]);
+	for (int i = 0; i < MAX_ENEMIES; i++)
+		if (g.enemies[i].active && push_out(&g.enemies[i].pos, cells, n))
+			collide_track(&g.enemies[i]);
+	for (int i = 0; i < MAX_PICKUPS; i++)
+		if (g.pickups[i].active) push_out(&g.pickups[i].pos, cells, n);
+	level_add_tree(TREE_FALLEN, g.ev.fall.x, g.ev.fall.z, g.ev.fall.dir, g.ev.fall.scale);
+	level_trees_changed();
+	g.ev.shake = EV_SHAKE_TIME;
+	sound_play_at(&sfx_queda, g.ev.fall.x, g.ev.fall.z, VOL_QUEDA);
+	show_message("UMA ARVORE CAIU", 90);
+}
+
+/* ---------- a mata se fecha atrás ---------- */
+
+/* Tetos da 05 para árvores novas: por bloco e por janela 3x3 blocos */
+static int tree_caps_ok(int cx, int cz) {
+	const GEN_PARAMS *gp = cur()->gen;
+	int chunk_cap = gp ? gp->chunk_cap : 5, win_cap = gp ? gp->window_trees : 16;
+	int bx = cx / CHUNK_CELLS, bz = cz / CHUNK_CELLS;
+	if (level_chunk_standing(bx, bz) >= chunk_cap) return 0;
+	for (int wz = bz - 1; wz <= bz + 1; wz++)        /* toda janela que contém o bloco */
+		for (int wx = bx - 1; wx <= bx + 1; wx++) {
+			int t = 0;
+			for (int z = wz - 1; z <= wz + 1; z++)
+				for (int x = wx - 1; x <= wx + 1; x++)
+					t += level_chunk_standing(x, z);
+			if (t >= win_cap) return 0;
+		}
+	return 1;
+}
+
+static int job_close_step(void) {
+	int gx, gz;
+	if (!group_cell(&gx, &gz)) return -1;
+	int target = g.ev.job.arg ? g.ev.job.arg : EV_PLANT_COUNT;
+	if (g.ev.job.placed >= target || level_tree_room() < 1) return 1;
+	for (int scans = 0; scans < 8; scans++) {
+		if (++g.ev.job.tries > EV_JOB_TRIES) return g.ev.job.placed ? 1 : -1;
+		/* atrás do grupo (oposto à câmera), a 7..14 células */
+		int a = (g.cam_yaw + 2048 + rng_range(&g.rng, -900, 900)) & 4095;
+		int d = rng_range(&g.rng, 7 * TILE_SIZE, 14 * TILE_SIZE);
+		int x = gx * TILE_SIZE + TILE_SIZE / 2 + ((isin(a) * d) >> 12);
+		int z = gz * TILE_SIZE + TILE_SIZE / 2 + ((icos(a) * d) >> 12);
+		int cx = x / TILE_SIZE, cz = z / TILE_SIZE;
+		if (cx < FOREST_EDGE + 1 || cz < FOREST_EDGE + 1 ||
+		    cx >= level_width() - FOREST_EDGE - 1 || cz >= level_height() - FOREST_EDGE - 1)
+			continue;
+		x = cx * TILE_SIZE + TILE_SIZE / 2;
+		z = cz * TILE_SIZE + TILE_SIZE / 2;
+		if (!reach_get(cx, cz) || !reach_walkable(cx, cz) || cell_busy(cx, cz) ||
+		    seen_by_camera(x, z) || !tree_caps_ok(cx, cz))
+			continue;
+		uint16_t blk = (uint16_t)(cx | (cz << 8));
+		if (reach_local_ok(cx, cz, &blk, 1) != REACH_OK)
+			return 0;                              /* 1 checagem por passo */
+		int scale = rng_range(&g.rng, tree_defs[TREE_PINE].scale_min, tree_defs[TREE_PINE].scale_max);
+		level_add_tree(TREE_PINE, x, z, rng_next(&g.rng) & 4095, scale);
+		level_trees_changed();
+		reach_set(cx, cz, 0);
+		g.ev.job.placed++;
+		return g.ev.job.placed >= target ? 1 : 0;
+	}
+	return 0;
+}
+
+/* ---------- onda de inimigos ---------- */
+
+static int act_wave(int arg) {
+	int gx, gz, n = arg ? arg : EV_WAVE_COUNT, made = 0;
+	if (!group_cell(&gx, &gz)) return 0;
+	for (int k = 0; k < n; k++) {
+		if (cur()->objective == OBJ_SURVIVE && g.enemies_left >= cur()->max_enemies) break;
+		for (int t = 0; t < 40; t++) {
+			int a = rng_next(&g.rng) & 4095;
+			int d = rng_range(&g.rng, REINFORCE_MIN_DIST, REINFORCE_MIN_DIST + 10 * TILE_SIZE);
+			int cx = (gx * TILE_SIZE + ((isin(a) * d) >> 12)) / TILE_SIZE;
+			int cz = (gz * TILE_SIZE + ((icos(a) * d) >> 12)) / TILE_SIZE;
+			int x = cx * TILE_SIZE + TILE_SIZE / 2, z = cz * TILE_SIZE + TILE_SIZE / 2;
+			if (!reach_get(cx, cz) || !reach_walkable(cx, cz) || cell_busy(cx, cz) ||
+			    seen_by_camera(x, z))
+				continue;
+			int before = g.enemies_left;
+			enemy_spawn(rng_range(&g.rng, 0, num_enemy_types - 1), x, z);
+			if (g.enemies_left == before) return made > 0;   /* pool cheio */
+			if (!made) sound_play_at(&sfx_rosnado, x, z, VOL_ROSNADO);
+			made++;
+			break;
+		}
+	}
+	if (made) show_message("ALGO SE APROXIMA", 90);
+	return made > 0;
+}
+
+/* ---------- caminho se abre (chave na barreira de raízes) ---------- */
+
+static int act_open_path(void) {
+	int bcx, bcz, br;
+	if (g.ev.barrier_open || !mapgen_barrier(&bcx, &bcz, &br)) return 0;
+	if (g.ev.keys <= 0 && !g.ev.job.arg) return 0;
+	for (int z = bcz - br - 2; z <= bcz + br + 2; z++)
+		for (int x = bcx - br - 2; x <= bcx + br + 2; x++) {
+			int d = (x - bcx) * (x - bcx) + (z - bcz) * (z - bcz);
+			if (d > (br + 2) * (br + 2)) continue;
+			if (level_cell_type(x, z) == CELL_BARRIER) {
+				level_set_cell(x, z, CELL_ROOTS);     /* vira chão de raízes */
+				level_rebuild_chunk(x, z);            /* em fatias (desenho) */
+			}
+			if (reach_walkable(x, z)) reach_set(x, z, 1);   /* a região de trás */
+		}
+	if (g.ev.keys > 0) g.ev.keys--;
+	g.ev.barrier_open = 1;
+	sound_play_at(&sfx_raizes, bcx * TILE_SIZE, bcz * TILE_SIZE, VOL_RAIZES);
+	show_message("AS RAIZES SE ABREM", 120);
+	return 1;
+}
+
+/* Jogador com chave encostado na barreira (gatilho EVT_KEY) */
+static int key_at_barrier(void) {
+	int bcx, bcz, br;
+	if (g.ev.keys <= 0 || g.ev.barrier_open || !mapgen_barrier(&bcx, &bcz, &br)) return 0;
+	for (int i = 0; i < MAX_PLAYERS; i++) {
+		const PLAYER *p = &g.players[i];
+		if (!player_alive(p)) continue;
+		int d = dist2d(p->pos.vx - (bcx * TILE_SIZE + TILE_SIZE / 2), p->pos.vz - (bcz * TILE_SIZE + TILE_SIZE / 2));
+		if (d < (br + 3) * TILE_SIZE + TILE_SIZE / 2) return 1;
+	}
+	return 0;
+}
+
+/* ---------- despacho ---------- */
+
+/* 1 = aconteceu; 0 = não deu (sai da fila); 2 = começou uma busca */
+static int apply(int action, int arg, int force) {
+	switch (action) {
+	case EV_FOG:      return act_fog(arg);
+	case EV_SILENCE:  return act_silence(arg);
+	case EV_WAVE:     return act_wave(arg);
+	case EV_OPEN_PATH:
+		g.ev.job.arg = force;                  /* depuração: abre mesmo sem chave */
+		{ int r = act_open_path(); g.ev.job.arg = 0; return r; }
+	case EV_TREE_FALL:
+	case EV_CLOSE_BEHIND:
+		if (g.ev.fall.timer > 0) return 0;     /* uma árvore por vez */
+		g.ev.job.action = action;
+		g.ev.job.arg = arg;
+		g.ev.job.k = g.ev.job.j = g.ev.job.tries = g.ev.job.placed = 0;
+		g.ev.job.dir0 = rng_range(&g.rng, 0, 7) * 512;
+		g.ev.job.start = rng_next(&g.rng) & 0xffff;
+		return 2;
+	}
+	return 0;
+}
+
+static void job_done(int ok) {
+	if (ok) {
+		g.ev.last = g.ev.job.action;
+		g.ev.map_cooldown = EV_MAP_COOLDOWN;
+		if (g.ev.job.action == EV_CLOSE_BEHIND)
+			show_message("A MATA SE FECHA ATRAS", 120);
+	}
+	g.ev.job.action = -1;
+}
+
+/* Busca em andamento e árvore caindo: um passo */
+static void tick_map_work(void) {
+	if (g.ev.fall.timer > 0 && --g.ev.fall.timer == 0)
+		fall_impact();
+	if (g.ev.job.action < 0) return;
+	int r = g.ev.job.action == EV_TREE_FALL ? job_fall_step() : job_close_step();
+	if (r != 0) job_done(r > 0);
+}
+
+/* Árvore caindo: o pinheiro em pé tremendo (aviso) e depois tombando com
+ * aceleração. Só desenho (lê g.ev.fall). */
+void events_draw(void) {
+	if (g.ev.fall.timer <= 0) return;
+	int pitch = 0, yaw = g.ev.fall.dir;
+	if (g.ev.fall.timer > EV_FALL_TIME) {           /* estalo: balança */
+		pitch = isin((g.frame * 700) & 4095) >> 7;
+	} else {
+		int p = EV_FALL_TIME - g.ev.fall.timer;     /* 0..EV_FALL_TIME */
+		pitch = tree_defs[TREE_FALLEN].pitch * p * p / (EV_FALL_TIME * EV_FALL_TIME);
+	}
+	VECTOR  pos = { g.ev.fall.x, 0, g.ev.fall.z };
+	SVECTOR rot = { pitch, yaw, 0 };
+	DRAWOPT opt = { 0 };
+	render_mesh(tree_defs[TREE_PINE].mesh, &pos, &rot, g.ev.fall.scale, &opt);
 }
 
 /* ------------------------------------------------------------------ */
@@ -143,6 +519,7 @@ static void check_triggers(void) {
 		case EVT_AREA:   hit = near_area(e->p1, e->p2); break;
 		case EVT_PICKUP: hit = g.quest >= e->p1; break;
 		case EVT_KILLS:  hit = g.ev.kills >= e->p1; break;
+		case EVT_KEY:    hit = key_at_barrier(); break;
 		}
 		if (hit) {
 			g.ev.fired |= 1u << i;
@@ -175,6 +552,7 @@ static void tick_timers(void) {
 
 void events_update(void) {
 	tick_timers();
+	tick_map_work();
 	if (g.play_frames < EV_GRACE) {             /* começo da fase: só o relógio */
 		for (int i = 0; i < g.ev.nq; i++)
 			if (g.ev.queue[i].force) goto run; /* depuração passa */
@@ -196,9 +574,12 @@ run:
 			best = i;
 	}
 	if (best < 0) return;
-	int a = g.ev.queue[best].action, arg = g.ev.queue[best].arg;
+	int a = g.ev.queue[best].action, arg = g.ev.queue[best].arg, force = g.ev.queue[best].force;
+	if (g.ev.job.action >= 0 && (a == EV_TREE_FALL || a == EV_CLOSE_BEHIND))
+		return;                                  /* espera a busca atual acabar */
 	g.ev.queue[best] = g.ev.queue[--g.ev.nq];
-	if (apply(a, arg)) {
+	int r = apply(a, arg, force);
+	if (r == 1) {
 		g.ev.last = a;
 		if ((EV_MAP_ACTIONS >> a) & 1)
 			g.ev.map_cooldown = EV_MAP_COOLDOWN;

@@ -334,6 +334,60 @@ static void build_thicket(const GEN_PARAMS *gp, uint32_t nseed) {
 		}
 }
 
+/* Barreira de raízes (etapa 06): um ANEL de células entre os raios r+1 e
+ * r+2 em volta de uma clareira sorteada, fechando um desvio opcional com um
+ * prêmio. Um passo de 1 célula muda a distância ao centro em no máximo 1,
+ * então nenhum caminho 4-conectado atravessa o anel sem pisar nele.
+ * Só fica se, com o anel fechado, a saída, as relíquias e os pontos S
+ * continuam alcançáveis e o anel encosta na área alcançável (dá para abrir
+ * por fora). Senão é desfeito. A inundação feita aqui é a do passo 5. */
+static int  bar_on, bar_cx, bar_cz, bar_r;
+
+static int try_barrier(const GEN_PARAMS *gp, int sx, int sz, int ex, int ez,
+                       const int *qx, const int *qz, int nq, int cx, int cz, int r) {
+	int dx0 = cx - sx, dz0 = cz - sz;
+	if (dx0 * dx0 + dz0 * dz0 < 12 * 12) return 0;   /* nem perto do início */
+	uint16_t cells[96];
+	uint8_t  old[96];
+	int n = 0, r1 = (r + 1) * (r + 1), r2 = (r + 2) * (r + 2);
+	for (int z = cz - r - 2; z <= cz + r + 2; z++)
+		for (int x = cx - r - 2; x <= cx + r + 2; x++) {
+			int d = (x - cx) * (x - cx) + (z - cz) * (z - cz);
+			if (d < r1 || d >= r2) continue;
+			if (!inside(x, z, FOREST_EDGE + 1)) return 0;
+			if (!walkable(x, z)) continue;           /* já bloqueada: fica como está */
+			if (n >= 96) return 0;
+			cells[n] = (uint16_t)(x | (z << 8));
+			old[n] = level_cell_type(x, z);
+			level_set_cell(x, z, CELL_BARRIER);
+			n++;
+		}
+	flood(sx, sz, GM_REACH);
+	int ok = n > 0;
+	if (ex >= 0 && !(gmark[ez][ex] & GM_REACH)) ok = 0;
+	for (int q = 0; q < nq && ok; q++)
+		if (!(gmark[qz[q]][qx[q]] & GM_REACH)) ok = 0;
+	if (gp->layout == GEN_SURVIVE) ok = 0;            /* cerco: sem desvio */
+	if (ok) {                                         /* encosta na área alcançável? */
+		int touch = 0;
+		for (int i = 0; i < n && !touch; i++) {
+			int x = cells[i] & 0xff, z = cells[i] >> 8;
+			touch = (gmark[z][x + 1] | gmark[z][x - 1] | gmark[z + 1][x] | gmark[z - 1][x]) & GM_REACH;
+		}
+		ok = touch;
+	}
+	if (!ok) {                                        /* desfaz */
+		for (int i = 0; i < n; i++)
+			level_set_cell(cells[i] & 0xff, cells[i] >> 8, old[i]);
+		for (int z = 0; z < H; z++)
+			for (int x = 0; x < W; x++)
+				gmark[z][x] &= ~GM_REACH;
+		return 0;
+	}
+	bar_on = 1; bar_cx = cx; bar_cz = cz; bar_r = r;
+	return 1;
+}
+
 static void generate(const GEN_PARAMS *gp) {
 	const uint32_t seed = stats.seed;
 	const int E = FOREST_EDGE;
@@ -389,7 +443,7 @@ static void generate(const GEN_PARAMS *gp) {
 	}
 
 	/* clareiras: as dos pontos de interesse + as sorteadas */
-	int ccx[16], ccz[16], nc = 0;
+	int ccx[16], ccz[16], ccr[16], nc = 0;
 	carve_clearing(sx, sz, gp->layout == GEN_SURVIVE ? gp->survive_r : 3);
 	if (ex >= 0) carve_clearing(ex, ez, 3);
 	for (int q = 0; q < nq; q++) carve_clearing(qx[q], qz[q], 4);
@@ -398,7 +452,7 @@ static void generate(const GEN_PARAMS *gp) {
 		int r = rnd(gp->clear_rmin, gp->clear_rmax);
 		int x = rnd(m + r, W - m - r - 1), z = rnd(m + r, H - m - r - 1);
 		carve_clearing(x, z, r);
-		ccx[nc] = x; ccz[nc] = z; nc++;
+		ccx[nc] = x; ccz[nc] = z; ccr[nc] = r; nc++;
 	}
 
 	/* 3) trilhas do início até cada ponto de interesse e cada clareira */
@@ -448,7 +502,12 @@ static void generate(const GEN_PARAMS *gp) {
 	 * só são sorteados em células marcadas (random_cell). Os bolsões
 	 * fechados ficam como estão: enchê-los de mata criava tufos soltos entre
 	 * as árvores, com 3-4 lados expostos cada (caro de desenhar). */
-	flood(sx, sz, GM_REACH);
+	bar_on = 0;
+	int bk = nc ? rnd(0, nc - 1) : -1;               /* 5a) barreira: tenta 1 clareira */
+	if (bk >= 0 && try_barrier(gp, sx, sz, ex, ez, qx, qz, nq, ccx[bk], ccz[bk], ccr[bk]))
+		;                                         /* (a inundação já foi feita lá) */
+	else
+		flood(sx, sz, GM_REACH);
 
 	/* peso da mata interior nas janelas: 1 por LADO EXPOSTO (o que custa
 	 * desenhar). Só DEPOIS das árvores, para o teto de peso (GEN_WINDOW_CAP)
@@ -486,6 +545,16 @@ static void generate(const GEN_PARAMS *gp) {
 		level_place_safe(ch, x, z);
 	}
 
+	/* 5c') prêmio atrás das raízes + a chave, longe do início */
+	if (bar_on) {
+		level_place_safe('W', bar_cx, bar_cz);
+		level_place_safe('G', bar_cx + 1, bar_cz);
+		level_place_safe('G', bar_cx - 1, bar_cz);
+		int x, z;
+		if (random_cell(E, E, W - E - 1, H - E - 1, sx, sz, far / 4, &x, &z))
+			level_place_safe('K', x, z);
+	}
+
 	/* 5d) itens pelo orçamento (perto de onde se anda: qualquer lugar livre) */
 	static const char item_ch[GEN_ITEM_TYPES] = { 'H', 'N', 'L', 'W', 'G', 'C' };
 	for (int t = 0; t < GEN_ITEM_TYPES; t++)
@@ -498,6 +567,22 @@ static void generate(const GEN_PARAMS *gp) {
 	/* pontos de teleporte: início, centro, janela mais densa, saída/relíquia */
 	gen_pts[0].cx = sx; gen_pts[0].cz = sz; gen_pts[0].yaw = 0;
 	gen_pts[1].cx = W / 2; gen_pts[1].cz = H / 2; gen_pts[1].yaw = 512;
+	if (bar_on) {                                     /* L2 + direita: na frente das raízes */
+		int best = -1, r3 = (bar_r + 3) * (bar_r + 3), r4 = (bar_r + 4) * (bar_r + 4);
+		for (int z = bar_cz - bar_r - 4; z <= bar_cz + bar_r + 4; z++)
+			for (int x = bar_cx - bar_r - 4; x <= bar_cx + bar_r + 4; x++) {
+				int d = (x - bar_cx) * (x - bar_cx) + (z - bar_cz) * (z - bar_cz);
+				if (d < r3 || d >= r4 || x < 0 || z < 0 || x >= W || z >= H ||
+				    !(gmark[z][x] & GM_REACH))
+					continue;
+				int ds = (x - sx) * (x - sx) + (z - sz) * (z - sz);   /* o lado do início */
+				if (best < 0 || ds < best) {
+					best = ds;
+					gen_pts[1].cx = x; gen_pts[1].cz = z;
+					gen_pts[1].yaw = angle_of(bar_cx - x, bar_cz - z);   /* olhando o centro */
+				}
+			}
+	}
 	gen_pts[3].cx = ex >= 0 ? ex : (nc ? ccx[0] : W / 2);
 	gen_pts[3].cz = ex >= 0 ? ez : (nc ? ccz[0] : H / 2);
 	gen_pts[3].yaw = 2048;
@@ -522,6 +607,9 @@ static int validate(void) {
 	for (int i = 0; i < n; i++) {
 		level_placed(i, &ch, &cx, &cz);
 		if (ch == 'C') continue;                     /* caixa ocupa a própria célula */
+		if (bar_on && (cx - bar_cx) * (cx - bar_cx) + (cz - bar_cz) * (cz - bar_cz) <=
+		              (bar_r + 1) * (bar_r + 1))
+			continue;                                /* prêmio atrás das raízes */
 		if (!(gmark[cz][cx] & GM_VISIT)) return 0;
 	}
 	return 1;
@@ -648,6 +736,11 @@ int mapgen_build(int index) {
 
 const DEBUG_POINT *mapgen_tree_point(void) {
 	return &tree_pt;
+}
+
+int mapgen_barrier(int *cx, int *cz, int *r) {
+	*cx = bar_cx; *cz = bar_cz; *r = bar_r;
+	return gen_active && bar_on;
 }
 
 const DEBUG_POINT *mapgen_worst_point(void) {
