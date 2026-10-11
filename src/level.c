@@ -739,10 +739,18 @@ void level_load(int index) {
 	load_lines = (uint16_t)(LINE_TIMER() - t_load);     /* < 65536 linhas (~4 s) */
 }
 
+/* Névoa da fase: a da tabela, ou a do evento "névoa avança" (g.ev.fog_far,
+ * lógica). O near acompanha na mesma proporção. Só desenho: lê g. */
+void level_apply_fog(void) {
+	const LEVEL_DEF *ld = &level_defs[cur_level];
+	int far = g.ev.fog_far > 0 ? g.ev.fog_far : ld->fog_far;
+	render_set_fog(ld->fog_near * far / ld->fog_far, far, ld->sky_r, ld->sky_g, ld->sky_b);
+}
+
 /* Névoa, céu e luz da fase atual (também chamado ao voltar dos menus) */
 void level_apply_look(void) {
 	const LEVEL_DEF *ld = &level_defs[cur_level];
-	render_set_fog(ld->fog_near, ld->fog_far, ld->sky_r, ld->sky_g, ld->sky_b);
+	level_apply_fog();
 	render_set_light(ld->amb_r, ld->amb_g, ld->amb_b, MOON_R, MOON_G, MOON_B);
 	/* imagens planas: a luz média de uma face de lado (sem normal própria) */
 	static const SVECTOR side = { ONE * 7 / 10, 0, -ONE * 7 / 10, 0 };

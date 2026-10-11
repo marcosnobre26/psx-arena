@@ -106,6 +106,7 @@ static void game_reset(int level, uint32_t seed) {
 		g.players[i].angle = g.cam_yaw;
 	camera_snap();                 /* câmera visual direto no lugar */
 	objective_start();
+	events_start();
 }
 
 /* ------------------------------------------------------------------ */
@@ -286,6 +287,8 @@ static void draw_hud(void) {
 		int pc, pg, pv;
 		render_stats_time(&pc, &pg, &pv);
 		hud_print(12, 136, "CPU %d GPU %d FOLGA %d (linhas)", pc, pg, pv);
+		hud_print(12, 116, "EVENTO %s  PROX %ds  MAPA %ds", event_name(g.ev.last),
+		          g.ev.next_random > 0 ? g.ev.next_random / 60 : 0, g.ev.map_cooldown / 60);
 		/* mapa: semente usada pelo gerador (SEED + fase + tentativa), quantas
 		 * tentativas e o tempo de carga; PLANO B = floresta fixa da 04e */
 		const MAPGEN_STATS *ms = mapgen_stats();
@@ -556,6 +559,7 @@ static void game_tick(void) {
 		bullets_update();
 		pickups_update();
 		effects_update();
+		events_update();                 /* a floresta muda (etapa 06) */
 		camera_turn();                   /* lógica: só o ângulo (g.cam_yaw) */
 		g.play_frames++;
 		if (objective_update() && g.state == STATE_PLAY) {
@@ -613,6 +617,10 @@ static void game_tick(void) {
 
 /* Desenha o quadro atual */
 static void game_draw(void) {
+#ifndef DEBUG_FOG_TUNING
+	if (g.ev.fog_far > 0 && render_fog_far() != g.ev.fog_far)
+		level_apply_fog();               /* névoa do evento (lê g) */
+#endif
 	switch (g.state) {
 	case STATE_TITLE:
 		camera_title();
@@ -779,6 +787,17 @@ static void debug_input(INPUT *in) {
 		in->pressed &= ~PAD_TRIANGLE;    /* não troca de arma */
 		l2_combo = 1;
 		debug_spawn_enemies();
+	}
+	if (l2 && show_debug && g.state == STATE_PLAY) {   /* eventos na hora (etapa 06) */
+		static const uint16_t ev_keys[NUM_EV_ACTIONS] = {
+			PAD_SQUARE, PAD_CIRCLE, PAD_CROSS, PAD_L1, PAD_R1, PAD_R2,
+		};
+		for (int a = 0; a < NUM_EV_ACTIONS; a++)
+			if (in->pressed & ev_keys[a]) {
+				in->pressed &= ~ev_keys[a];  /* não ataca/pula/troca */
+				l2_combo = 1;
+				events_debug(a);
+			}
 	}
 	if (l2 && show_debug && (in->pressed & PAD_START)) {
 		in->pressed &= ~PAD_START;
@@ -1221,7 +1240,8 @@ static void bench_frame(int vs) {
  * (jogo, pausa, vitória, derrota) e param no título e na seleção. */
 static void ambience_update(void) {
 	static int playing = 0;
-	int want = g.state != STATE_TITLE && g.state != STATE_SELECT;
+	/* evento "silêncio": o ambiente para (só lê g.ev) */
+	int want = g.state != STATE_TITLE && g.state != STATE_SELECT && g.ev.silence == 0;
 	if (want == playing)
 		return;
 	playing = want;

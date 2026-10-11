@@ -195,6 +195,25 @@ typedef struct {
 /* Objetivo de uma fase (ver objective.c) */
 enum { OBJ_KILL_ALL, OBJ_REACH_EXIT, OBJ_COLLECT, OBJ_SURVIVE };
 
+/* Eventos durante a partida (events.c; etapa 06) */
+enum { EV_FOG, EV_TREE_FALL, EV_OPEN_PATH, EV_CLOSE_BEHIND, EV_WAVE, EV_SILENCE,
+       NUM_EV_ACTIONS };
+#define EV_MAP_ACTIONS ((1 << EV_TREE_FALL) | (1 << EV_OPEN_PATH) | (1 << EV_CLOSE_BEHIND))
+enum { EVT_RANDOM,      /* a cada p1..p2 s (g.rng); ação sorteada na máscara arg */
+       EVT_TIME,        /* uma vez, p1 s depois do começo da fase */
+       EVT_AREA,        /* uma vez, um jogador a p2 células da área p1 (AREA_*) */
+       EVT_PICKUP,      /* uma vez, ao pegar o p1-ésimo item de missão */
+       EVT_KILLS,       /* uma vez, ao derrotar p1 inimigos */
+       EVT_KEY };       /* jogador com chave encosta na barreira de raízes */
+enum { AREA_EXIT, AREA_QUEST };
+typedef struct {
+	uint8_t trigger;     /* EVT_* */
+	uint8_t action;      /* EV_* (ignorado em EVT_RANDOM) */
+	uint8_t prio;        /* maior sai da fila antes */
+	int16_t p1, p2;      /* parâmetros do gatilho */
+	int16_t arg;         /* parâmetro da ação (EVT_RANDOM: máscara de ações) */
+} EVENT_DEF;
+
 /* Uma fase (levels.c): gerador do mapa + aparência + objetivo */
 typedef struct {
 	const char        *name;
@@ -209,6 +228,8 @@ typedef struct {
 	void             (*build)(void); /* monta a grade e os objetos (por código) */
 	const DEBUG_POINT *debug_pts;    /* 4 pontos de teleporte (L2 + direcional) */
 	const GEN_PARAMS  *gen;          /* != NULL: mapa GERADO por g.seed (build = plano B) */
+	const EVENT_DEF   *events;       /* eventos da fase (etapa 06) */
+	int                num_events;
 } LEVEL_DEF;
 extern const LEVEL_DEF  level_defs[];
 extern const int        num_levels;       /* fases da sequência normal */
@@ -349,6 +370,23 @@ typedef struct {
 
 	char    message[40];    /* mensagem temporária no centro da tela */
 	int     message_timer;
+
+	/* eventos da fase (events.c). Tudo aqui é LÓGICA: só g.in, passos e g.rng */
+	struct {
+		int      next_random;     /* passos até o próximo evento aleatório */
+		uint32_t fired;           /* bit i = EVENT_DEF i já disparou (uma vez) */
+		int      map_cooldown;    /* passos até poder mudar o mapa de novo */
+		struct { uint8_t action, prio, force; int16_t arg; } queue[EV_QUEUE_LEN];
+		int      nq;
+		int      kills;           /* inimigos derrotados na fase */
+		int      keys;            /* chaves (abre barreira de raízes) */
+		int      fog_far;         /* névoa atual (a lógica lê ESTA, não a da tabela) */
+		int      fog_timer;       /* passos do avanço da névoa (0 = normal) */
+		int      fog_target;      /* névoa mínima do avanço */
+		int      silence;         /* passos de silêncio (sons de ambiente parados) */
+		int      shake;           /* passos de tremor (a câmera visual só lê) */
+		int      last;            /* última ação aplicada (EV_*), para o overlay */
+	} ev;
 } GAME;
 
 extern GAME g;
@@ -431,6 +469,7 @@ int  level_cut_count(void);             /* blocos+árvores cortados por falta de
 void level_mark_occluders(int ex, int ez, const int *x, const int *z, int n, int ticks);
 int  level_tree_density(int x, int z, int radius);   /* árvores (+mata) perto: para a câmera */
 void level_apply_look(void);            /* névoa e luz da fase atual */
+void level_apply_fog(void);             /* só a névoa (segue g.ev.fog_far) */
 void level_draw(void);
 int  level_cell_solid(int cx, int cz);
 int  level_cell_low(int cx, int cz);    /* sólido baixo (tronco caído)? */
@@ -503,5 +542,12 @@ void props_draw(void);
 
 /* main.c */
 void show_message(const char *text, int frames);
+
+/* events.c */
+void events_start(void);              /* fim do game_reset */
+void events_update(void);             /* um passo de lógica (STATE_PLAY) */
+void events_debug(int action);        /* atalho de depuração: na hora, sem regras */
+void events_enemy_killed(void);
+const char *event_name(int action);
 
 #endif

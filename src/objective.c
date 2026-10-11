@@ -73,7 +73,7 @@ static int spawn_ok(int x, int z) {
 	if (n) {
 		int dx = x - gx / n, dz = z - gz / n;
 		int rel = angle_diff(g.cam_yaw, angle_of(dx, dz));
-		if (rel > -700 && rel < 700 && dist2d(dx, dz) < level_defs[g.level].fog_far)
+		if (rel > -700 && rel < 700 && dist2d(dx, dz) < g.ev.fog_far)
 			return 0;
 	}
 	for (int i = 0; i < MAX_ENEMIES; i++) {

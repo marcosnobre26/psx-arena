@@ -352,11 +352,42 @@ static const DEBUG_POINT forest_debug_pts[4] = {
 	{  96,  96, 3072 },       /* v  maior clareira, olhando para oeste */
 };
 
+/* ------------------------------------------------------------------ */
+/* Eventos de cada fase (events.c; etapa 06)                            */
+/* ------------------------------------------------------------------ */
+/* { gatilho, ação, prioridade, p1, p2, arg }. EVT_RANDOM: a cada p1..p2 s
+ * sorteia uma ação da máscara arg. Os outros disparam uma vez. */
+#define EV_ALL ((1 << EV_FOG) | (1 << EV_TREE_FALL) | (1 << EV_CLOSE_BEHIND) | \
+                (1 << EV_WAVE) | (1 << EV_SILENCE))
+static const EVENT_DEF f1_events[] = {
+	{ EVT_RANDOM, 0,          1, 45, 90, EV_ALL },
+	{ EVT_KILLS,  EV_SILENCE, 2,  6,  0, 0 },     /* metade derrotada: silêncio */
+	{ EVT_KEY,    EV_OPEN_PATH, 9, 0, 0, 0 },
+};
+static const EVENT_DEF f2_events[] = {
+	{ EVT_RANDOM, 0,          1, 45, 90, EV_ALL },
+	{ EVT_AREA,   EV_FOG,     3, AREA_EXIT, 24, 50 },   /* perto da saída: névoa */
+	{ EVT_KEY,    EV_OPEN_PATH, 9, 0, 0, 0 },
+};
+static const EVENT_DEF f3_events[] = {
+	{ EVT_RANDOM, 0,          1, 45, 90, EV_ALL },
+	{ EVT_PICKUP, EV_CLOSE_BEHIND, 3, 2, 0, 0 },     /* 2a relíquia: a mata fecha */
+	{ EVT_PICKUP, EV_WAVE,    2,  3,  0, 3 },        /* 3a relíquia: onda */
+	{ EVT_KEY,    EV_OPEN_PATH, 9, 0, 0, 0 },
+};
+static const EVENT_DEF f4_events[] = {
+	{ EVT_RANDOM, 0,          1, 45, 90, (1 << EV_FOG) | (1 << EV_TREE_FALL) | (1 << EV_SILENCE) },
+	{ EVT_TIME,   EV_FOG,     2, 35,  0, 60 },        /* meio do cerco: névoa */
+	{ EVT_KEY,    EV_OPEN_PATH, 9, 0, 0, 0 },
+};
+#define EVENTS(t) t, (int)(sizeof(t) / sizeof(t[0]))
+
 const LEVEL_DEF level_defs[] = {
 	/* nome
 	 *   céu=névoa (R,G,B)  névoa near/far  luz ambiente  música
 	 *   objetivo        parâmetro  máx. inimigos  texto do objetivo
 	 *   gerador  pontos de teleporte (L2 + direcional; o 3o = pior ponto do bench)
+ *   eventos da fase (etapa 06)
 	 *
 	 * A câmera fica a ~1000 de profundidade do jogador: near abaixo disso
 	 * enevoa o próprio jogador. Lanterna: objetos no cone usam near/far
@@ -365,19 +396,19 @@ const LEVEL_DEF level_defs[] = {
 	{ "CACADA",
 	  10, 12, 24,        1300, 3200,     40, 40, 56,   0,
 	  OBJ_KILL_ALL,   0,         0,             "DERROTE TODOS OS INIMIGOS",
-	  build_f1, f1_pts, &f1_gen },
+	  build_f1, f1_pts, &f1_gen, EVENTS(f1_events) },
 	{ "TRAVESSIA",
 	  6, 14, 10,        1200, 2800,     30, 40, 34,   0,
 	  OBJ_REACH_EXIT, 0,         0,             "ATRAVESSE A FLORESTA",
-	  build_f2, f2_pts, &f2_gen },
+	  build_f2, f2_pts, &f2_gen, EVENTS(f2_events) },
 	{ "RELIQUIAS",
 	  16,  8, 20,        1300, 3000,     40, 30, 48,   0,
 	  OBJ_COLLECT,    4,         0,             "PEGUE 4 RELIQUIAS E SAIA",
-	  build_f3, f3_pts, &f3_gen },
+	  build_f3, f3_pts, &f3_gen, EVENTS(f3_events) },
 	{ "CERCO",
 	  20,  8,  8,        1400, F4_FOG_FAR, 48, 32, 32,   0,
 	  OBJ_SURVIVE,    60,        F4_MAX_ENEMIES, "SOBREVIVA 60 SEGUNDOS",
-	  build_f4, f4_pts, &f4_gen },
+	  build_f4, f4_pts, &f4_gen, EVENTS(f4_events) },
 	/* SÓ TESTE (fora da sequência normal): DEBUG_START_LEVEL 5 e ./dev bench */
 	{ "FLORESTA (TESTE)",
 	  8, 12, 10,        1300, FOREST_FOG_FAR, 36, 40, 36,   0,

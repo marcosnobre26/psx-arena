@@ -71,6 +71,13 @@
 #define MAX_TREES       1024    /* árvores e troncos no mapa (8 bytes cada) */
 #define PLACE_SEARCH    6       /* level_place_safe: procura célula livre até aqui */
 #define FOREST_EDGE     4       /* borda de mata alta das florestas (células) */
+/* Eventos (etapa 06): tempos em passos de 1/60 s */
+#define EV_QUEUE_LEN     8
+#define EV_GRACE         (30 * 60)   /* nada nos primeiros 30 s da fase */
+#define EV_MAP_COOLDOWN  (30 * 60)   /* no máximo 1 evento que muda o mapa a cada 30 s */
+#define EV_FOG_RAMP      (5 * 60)    /* névoa: 5 s descendo, ... */
+#define EV_FOG_TOTAL     (40 * 60)   /* ... e volta ao normal depois de ~40 s */
+#define EV_SILENCE_TIME  (12 * 60)
 #ifndef MAPGEN_TRIES
 #define MAPGEN_TRIES    16      /* mapa gerado inválido: tenta semente + 1 até aqui */
 #endif

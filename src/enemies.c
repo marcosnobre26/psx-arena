@@ -71,6 +71,7 @@ void enemy_damage(ENEMY *e, int amount, int push_x, int push_z) {
 		e->active = 0;
 		collide_track(e);                 /* morreu: sai da grade */
 		g.enemies_left--;
+		events_enemy_killed();
 		g.score += d->score;
 		effect_spawn(FX_BURST, e->pos.vx, e->pos.vz, (300 * d->scale) >> 12, 18,
 		             d->palette[0].r, d->palette[0].g, d->palette[0].b);
