@@ -200,14 +200,29 @@ uma branch. As regras do ROADMAP (determinismo, orçamentos de desempenho,
   teste: fixa; etapa 05: derivada de `g.seed`, nunca `g.rng`). Nomes fixos
   dos modelos: `pinheiro`, `arvore_seca`, `tronco` (+ `*_bb-4bit.png`).
 - Blocos: o 3×3 em volta de cada jogador é montado no mesmo quadro (sem
-  buracos); só o anel externo usa a fila de 1 bloco/quadro. `level_invalidate`
-  remonta um bloco depois de `level_set_cell`.
+  buracos); o anel externo e as remontagens dos eventos passam por UM
+  construtor em fatias (`rebuild_step`, orçamento adaptativo até
+  `REBUILD_CPU_CAP` = 440). Cada bloco tem 4 sub-blocos 4×4 (`sub_start`)
+  descartados fora da tela/névoa — mantenha a ordem de montagem por quarto
+  (`chunk_cell_order`). `level_invalidate` remonta inteiro (evite).
 - Névoa: só cores **escuras** (em faces texturizadas a cor só escurece).
   DQA/DQB são gravados por `gte_SetDepthCue` (macro própria em `render.c`).
   Primitiva aditiva sem textura (cone da lanterna) precisa de `DR_TPAGE`
   antes **e** depois, senão muda o modo de mistura das sombras.
 - Controles: **Select = lanterna** (skin só na seleção); L2 alterna o overlay
   ao **soltar**; overlay aberto + L2 + START pula de fase.
+- **Desempenho (etapa 10a):** meta = pior quadro ≤ 450 linhas nas fases
+  1–4 (multidão de 10 s, andar, remontagem) e ≤ 480 no quadro de evento,
+  sempre 30 FPS; ~75 linhas de folga para as próximas etapas. Um quadro
+  > 525 vira 3 passos de lógica e pode PRENDER em 20 FPS (biestável): deixe
+  folga. `./dev bench -D BENCH_SUBSET=1 -D BENCH_NO_EVENTS=1` (14 piores
+  pontos, ~1 min) para iterar; o completo no fim. Lições medidas: conta em
+  C antes da GTE (pré-descarte de costas) é MAIS LENTA que deixar a GTE
+  projetar e descartar; o caro é projetar o que está fora da tela
+  (descarte por esfera em blocos/sub-blocos/modelos) e chamada de função
+  por célula/vizinho em laço quente. `MAX_TICKS_PER_FRAME` = 4 (2 tira da
+  armadilha dos 20 FPS, mas com sobrecarga forte o jogo fica em câmera
+  lenta e muda o "tempo" do modo link: decisão do Marcos, não aplicado).
 - Desempenho: ~30 FPS na fase com os limites atuais; confira com **L2** no
   jogo (`SEED`, `POLIS` = polígonos enviados à GPU, FPS e bytes de primitivas;
   `PACKET_LEN` = 96 KB por buffer).

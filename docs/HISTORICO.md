@@ -576,3 +576,51 @@ automatizar testes visuais.
   **RAM:** 823 122 → 875 218 bytes (**+52 096**: código ~19 KB, 3 sons
   ~17 KB — também ~17 KB de SPU —, buffer da remontagem em fatias 7,7 KB,
   alcance + janela ~7,6 KB). Total ~855 KB de 1,2 MB.
+- 2026-10-11 — Etapa 10a (folga de CPU, antes da 07). **Medição** (bench:
+  multidão parada por 10 s com série por segundo; perfil de lógica dos
+  inimigos/jogadores e desenho dos inimigos; pontos `f{N}_andar` que
+  percorrem o caminho do início até a saída): **nada cresce com o tempo**.
+  A queda a 20 FPS dos 3 pontos era **biestável**: em ~500 linhas, um único
+  quadro > 525 (remontagem, printf) faz rodar 3 passos de lógica (+35 linhas)
+  e o jogo não volta mais. Andar montava blocos inteiros de até 193 linhas
+  num quadro (f3 528, 20 FPS). Nos piores pontos (f2, ~490): blocos ~205,
+  desenho dos inimigos ~133 (sombras 33), lógica dos inimigos ~70 (colisão
+  ~56), árvores ~45.
+
+  **`./dev replay-test`** (nova ferramenta): partida roteirizada de 60 s por
+  fase, hash de `g` + mapa a cada 10 s. Conferida: desenho mais pesado dá
+  IGUAL (não depende do FPS), lógica mudada dá DIFERENTE. Achou um bug: a
+  busca da árvore que cai copiava lixo da pilha para `g.ev.fall` (corrigido;
+  referência regravada, comportamento igual).
+
+  **Otimizações** (todas com replay IGUAL): anel externo de blocos montado
+  em fatias pelo construtor único (teto adaptativo 440); sub-blocos 4×4
+  descartados fora da tela (conferido: 0 quads visíveis pulados); colisão
+  com leitura direta da grade e da entidade (lógica 67 → 54); sombra sem
+  rotação direto da vista e sombra simples (1 quad) além de 800 da câmera
+  (visual, aprovado); matriz direto de `isin/icos` para giro só no eixo
+  vertical (idêntica ao `RotMatrix` em 107 mil conferências). **Medido e
+  descartado:** pré-descarte de faces de costas em C (+15..18 linhas: a GTE
+  é mais rápida).
+
+  **Antes → depois** (pior quadro, CPU em linhas; 30 FPS ≈ 525):
+
+  | Fase | Medida | Antes | Depois |
+  |---|---|---|---|
+  | f1 | multidão 10 s / andar / eventos | 478 / 509 / 496 | 409 / 333 / 433 |
+  | f2 | multidão 10 s / andar / eventos | 505 / 459 / 572 (20 FPS) | 450 / 307 / 471 |
+  | f2 | remontagem / controle | 539 (20) / 540 (20) | 446 / 445 |
+  | f3 | multidão 10 s / andar / eventos | 417 / 528 (20) / 430 | 366 / 325 / 399 |
+  | f4 | multidão 10 s / andar / eventos | 442 / 420 / 447 | 374 / 292 / 391 |
+  | f4 | 2 jogadores | 428 | 375 |
+  | fase 5 | multidão / eventos / remontagem | 512 / 606 (20) / 553 (20) | 461 / 478 / 462 |
+
+  Meta cumprida: fases 1–4 ≤ 450 nos quadros normais e ≤ 480 nos de evento,
+  sempre 30 FPS; fase 5 a 30 FPS. **Proposta medida, não aplicada:**
+  `MAX_TICKS_PER_FRAME` 4 → 2. Sob sobrecarga artificial
+  (`TREE_LOD_DIST=3000`), tira o f2_fixo_arv da armadilha (20 → 30 FPS, tempo
+  real); quando nem 2 passos cabem (canto denso), o jogo vai a 67% da
+  velocidade (câmera lenta) em vez de 20 FPS em tempo real. No modo link:
+  continua determinístico (lógica por passo), mas o "tempo" do jogo deixa de
+  acompanhar o relógio quando um console sobrecarrega (no lockstep, o mais
+  lento já dita o ritmo). RAM: 875 218 → 877 874 bytes (+2 656).

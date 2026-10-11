@@ -203,6 +203,7 @@ troque para `Debug` em [`CMakePresets.json`](CMakePresets.json) (`-Og`).
 | `clean` | apaga `build/` |
 | `events-test [N] [-D N=V]` | simula os eventos da etapa 06 no PC com N sementes por fase (objetivo alcançável, ninguém preso, determinismo, cancelamentos) |
 | `mapgen-test [N] [--bench] [-D N=V]` | testa o gerador de florestas no PC com N sementes por fase (inválidos, tentativas, densidade, tempo, determinismo); `--bench` grava as piores sementes em `src/bench_seeds.h` |
+| `replay-test [--save]` | partida roteirizada (60 s por fase, eventos forçados), hash de `g` + mapa a cada 10 s comparado com `tools/replay_ref.txt`: prova que a lógica não mudou |
 | `bench [-D N=V ...]` | benchmark automático: compila com `DEBUG_BENCHMARK` em `build-bench/` (variantes com `-D` em `build-bench-var/`), roda no DuckStation Linux, mostra a tabela (detalhes no GUIA) |
 
 ---
@@ -397,6 +398,15 @@ Separação de responsabilidades: `*_update()` só altera estado; `*_draw()` só
    dois `DR_TPAGE` (aditivo antes, 50% depois — senão as sombras seriam somadas e sumiriam). O
    índice na OT usa o vértice mais próximo menos meia célula, para o chão não cobrir a ponta.
 
+**Custo por quadro (etapa 10a).** Os blocos são descartados por esfera no
+bloco e em 4 sub-blocos 4×4 (antes, num bloco visível só em parte, ~60% dos
+quads eram projetados fora da tela). O anel externo de blocos é montado em
+fatias (antes, até ~190 linhas num quadro ao andar). Modelos que só giram no
+eixo vertical montam a matriz direto de `isin/icos`; sem rotação (sombras),
+direto da vista. Sombra além de `SHADOW_SIMPLE_DIST` da câmera = 1 quad.
+Medido e descartado: pré-descarte de faces de costas em C (mais lento que a
+GTE).
+
 ### Coordenadas, unidades e ponto fixo
 
 - Eixos do PS1: **X** direita, **Y para baixo**, **Z** para frente. "Subir" é Y negativo.
@@ -559,7 +569,7 @@ tronco em pé bloqueiam; tronco caído e chão vazio não; pessoas não. A IA ai
 | `.text` | ~135 KB | código do jogo + bibliotecas do SDK usadas |
 | `.data` | ~118 KB | modelos, texturas e sons embutidos, tabelas |
 | `.bss` | ~602 KB | 2 × 96 KB de primitivas, 2 × OT, cache de 36 blocos (~277 KB; também é a memória do BFS do gerador) + 1 de reserva (remontagem em fatias), grade 128×128 (16 KB), alcance (2 KB) e janela da checagem (~5 KB), árvores, pools |
-| **Total** | **~855 KB** (875 218 bytes) de 2 MB | orçamento do roteiro: 1,2 MB |
+| **Total** | **~857 KB** (877 874 bytes) de 2 MB | orçamento do roteiro: 1,2 MB |
 
 Medido com `mipsel-linux-gnu-size build/arena.elf` (dentro do `./dev shell`).
 
