@@ -23,7 +23,7 @@ const CHARACTER_DEF character_defs[] = {
 	/* ... mat. arma embutida (some no jogo), mão (x, y, z no espaço do modelo: Y para baixo) */
 	{ "ROBO",       "EQUILIBRADO. ESPADA",         &player_mesh, ONE,    1,    NULL, 100, 14, 34,  W_SWORD,   -1,     0,  4, {  87, -159, 26 } },
 	{ "CAVALEIRO",  "LENTO, MUITA VIDA, MACHADO",  &knight_mesh, ONE,    0,    NULL, 160, 10, 28,  W_AXE,     -1,     0,  3, { 110, -179, 77 } },
-	{ "BATEDOR",    "RAPIDO, ESPADA E ARCO",       &scout_mesh,  ONE,    0,    NULL,  70, 19, 42,  W_SWORD,   W_BOW,  6,  4, {  64, -138, 26 } },
+	{ "BATEDOR",    "RAPIDO, ESPADA E ARCO",       &scout_mesh,  ONE,    0,    NULL,  80, 19, 42,  W_SWORD,   W_BOW,  6,  4, {  64, -138, 26 } },
 };
 const int num_characters = sizeof(character_defs) / sizeof(character_defs[0]);
 
