@@ -1128,9 +1128,13 @@ static void bench_frame(int vs) {
 		if (--bench.timer <= 0) {
 			bench_reset_stats();
 			bench.timer = BENCH_MEASURE;
-			if (bench.stage == 2) {          /* invalida agora: o próximo quadro remonta */
-				const PLAYER *p0 = &g.players[0];
-				level_invalidate(p0->pos.vx / TILE_SIZE, p0->pos.vz / TILE_SIZE);
+			if (bench.stage == 2) {          /* remonta EM FATIAS o bloco do jogador */
+				const PLAYER *p0 = &g.players[0];  /* (como a barreira que se abre) */
+#ifndef BENCH_NO_REBUILD                     /* controle: a mesma janela sem remontar */
+				level_rebuild_chunk(p0->pos.vx / TILE_SIZE, p0->pos.vz / TILE_SIZE);
+#else
+				(void)p0;
+#endif
 				bench.timer = 60;            /* o quadro da montagem + 59 */
 			}
 			bench.phase = BENCH_MEASURING;

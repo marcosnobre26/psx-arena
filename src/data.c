@@ -119,4 +119,7 @@ const TREE_DEF tree_defs[NUM_TREE_TYPES] = {
 	{ &pinheiro_mesh,    &tex_pinheiro_bb_t,   512, 1024,  ONE * 85 / 100, ONE * 130 / 100, 1,  36,  240 },
 	{ &arvore_seca_mesh, &tex_seca_bb_t,       512, 1024,  ONE * 85 / 100, ONE * 120 / 100, 1,  44,  200 },
 	{ &tronco_mesh,      NULL,                 0,   0,     ONE * 90 / 100, ONE * 110 / 100, 3,  0,   0   },
+	/* árvore que caiu (evento): o pinheiro deitado; a colisão (tronco baixo,
+	 * copa sólida) é marcada pelo events.c nas células, sem mudar o tipo */
+	{ &pinheiro_mesh,    NULL,                 0,   0,     ONE * 85 / 100, ONE * 130 / 100, 0,  0,   0,  -1024 },
 };

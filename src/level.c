@@ -147,18 +147,21 @@ static void add_quad(CHUNK_GEOM *c, const int corner[4][3], int n, int uvset,
 	q->zbias = zbias;
 }
 
-static void build_chunk(CHUNK_GEOM *c, int ccx, int ccz) {
-	const int gx0 = ccx * CHUNK_CELLS, gz0 = ccz * CHUNK_CELLS;
-	c->origin.vx = gx0 * TILE_SIZE;
+static void build_chunk_begin(CHUNK_GEOM *c, int ccx, int ccz) {
+	c->origin.vx = ccx * CHUNK_CELLS * TILE_SIZE;
 	c->origin.vy = 0;
-	c->origin.vz = gz0 * TILE_SIZE;
+	c->origin.vz = ccz * CHUNK_CELLS * TILE_SIZE;
 	c->nquads = 0;
+}
 
-	for (int lz = 0; lz < CHUNK_CELLS; lz++)
-	for (int lx = 0; lx < CHUNK_CELLS; lx++) {
+/* Quads de UMA célula (lx, lz) do bloco (ccx, ccz). A montagem inteira e a
+ * em fatias (etapa 06) usam a mesma função: resultado idêntico. */
+static void build_chunk_cell(CHUNK_GEOM *c, int ccx, int ccz, int lx, int lz) {
+	const int gx0 = ccx * CHUNK_CELLS, gz0 = ccz * CHUNK_CELLS;
+	{
 		int cx = gx0 + lx, cz = gz0 + lz;
 		int t = cell_type(cx, cz);
-		if (t == CELL_OUTSIDE) continue;
+		if (t == CELL_OUTSIDE) return;
 
 		/* chão */
 		if (type_has_floor(t)) {
@@ -169,7 +172,7 @@ static void build_chunk(CHUNK_GEOM *c, int ccx, int ccz) {
 
 		/* paredes e mata: topo + laterais onde o vizinho é mais baixo */
 		int h = type_slices(t);
-		if (h == 0) continue;
+		if (h == 0) return;
 		{
 			int corner[4][3] = { { lx, lz, h }, { lx, lz + 1, h }, { lx + 1, lz + 1, h }, { lx + 1, lz, h } };
 			add_quad(c, corner, 0, 0, type_tex(t), 0, 0, 100, 100, 100, gx0, gz0);
@@ -192,6 +195,13 @@ static void build_chunk(CHUNK_GEOM *c, int ccx, int ccz) {
 			}
 		}
 	}
+}
+
+static void build_chunk(CHUNK_GEOM *c, int ccx, int ccz) {
+	build_chunk_begin(c, ccx, ccz);
+	for (int lz = 0; lz < CHUNK_CELLS; lz++)
+		for (int lx = 0; lx < CHUNK_CELLS; lx++)
+			build_chunk_cell(c, ccx, ccz, lx, lz);
 }
 
 /* ------------------------------------------------------------------ */
@@ -334,6 +344,87 @@ void level_invalidate(int cx, int cz) {
 	loaded_count--;
 }
 
+/* Só os bits de colisão (CELL_SOLID / CELL_LOW) de uma célula, sem mudar o
+ * tipo: o desenho do bloco não depende deles, então NÃO remonta (árvore
+ * que caiu; etapa 06). flags = 0 limpa os dois. */
+void level_set_flags(int cx, int cz, int flags) {
+	if (cx < 0 || cz < 0 || cx >= lw || cz >= lh) return;
+	int t = cells[cz][cx] & CELL_TYPE_MASK;
+	cells[cz][cx] = t | flags | (type_solid(t) ? CELL_SOLID : 0);
+}
+
+/* ------------------------------------------------------------------ */
+/* Remontagem EM FATIAS (etapa 06): o TIPO de uma célula mudou (barreira */
+/* de raízes aberta). Montar um bloco inteiro custa 60-190 linhas e, num */
+/* quadro já pesado, perde os 30 FPS. Aqui ele é montado célula a célula */
+/* num buffer reserva, até REBUILD_LINES linhas por quadro; o bloco antigo */
+/* continua desenhado até o novo ficar pronto (a COLISÃO já mudou na hora, */
+/* na lógica: só o desenho atrasa alguns quadros).                       */
+/* ------------------------------------------------------------------ */
+static CHUNK_GEOM rebuild_geom;              /* buffer reserva */
+static int8_t     rebuild_q[4][2];           /* blocos na fila */
+static int        rebuild_n, rebuild_cell = -1;
+
+void level_rebuild_chunk(int cx, int cz) {
+	int bx = cx / CHUNK_CELLS, bz = cz / CHUNK_CELLS;
+	if (cx < 0 || cz < 0 || bx >= ncx || bz >= ncz) return;
+	for (int i = 0; i < rebuild_n; i++)
+		if (rebuild_q[i][0] == bx && rebuild_q[i][1] == bz) return;
+	if (rebuild_n >= 4) {                      /* fila cheia: o jeito antigo */
+		level_invalidate(cx, cz);
+		return;
+	}
+	rebuild_q[rebuild_n][0] = bx;
+	rebuild_q[rebuild_n][1] = bz;
+	rebuild_n++;
+}
+
+static void rebuild_step(void) {
+	if (rebuild_n == 0) return;
+	int bx = rebuild_q[0][0], bz = rebuild_q[0][1];
+	if (slot_of[bz][bx] < 0) {                 /* não está montado: nada a fazer */
+		rebuild_cell = -1;                     /* (quando montar, já vem novo) */
+		goto next;
+	}
+	if (rebuild_cell < 0) {
+		build_chunk_begin(&rebuild_geom, bx, bz);
+		rebuild_cell = 0;
+	}
+	{
+		/* orçamento ADAPTATIVO: só a folga que o quadro anterior deixou até
+		 * REBUILD_CPU_CAP (no máximo REBUILD_LINES). Antes de cada célula,
+		 * estima o custo pela pior célula vista: não passa do orçamento.
+		 * Sem folga nenhuma por 60 quadros, monta 1 célula (não trava). */
+		static int cell_cost = 4, starved;
+		int pc, pg, pv;
+		render_stats_time(&pc, &pg, &pv);
+		int budget = REBUILD_CPU_CAP - pc;
+		if (budget > REBUILD_LINES) budget = REBUILD_LINES;
+		if (budget < cell_cost && ++starved < 60) return;
+		starved = 0;
+		uint16_t t0 = LINE_TIMER();
+		do {
+			uint16_t tc = LINE_TIMER();
+			build_chunk_cell(&rebuild_geom, bx, bz, rebuild_cell % CHUNK_CELLS, rebuild_cell / CHUNK_CELLS);
+			int c = (uint16_t)(LINE_TIMER() - tc);
+			if (c > cell_cost) cell_cost = c;
+			rebuild_cell++;
+		} while (rebuild_cell < CHUNK_CELLS * CHUNK_CELLS &&
+		         (uint16_t)(LINE_TIMER() - t0) + cell_cost <= budget);
+		int bl = (uint16_t)(LINE_TIMER() - t0);
+		if (bl > build_lines_max) build_lines_max = bl;
+	}
+	if (rebuild_cell < CHUNK_CELLS * CHUNK_CELLS) return;
+	slot_geom[slot_of[bz][bx]] = rebuild_geom; /* pronto: troca (cópia de ~8 KB) */
+	rebuild_cell = -1;
+next:
+	rebuild_n--;
+	for (int i = 0; i < rebuild_n; i++) {
+		rebuild_q[i][0] = rebuild_q[i + 1][0];
+		rebuild_q[i][1] = rebuild_q[i + 1][1];
+	}
+}
+
 void level_stats(int *loaded, int *slots, int *built, int *overflow) {
 	*loaded = loaded_count;
 	*slots = CHUNK_SLOTS;
@@ -383,7 +474,9 @@ void level_add_tree(int type, int x, int z, int angle, int scale) {
 	 * BAIXAS ao longo do comprimento (eixo pelo ângulo arredondado): dá para
 	 * pular por cima, tiros param, a visão passa */
 	int cx = x / TILE_SIZE, cz = z / TILE_SIZE;
-	if (tree_defs[type].cells == 3) {
+	if (tree_defs[type].cells == 0) {
+		/* deitada (evento): a colisão vem das células, marcada por events.c */
+	} else if (tree_defs[type].cells == 3) {
 		int along_z = ((angle + 512) >> 10) & 1;   /* 1024/3072: comprido em Z */
 		for (int k = -1; k <= 1; k++) {
 			int lx = cx + (along_z ? 0 : k), lz = cz + (along_z ? k : 0);
@@ -411,6 +504,57 @@ static void trees_finish(void) {
 	for (int i = 0; i < num_trees; i++)
 		tree_tmp[fill[trees[i].z / CHUNK_SIZE][trees[i].x / CHUNK_SIZE]++] = trees[i];
 	memcpy(trees, tree_tmp, num_trees * sizeof(TREE));
+}
+
+/* ------------------------------------------------------------------ */
+/* Árvores em tempo de jogo (eventos; etapa 06). Fora de g, como as do   */
+/* mapa: são função determinística da semente + eventos (lógica).        */
+/* ------------------------------------------------------------------ */
+
+/* Árvore EM PÉ (círculo de tronco) na célula (cx, cz)? Devolve o índice. */
+int level_standing_tree_at(int cx, int cz) {
+	int bx = cx / CHUNK_CELLS, bz = cz / CHUNK_CELLS;
+	if (cx < 0 || cz < 0 || bx >= MAX_CCX || bz >= MAX_CCZ) return -1;
+	for (int i = tree_start[bz][bx], n = tree_count[bz][bx]; n > 0; n--, i++)
+		if (tree_defs[trees[i].type].cells == 1 &&
+		    trees[i].x / TILE_SIZE == cx && trees[i].z / TILE_SIZE == cz)
+			return i;
+	return -1;
+}
+
+void level_tree_info(int i, int *x, int *z, int *type, int *scale, int *angle) {
+	*x = trees[i].x;
+	*z = trees[i].z;
+	*type = trees[i].type;
+	*scale = trees[i].scale << 6;
+	*angle = trees[i].rot << 4;
+}
+
+/* Árvores em pé no bloco (bx, bz): os tetos da 05 valem para as novas */
+int level_chunk_standing(int bx, int bz) {
+	if (bx < 0 || bz < 0 || bx >= MAX_CCX || bz >= MAX_CCZ) return 0;
+	int n = 0;
+	for (int i = tree_start[bz][bx], k = tree_count[bz][bx]; k > 0; k--, i++)
+		n += tree_defs[trees[i].type].cells == 1;
+	return n;
+}
+
+/* Tira a árvore i (e o obstáculo dela) e reordena por bloco */
+void level_remove_tree(int i) {
+	if (i < 0 || i >= num_trees) return;
+	if (tree_defs[trees[i].type].cells == 1)
+		collide_remove_obstacle(trees[i].x, trees[i].z);
+	trees[i] = trees[--num_trees];
+	trees_finish();
+}
+
+/* Depois de level_add_tree em tempo de jogo: reordena por bloco */
+void level_trees_changed(void) {
+	trees_finish();
+}
+
+int level_tree_room(void) {
+	return MAX_TREES - num_trees;
 }
 
 /* Só os blocos do 5x5 em volta do grupo, em ANÉIS do centro para fora
@@ -454,6 +598,12 @@ static void trees_draw(void) {
 					int ok = render_mesh(d->mesh, &pos, &rot, scale, &trans);
 					trees_drawn_mesh += ok;
 					trees_drawn_trans += ok;
+					continue;
+				}
+				if (d->pitch) {                  /* caída: sempre modelo (são poucas) */
+					VECTOR  pos = { t->x, 0, t->z };
+					SVECTOR rot = { d->pitch, t->rot << 4, 0 };
+					trees_drawn_mesh += render_mesh(d->mesh, &pos, &rot, scale, &opt);
 					continue;
 				}
 				if (depth > TREE_LOD_DIST) {
@@ -729,6 +879,8 @@ void level_load(int index) {
 	ncx = (lw + CHUNK_CELLS - 1) / CHUNK_CELLS;
 	ncz = (lh + CHUNK_CELLS - 1) / CHUNK_CELLS;
 	cache_reset();
+	rebuild_n = 0;                    /* remontagens em fatias pendentes: nenhuma */
+	rebuild_cell = -1;
 	chunk_overflow = 0;
 	fcx = g.spawn_x / CHUNK_SIZE;
 	fcz = g.spawn_z / CHUNK_SIZE;
@@ -761,6 +913,7 @@ void level_apply_look(void) {
 void level_draw(void) {
 	prof_begin(PROF_CHUNKS);
 	stream_update();
+	rebuild_step();
 	/* do mais perto para o mais longe da câmera (inserção: são <= 36) */
 	const VECTOR *cam = render_camera_pos();
 	int order[CHUNK_SLOTS], dist[CHUNK_SLOTS], n = 0;

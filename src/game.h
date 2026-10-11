@@ -139,7 +139,7 @@ enum {
 
 /* Árvores e troncos caídos (data.c: tree_defs). Ficam guardados por bloco
  * em level.c (fora de g: vêm do mapa, como as células). */
-enum { TREE_PINE, TREE_DEAD, TREE_LOG, NUM_TREE_TYPES };
+enum { TREE_PINE, TREE_DEAD, TREE_LOG, TREE_FALLEN, NUM_TREE_TYPES };
 typedef struct {
 	const MESH    *mesh;
 	const TEXTURE *bb;          /* imagem plana de longe (NULL = some de longe) */
@@ -148,6 +148,7 @@ typedef struct {
 	int            cells;       /* 1 = em pé (círculo do tronco); 3 = deitado (3 células baixas) */
 	int            trunk_r;     /* em pé: raio do tronco na escala ONE (colisão) */
 	int            canopy_r;    /* em pé: raio da copa (câmera: "esta árvore tapa?") */
+	int            pitch;       /* != 0: modelo deitado (árvore que caiu; etapa 06) */
 } TREE_DEF;
 extern const TREE_DEF tree_defs[];
 
@@ -449,6 +450,14 @@ void level_begin(int w, int h);         /* mapa por código: tamanho (tudo vazio
 void level_set_cell(int cx, int cz, int type);   /* CELL_* (solidez automática) */
 int  level_cell_type(int cx, int cz);
 int  level_tree_get(int i, int *x, int *z);       /* tipo da árvore i, ou -1 */
+int  level_standing_tree_at(int cx, int cz);       /* índice da árvore em pé, ou -1 */
+void level_tree_info(int i, int *x, int *z, int *type, int *scale, int *angle);
+int  level_chunk_standing(int bx, int bz);
+void level_remove_tree(int i);
+void level_trees_changed(void);                   /* depois de level_add_tree no jogo */
+int  level_tree_room(void);
+void level_set_flags(int cx, int cz, int flags);  /* só bits (sólido/baixo): não remonta */
+void level_rebuild_chunk(int cx, int cz);         /* remonta em fatias (tipo mudou) */
 void level_place(char ch, int cx, int cz);       /* cria o que a letra representa */
 int  level_place_safe(char ch, int cx, int cz);  /* idem, na célula livre mais próxima */
 int  level_place_failures(int i, char *ch, int *cx, int *cz);   /* teste: falhas */
@@ -498,6 +507,7 @@ int  collide_move(VECTOR *pos, int dx, int dz, int radius, const void *self, int
 int  collide_solid_at(int x, int z, int radius);       /* célula sólida ou obstáculo ali? */
 void collide_reset(void);               /* início do level_load */
 void collide_add_obstacle(int x, int z, int r);   /* tronco em pé / prop sólido */
+void collide_remove_obstacle(int x, int z);         /* árvore que caiu (etapa 06) */
 int  collide_cell_has_obstacle(int cx, int cz);
 void collide_track(const void *self);   /* posição mudou direto: atualiza a grade */
 ENEMY *collide_enemy_at(int x, int z, int pad);   /* tiro: inimigo atingido (ou NULL) */

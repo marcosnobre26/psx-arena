@@ -157,9 +157,14 @@ void collide_reset(void) {
  * para o círculo caber inteiro na célula do centro: assim as buscas só
  * precisam olhar as células que tocam. */
 void collide_add_obstacle(int x, int z, int r) {
-	if (num_obst >= MAX_OBST || x < 0 || z < 0 ||
-	    x >= MAP_MAX_W * TILE_SIZE || z >= MAP_MAX_H * TILE_SIZE)
+	if (x < 0 || z < 0 || x >= MAP_MAX_W * TILE_SIZE || z >= MAP_MAX_H * TILE_SIZE)
 		return;
+	int slot = num_obst;
+	if (slot >= MAX_OBST) {                  /* cheio: reaproveita um removido (r = 0) */
+		for (slot = 0; slot < MAX_OBST && obst[slot].r; slot++)
+			;
+		if (slot >= MAX_OBST) return;
+	}
 	int cx = x / TILE_SIZE, cz = z / TILE_SIZE;
 	int x0 = cx * TILE_SIZE, z0 = cz * TILE_SIZE;
 	int lim = x - x0;
@@ -168,10 +173,28 @@ void collide_add_obstacle(int x, int z, int r) {
 	if (z0 + TILE_SIZE - 1 - z < lim) lim = z0 + TILE_SIZE - 1 - z;
 	if (r > lim) r = lim;
 	if (r < 1) r = 1;
-	OBST *o = &obst[num_obst];
+	OBST *o = &obst[slot];
 	o->x = x; o->z = z; o->r = r;
 	o->next = obst_head[cz][cx];
-	obst_head[cz][cx] = num_obst++;
+	obst_head[cz][cx] = slot;
+	if (slot == num_obst) num_obst++;
+}
+
+/* Tira o obstáculo com centro em (x, z) (árvore que caiu; etapa 06). O
+ * slot fica livre (r = 0) para o próximo collide_add_obstacle. */
+void collide_remove_obstacle(int x, int z) {
+	if (x < 0 || z < 0 || x >= MAP_MAX_W * TILE_SIZE || z >= MAP_MAX_H * TILE_SIZE)
+		return;
+	int cx = x / TILE_SIZE, cz = z / TILE_SIZE;
+	for (int16_t *link = &obst_head[cz][cx]; *link >= 0; link = &obst[*link].next) {
+		OBST *o = &obst[*link];
+		if (o->x == x && o->z == z) {
+			*link = o->next;
+			o->r = 0;
+			o->next = -1;
+			return;
+		}
+	}
 }
 
 int collide_cell_has_obstacle(int cx, int cz) {
