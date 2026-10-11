@@ -351,15 +351,31 @@ cmd_bench() {
 # para o PC com gcc (dentro do Docker) e roda N sementes por fase.
 # ---------------------------------------------------------------------------
 cmd_mapgen_test() {
-	local n="${1:-1000}"
+	local n="1000" bench="" defs=""
+	while [[ $# -gt 0 ]]; do
+		case "$1" in
+			--bench) bench="--bench"; shift ;;
+			-D) defs="$defs -D$2"; shift 2 ;;
+			-D*) defs="$defs $1"; shift ;;
+			*) n="$1"; shift ;;
+		esac
+	done
 	[[ -f build/gen/assets_gen.c ]] || cmd_build >/dev/null || return 1
+	local out; out="$(mktemp)"
 	sdk sh -c "
 		I=$SDK_DIR/include/libpsn00b
-		gcc -O2 -w -DHOST_TEST -include stdlib.h -I src -I models -I build/gen -I \$I \
+		gcc -O2 -w -DHOST_TEST $defs -include stdlib.h -I src -I models -I build/gen -I \$I \
 			-o build/mapgen_test tools/mapgen_test.c src/mapgen.c src/level.c src/levels.c \
 			src/collision.c src/rng.c src/data.c src/mathutil.c build/gen/assets_gen.c \
-			-Wl,--unresolved-symbols=ignore-all && ./build/mapgen_test $n
-	"
+			-Wl,--unresolved-symbols=ignore-all 2>&1 | grep -v 'relocation against\\|DT_TEXTREL' >&2
+		./build/mapgen_test $n $bench
+	" > "$out" || { cat "$out"; rm -f "$out"; return 1; }
+	grep -v '^BENCHSEEDS:' "$out"
+	if [[ -n "$bench" ]]; then
+		grep '^BENCHSEEDS:' "$out" | sed 's/^BENCHSEEDS://' > src/bench_seeds.h
+		c_ok "gravado: src/bench_seeds.h (5 piores sementes por fase para o ./dev bench)"
+	fi
+	rm -f "$out"
 }
 
 case "${1:-build}" in

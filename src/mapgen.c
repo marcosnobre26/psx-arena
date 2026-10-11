@@ -48,6 +48,7 @@ static int16_t chunk_wt[MAX_CB][MAX_CB];      /* peso: árvore = 4, célula de m
 
 static MAPGEN_STATS stats;
 static DEBUG_POINT  gen_pts[4];               /* pontos de teleporte do mapa gerado */
+static DEBUG_POINT  tree_pt;                  /* janela com mais árvores (bench) */
 static int          gen_active;               /* o mapa atual foi gerado (não plano B) */
 
 static RNG gr;                                 /* RNG LOCAL da geração */
@@ -156,6 +157,16 @@ static int window_weight(int bx, int bz) {
 	return w;
 }
 
+/* Árvores numa janela de 3x3 blocos centrada em (bx, bz) */
+static int window_tree_count(int bx, int bz) {
+	int t = 0;
+	for (int z = bz - 1; z <= bz + 1; z++)
+		for (int x = bx - 1; x <= bx + 1; x++)
+			if (x >= 0 && z >= 0 && x < MAX_CB && z < MAX_CB)
+				t += chunk_trees[z][x];
+	return t;
+}
+
 /* Cabe mais uma árvore no bloco (bx, bz) sem estourar o teto do bloco nem o
  * de nenhuma janela 3x3 que o contém? */
 static int tree_fits(const GEN_PARAMS *gp, int bx, int bz) {
@@ -163,7 +174,8 @@ static int tree_fits(const GEN_PARAMS *gp, int bx, int bz) {
 		return 0;
 	for (int z = bz - 1; z <= bz + 1; z++)
 		for (int x = bx - 1; x <= bx + 1; x++)
-			if (window_weight(x, z) + 4 > gp->window_cap * 4)
+			if (window_weight(x, z) + 4 > gp->window_cap * 4 ||
+			    window_tree_count(x, z) + 1 > gp->window_trees)
 				return 0;
 	return 1;
 }
@@ -384,10 +396,16 @@ static void measure(void) {
 		for (int bx = 0; bx < MAX_CB; bx++) {
 			trees += chunk_trees[bz][bx];
 			if (chunk_trees[bz][bx] > stats.max_chunk) stats.max_chunk = chunk_trees[bz][bx];
+			if (bx * CHUNK_CELLS >= W || bz * CHUNK_CELLS >= H) continue;
 			int w = window_weight(bx, bz);
-			if (bx * CHUNK_CELLS < W && bz * CHUNK_CELLS < H && w > best) {
+			if (w > best) {
 				best = w;
 				stats.win_bx = bx; stats.win_bz = bz;
+			}
+			int t = window_tree_count(bx, bz);
+			if (t > stats.win_trees) {
+				stats.win_trees = t;
+				stats.wt_bx = bx; stats.wt_bz = bz;
 			}
 		}
 	for (int z = FOREST_EDGE; z < H - FOREST_EDGE; z++)
@@ -398,20 +416,27 @@ static void measure(void) {
 	stats.win_weight = best;
 }
 
-/* Ponto livre perto do centro da janela mais densa (pior ponto do bench) */
-static void set_worst_point(void) {
-	int cx = stats.win_bx * CHUNK_CELLS + CHUNK_CELLS / 2, cz = stats.win_bz * CHUNK_CELLS + CHUNK_CELLS / 2;
+/* Ponto livre e alcançável perto do centro do bloco (bx, bz) */
+static void free_point_near(int bx, int bz, DEBUG_POINT *out) {
+	int cx = bx * CHUNK_CELLS + CHUNK_CELLS / 2, cz = bz * CHUNK_CELLS + CHUNK_CELLS / 2;
 	for (int r = 0; r < 12; r++)
 		for (int dz = -r; dz <= r; dz++)
 			for (int dx = -r; dx <= r; dx++) {
 				int x = cx + dx, z = cz + dz;
 				if (walkable(x, z) && (gmark[z][x] & GM_VISIT) &&
 				    !collide_solid_at(x * TILE_SIZE + TILE_SIZE / 2, z * TILE_SIZE + TILE_SIZE / 2, PLAYER_RADIUS + 16)) {
-					gen_pts[2].cx = x; gen_pts[2].cz = z; gen_pts[2].yaw = 0;
+					out->cx = x; out->cz = z; out->yaw = 0;
 					return;
 				}
 			}
-	gen_pts[2] = gen_pts[0];
+	*out = gen_pts[0];
+}
+
+/* Pior ponto do bench: centro da janela mais densa (árvores e mata); e o
+ * centro da janela com mais árvores */
+static void set_worst_point(void) {
+	free_point_near(stats.win_bx, stats.win_bz, &gen_pts[2]);
+	free_point_near(stats.wt_bx, stats.wt_bz, &tree_pt);
 }
 
 /* Limpa o que uma tentativa criou em g (o resto de g não é tocado) */
@@ -471,6 +496,18 @@ int mapgen_build(int index) {
 	return 0;
 }
 
+const DEBUG_POINT *mapgen_tree_point(void) {
+	return &tree_pt;
+}
+
+const DEBUG_POINT *mapgen_worst_point(void) {
+	return &gen_pts[2];
+}
+
+#ifdef DEBUG_BENCHMARK
+int bench_force_fixed;
+#endif
+
 const MAPGEN_STATS *mapgen_stats(void) {
 	return &stats;
 }
@@ -490,4 +527,29 @@ int mapgen_active(void) {
 void mapgen_mark_fixed(void) {
 	gen_active = 0;
 	memset(&stats, 0, sizeof(stats));
+#ifdef DEBUG_BENCHMARK
+	/* bench: mede a floresta fixa com o MESMO critério do gerador (janela
+	 * mais pesada e janela com mais árvores), para comparar de forma justa */
+	uint8_t *scratch = level_scratch(MAP_MAX_W * MAP_MAX_H * 3);
+	gmark = (uint8_t (*)[MAP_MAX_W])scratch;
+	bfs_queue = (uint16_t *)(scratch + MAP_MAX_W * MAP_MAX_H);
+	memset(gmark, 0, MAP_MAX_W * MAP_MAX_H);
+	memset(chunk_trees, 0, sizeof(chunk_trees));
+	memset(chunk_wt, 0, sizeof(chunk_wt));
+	W = level_width();
+	H = level_height();
+	int x, z, type;
+	for (int i = 0; (type = level_tree_get(i, &x, &z)) >= 0; i++) {
+		int bx = x / (CHUNK_CELLS * TILE_SIZE), bz = z / (CHUNK_CELLS * TILE_SIZE);
+		if (type != TREE_LOG) chunk_trees[bz][bx]++;
+		chunk_wt[bz][bx] += 4;
+	}
+	for (int cz = 0; cz < H; cz++)
+		for (int cx = 0; cx < W; cx++)
+			if (level_cell_type(cx, cz) == CELL_THICKET)
+				chunk_wt[cz / CHUNK_CELLS][cx / CHUNK_CELLS] += 1;
+	validate();
+	measure();
+	set_worst_point();
+#endif
 }

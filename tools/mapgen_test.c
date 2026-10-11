@@ -11,7 +11,9 @@
  *   - densidade (árvores por mil células) mínima/média/máxima, maior bloco,
  *     janela 3x3 mais pesada; tempo de geração no PC (referência);
  *   - as 5 sementes com a PIOR janela de cada fase (para o ./dev bench).
- * Uso: tools/mapgen_test [N]   (padrão 1000)
+ * Uso: tools/mapgen_test [N] [--bench]   (padrão 1000)
+ *   --bench grava src/bench_seeds.h com as 5 piores sementes de cada fase
+ *   (o ./dev bench mede exatamente esses mapas).
  */
 #include <stdio.h>
 #include <string.h>
@@ -96,16 +98,24 @@ static void load(int lv, uint32_t seed) {
 }
 
 int main(int argc, char **argv) {
-	int N = argc > 1 ? atoi(argv[1]) : 1000;
+	int N = 1000, write_bench = 0;
+	for (int i = 1; i < argc; i++) {
+		if (!strcmp(argv[i], "--bench")) write_bench = 1;
+		else N = atoi(argv[i]);
+	}
 	int total_problems = 0;
+	uint32_t worst[4][5], worstt[4][5];             /* 5 piores sementes por fase (2 critérios) */
+	memset(worst, 0, sizeof(worst));
+	memset(worstt, 0, sizeof(worstt));
 	printf("Gerador de florestas: %d sementes por fase (MAPGEN_TRIES = %d)\n", N, MAPGEN_TRIES);
 	for (int lv = 0; lv < num_levels; lv++) {
 		if (!level_defs[lv].gen) continue;
 		int fallback = 0, problems = 0, nondet = 0, max_tries = 0, tries_hist[5] = { 0 };
 		int dmin = 1 << 30, dmax = 0, dsum = 0, cmax = 0, wmax = 0, wsum = 0;
 		double tsum = 0, tmax = 0;
-		struct { int w; uint32_t s; } top[5] = { { -1, 0 } };
-		for (int i = 0; i < 5; i++) top[i].w = -1;
+		struct { int w; uint32_t s; } top[5], topt[5];
+		for (int i = 0; i < 5; i++) top[i].w = topt[i].w = -1;
+		int tmaxw = 0;
 		for (int k = 0; k < N; k++) {
 			uint32_t seed = 0x1000u + (uint32_t)k * 7919u;
 			clock_t c0 = clock();
@@ -124,12 +134,20 @@ int main(int argc, char **argv) {
 				if (st->max_chunk > cmax) cmax = st->max_chunk;
 				if (st->win_weight > wmax) wmax = st->win_weight;
 				wsum += st->win_weight;
-				for (int i = 0; i < 5; i++)                 /* 5 piores janelas */
+				for (int i = 0; i < 5; i++)                 /* 5 piores janelas (árvores e mata) */
 					if (st->win_weight > top[i].w) {
 						for (int j = 4; j > i; j--) top[j] = top[j - 1];
 						top[i].w = st->win_weight; top[i].s = seed;
 						break;
 					}
+				int sc = st->win_trees * 1024 + st->win_weight;   /* desempate: peso total */
+				for (int i = 0; i < 5; i++)                 /* 5 janelas com mais árvores */
+					if (sc > topt[i].w) {
+						for (int j = 4; j > i; j--) topt[j] = topt[j - 1];
+						topt[i].w = sc; topt[i].s = seed;
+						break;
+					}
+				if (st->win_trees > tmaxw) tmaxw = st->win_trees;
 			}
 			uint32_t h1 = grid_hash();
 			if (k < 200) {                                  /* mesma semente -> mesmo mapa */
@@ -144,11 +162,31 @@ int main(int argc, char **argv) {
 		printf("        densidade (arvores/mil) min %d med %d max %d   maior bloco %d arvores   janela 3x3 (arvores eq.) max %d med %d\n",
 		       dmin, ok ? dsum / ok : 0, dmax, cmax, wmax / 4, ok ? wsum / ok / 4 : 0);
 		printf("        tempo no PC: med %.2f ms max %.2f ms (referencia; o do console vem do ./dev bench)\n", tsum / N, tmax);
-		printf("        5 piores janelas (para o bench): ");
-		for (int i = 0; i < 5; i++) printf("0x%08x(%d) ", top[i].s, top[i].w / 4);
+		printf("        5 piores janelas arvores+mata: ");
+		for (int i = 0; i < 5; i++) { printf("0x%08x(%d) ", top[i].s, top[i].w / 4); worst[lv][i] = top[i].s; }
+		printf("\n        5 janelas com mais arvores (max %d): ", tmaxw);
+		for (int i = 0; i < 5; i++) { printf("0x%08x(%d) ", topt[i].s, topt[i].w / 1024); worstt[lv][i] = topt[i].s; }
 		printf("\n");
 		total_problems += problems + nondet + fallback;
 	}
 	printf("%s\n", total_problems ? "ATENCAO: ha problemas acima" : "TUDO CERTO: 0 invalidos, 0 problemas, deterministico");
+	if (write_bench) {
+		/* o stdio.h do SDK (que fica na frente no -I) não tem FILE: o conteúdo
+		 * sai com o prefixo BENCHSEEDS: e o ./dev grava src/bench_seeds.h */
+		printf("BENCHSEEDS:/* GERADO por ./dev mapgen-test --bench (%d sementes por fase) - nao edite.\n", N);
+		printf("BENCHSEEDS: * As 5 sementes com a janela 3x3 de blocos mais pesada de cada fase: o\n");
+		printf("BENCHSEEDS: * ./dev bench mede o PIOR mapa possivel, nao um sorteado. */\n");
+		printf("BENCHSEEDS:static const uint32_t bench_worst_seeds[4][5] = {\n");
+		for (int lv = 0; lv < 4; lv++)
+			printf("BENCHSEEDS:\t{ 0x%08xu, 0x%08xu, 0x%08xu, 0x%08xu, 0x%08xu },\n",
+			       worst[lv][0], worst[lv][1], worst[lv][2], worst[lv][3], worst[lv][4]);
+		printf("BENCHSEEDS:};\n");
+		printf("BENCHSEEDS:/* as 5 com a janela de MAIS ARVORES (interior) */\n");
+		printf("BENCHSEEDS:static const uint32_t bench_tree_seeds[4][5] = {\n");
+		for (int lv = 0; lv < 4; lv++)
+			printf("BENCHSEEDS:\t{ 0x%08xu, 0x%08xu, 0x%08xu, 0x%08xu, 0x%08xu },\n",
+			       worstt[lv][0], worstt[lv][1], worstt[lv][2], worstt[lv][3], worstt[lv][4]);
+		printf("BENCHSEEDS:};\n");
+	}
 	return 0;
 }

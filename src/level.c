@@ -683,12 +683,18 @@ void level_load(int index) {
 	cur_level = index;
 	level_apply_look();               /* a luz entra na cor dos blocos */
 
+#ifdef DEBUG_BENCHMARK
+	if (ld->gen && !bench_force_fixed) {
+#else
 	if (ld->gen) {
+#endif
 		mapgen_build(index);          /* gera (com novas tentativas e plano B) */
 	} else {
 		level_reset_objects();        /* grade espacial vazia antes de criar objetos */
 		ld->build();                  /* fase fixa (levels.c) */
-		mapgen_mark_fixed();
+		uint16_t t_fix = LINE_TIMER();
+		mapgen_mark_fixed();          /* no bench também mede a floresta: */
+		t_load += (uint16_t)(LINE_TIMER() - t_fix);   /* fora do tempo de carga */
 	}
 	trees_finish();
 
@@ -802,4 +808,12 @@ int level_cell_top(int cx, int cz) {
 }
 
 int level_width(void)  { return lw; }
+
+/* Árvore i do mapa (posição de mundo); devolve o tipo, ou -1 se não existe */
+int level_tree_get(int i, int *x, int *z) {
+	if (i < 0 || i >= num_trees) return -1;
+	*x = trees[i].x;
+	*z = trees[i].z;
+	return trees[i].type;
+}
 int level_height(void) { return lh; }

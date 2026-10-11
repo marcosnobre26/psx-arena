@@ -294,18 +294,35 @@ static const DEBUG_POINT f4_pts[4] = { { 31, 31, 0 }, { 31, 31, 1024 }, { 31, 31
 /* As florestas fixas acima (build_f1..f4) viram o PLANO B: só são usadas se
  * MAPGEN_TRIES sementes seguidas gerarem mapas inválidos. Orçamentos de
  * inimigos/itens iguais aos da 04e. Tetos de densidade: escolhidos pelo
- * ./dev bench (o pior mapa não pode passar do pior caso da 04e). */
+ * ./dev bench (o pior mapa não pode passar do pior caso da 04e).
+ * O que mais pesa na CPU é ÁRVORE perto da câmera (modelo completo + raízes
+ * no chão), não mata: por isso o teto que manda é o de árvores por janela
+ * 3x3 blocos (GEN_TREES_Fn, por fase) e por bloco (GEN_CHUNK_CAP). Teste
+ * outros valores sem editar: ./dev mapgen-test 1000 --bench -D GEN_TREES_F4=12
+ * e depois ./dev bench -D GEN_TREES_F4=12. */
 #ifndef GEN_WINDOW_CAP
 #define GEN_WINDOW_CAP 40       /* "árvores" numa janela 3x3 blocos (o que a câmera vê) */
 #endif
 #ifndef GEN_CHUNK_CAP
-#define GEN_CHUNK_CAP  8        /* árvores num bloco 8x8 */
+#define GEN_CHUNK_CAP  5        /* árvores num bloco 8x8 */
 #endif
-/*                                       tam      layout       dens   tetos                         clareiras   cerco troncos inim. dist  vida ener pilha arma gema caixa */
-static const GEN_PARAMS f1_gen = { 64, 64,   GEN_HUNT,    20, 90, GEN_CHUNK_CAP, GEN_WINDOW_CAP, 3, 5, 3, 6, 0,    6,      12,   12, { 2, 1, 2, 1, 3, 3 } };
-static const GEN_PARAMS f2_gen = { 128, 128, GEN_CROSS,   20, 90, GEN_CHUNK_CAP, GEN_WINDOW_CAP, 5, 8, 4, 8, 0,    15,     14,   16, { 2, 1, 3, 1, 3, 2 } };
-static const GEN_PARAMS f3_gen = { 64, 64,   GEN_COLLECT, 20, 90, GEN_CHUNK_CAP, GEN_WINDOW_CAP, 2, 4, 3, 5, 0,    6,      8,    10, { 1, 1, 2, 0, 1, 2 } };
-static const GEN_PARAMS f4_gen = { 64, 64,   GEN_SURVIVE, 20, 90, GEN_CHUNK_CAP, GEN_WINDOW_CAP, 2, 3, 3, 5, 11,   6,      3,    6,  { 1, 1, 2, 0, 0, 2 } };
+#ifndef GEN_TREES_F1
+#define GEN_TREES_F1 16         /* árvores numa janela 3x3 (pelo bench) */
+#endif
+#ifndef GEN_TREES_F2
+#define GEN_TREES_F2 20
+#endif
+#ifndef GEN_TREES_F3
+#define GEN_TREES_F3 12
+#endif
+#ifndef GEN_TREES_F4
+#define GEN_TREES_F4 10
+#endif
+/*                                 tam       layout       dens    tetos: bloco, janela, árvores/janela  clareiras   cerco troncos inim. dist  vida ener pilha arma gema caixa */
+static const GEN_PARAMS f1_gen = { 64, 64,   GEN_HUNT,    20, 90, GEN_CHUNK_CAP, GEN_WINDOW_CAP, GEN_TREES_F1, 3, 5, 3, 6, 0,    6,      12,   12, { 2, 1, 2, 1, 3, 3 } };
+static const GEN_PARAMS f2_gen = { 128, 128, GEN_CROSS,   20, 90, GEN_CHUNK_CAP, GEN_WINDOW_CAP, GEN_TREES_F2, 5, 8, 4, 8, 0,    15,     14,   16, { 2, 1, 3, 1, 3, 2 } };
+static const GEN_PARAMS f3_gen = { 64, 64,   GEN_COLLECT, 20, 90, GEN_CHUNK_CAP, GEN_WINDOW_CAP, GEN_TREES_F3, 2, 4, 3, 5, 0,    6,      8,    10, { 1, 1, 2, 0, 1, 2 } };
+static const GEN_PARAMS f4_gen = { 64, 64,   GEN_SURVIVE, 20, 90, GEN_CHUNK_CAP, GEN_WINDOW_CAP, GEN_TREES_F4, 2, 3, 3, 5, 11,   6,      3,    6,  { 1, 1, 2, 0, 0, 2 } };
 
 /* Teleporte de depuração (L2 + direcional com o overlay aberto): sempre
  * os mesmos lugares e a mesma direção de câmera, para medir FPS/POLIS.

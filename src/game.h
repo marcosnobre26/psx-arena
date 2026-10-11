@@ -161,6 +161,8 @@ typedef struct {
 	int chunk_cap;               /* árvores no máximo por bloco 8x8 */
 	int window_cap;              /* "árvores" no máximo numa janela 3x3 blocos
 	                                (mata conta 1/4 por célula) */
+	int window_trees;            /* árvores no máximo numa janela 3x3 blocos
+	                                (as árvores pesam mais que a mata na CPU) */
 	int clear_min, clear_max;    /* clareiras sorteadas */
 	int clear_rmin, clear_rmax;  /* raio delas */
 	int survive_r;               /* GEN_SURVIVE: raio da clareira do cerco */
@@ -174,7 +176,8 @@ typedef struct {
 	uint32_t seed;               /* semente usada (base + tentativas - 1) */
 	int tries, fallback;         /* tentativas; 1 = usou o plano B */
 	int trees, dens_permil, max_chunk;
-	int win_weight, win_bx, win_bz;   /* janela 3x3 mais pesada (peso: árvore = 4) */
+	int win_weight, win_bx, win_bz;   /* janela 3x3 mais pesada (peso: árvore = 4, mata = 1/célula) */
+	int win_trees, wt_bx, wt_bz;      /* janela 3x3 com MAIS ÁRVORES (o interior) */
 } MAPGEN_STATS;
 
 /* Ponto fixo para o teleporte de depuração (célula + direção da câmera) */
@@ -390,12 +393,18 @@ void *level_scratch(int bytes);         /* rascunho (só dentro do level_load) *
 int  mapgen_build(int index);           /* 1 = gerou; 0 = plano B */
 const MAPGEN_STATS *mapgen_stats(void);
 const DEBUG_POINT *mapgen_points(int index);   /* teleporte: gerados ou fixos */
+const DEBUG_POINT *mapgen_tree_point(void);     /* centro da janela com mais árvores */
+const DEBUG_POINT *mapgen_worst_point(void);    /* centro da janela mais pesada */
+#ifdef DEBUG_BENCHMARK
+extern int bench_force_fixed;                   /* bench: carrega a floresta fixa (plano B) */
+#endif
 int  mapgen_active(void);
 void mapgen_mark_fixed(void);
 int  level_load_lines(void);            /* tempo do último level_load em linhas (~63,5 us) */
 void level_begin(int w, int h);         /* mapa por código: tamanho (tudo vazio) */
 void level_set_cell(int cx, int cz, int type);   /* CELL_* (solidez automática) */
 int  level_cell_type(int cx, int cz);
+int  level_tree_get(int i, int *x, int *z);       /* tipo da árvore i, ou -1 */
 void level_place(char ch, int cx, int cz);       /* cria o que a letra representa */
 int  level_place_safe(char ch, int cx, int cz);  /* idem, na célula livre mais próxima */
 int  level_place_failures(int i, char *ch, int *cx, int *cz);   /* teste: falhas */

@@ -836,20 +836,58 @@ typedef struct {
 	int crowd;
 	int two;            /* 1 = com o jogador 2 no limite de distância */
 } BENCH_PT;
-static const BENCH_PT bench_pts[] = {
+#include "bench_seeds.h"                   /* ./dev mapgen-test --bench */
+
+/* Fase 5 (fixa): os mesmos 6 pontos de sempre (comparáveis entre etapas) */
+static const BENCH_PT bench_fixed[] = {
 	{ "inicio",       4,  0, CROWD_SPAWN8,  0 },
 	{ "cruzamento",   4,  1, CROWD_SPAWN8,  0 },
 	{ "canto_denso",  4,  2, CROWD_SPAWN8,  0 },
 	{ "clareira",     4,  3, CROWD_SPAWN8,  0 },
 	{ "canto_tapado", 4, -1, CROWD_SPAWN8,  0 },
 	{ "canto_2j",     4, -2, CROWD_SPAWN8,  1 },
-	{ "f1_pior",      0,  2, CROWD_GATHER,  0 },
-	{ "f2_pior",      1,  2, CROWD_GATHER,  0 },
-	{ "f3_pior",      2,  2, CROWD_GATHER,  0 },
-	{ "f4_pior",      3,  2, CROWD_SURVIVE, 0 },
-	{ "f4_pior_2j",   3,  2, CROWD_SURVIVE, 1 },
 };
-#define BENCH_POINTS ((int)(sizeof(bench_pts) / sizeof(bench_pts[0])))
+#define BENCH_NFIXED ((int)(sizeof(bench_fixed) / sizeof(bench_fixed[0])))
+/* Depois: fases 1-4, cada uma nas 5 sementes de PIOR janela (no ponto 2 =
+ * centro da janela mais densa), e o CERCO com 2 jogadores na pior delas */
+#define BENCH_POINTS (BENCH_NFIXED + 4 * 5 + 1 + 4 * 5 + 4 * 2)
+#define BENCH_SEED_FIXED 0xffffffffu      /* "semente" que carrega a floresta fixa da 04e */
+
+/* Monta o ponto i (os gerados não cabem numa tabela fixa) */
+static BENCH_PT bench_point(int i, uint32_t *seed, char *name) {
+	if (i < BENCH_NFIXED) {
+		*seed = BENCH_SEED;
+		strcpy(name, bench_fixed[i].name);
+		return bench_fixed[i];
+	}
+	i -= BENCH_NFIXED;
+	BENCH_PT p = { 0, 0, 2, CROWD_GATHER, 0 };
+	if (i < 20) {
+		p.level = i / 5;
+		*seed = bench_worst_seeds[i / 5][i % 5];
+		sprintf(name, "f%d_pior%d", p.level + 1, i % 5 + 1);
+	} else if (i == 20) {                         /* CERCO, 2 jogadores, pior semente */
+		p.level = 3;
+		p.two = 1;
+		*seed = bench_worst_seeds[3][0];
+		strcpy(name, "f4_pior1_2j");
+	} else if (i >= 41) {                         /* floresta FIXA da 04e, mesmo critério */
+		i -= 41;
+		p.level = i / 2;
+		p.pt = i % 2 ? 4 : 5;                     /* 5 = mapgen_worst_point() */
+		*seed = BENCH_SEED_FIXED;
+		sprintf(name, "f%d_fixo_%s", p.level + 1, i % 2 ? "arv" : "pior");
+	} else {                                      /* janelas com MAIS ÁRVORES */
+		i -= 21;
+		p.level = i / 5;
+		p.pt = 4;                                 /* 4 = mapgen_tree_point() */
+		*seed = bench_tree_seeds[i / 5][i % 5];
+		sprintf(name, "f%d_arv%d", p.level + 1, i % 5 + 1);
+	}
+	if (p.level == 3) p.crowd = CROWD_SURVIVE;
+	return p;
+}
+
 static const DEBUG_POINT bench_extra[2] = {
 	{ 110, 24, 512 },       /* canto denso onde 2 árvores tapam o jogador (50%) */
 	{ 110, 24, 512 },       /* o mesmo, com o jogador 2 no limite de distância */
@@ -891,6 +929,9 @@ enum { BENCH_TELEPORT, BENCH_WAIT, BENCH_MEASURING, BENCH_DONE };
 static struct {
 	int      phase, point, timer, extras, stage;
 	uint32_t spawned;               /* bits: inimigos criados pelo benchmark */
+	uint32_t seed;                  /* semente do ponto atual */
+	BENCH_PT cur;                   /* ponto atual */
+	char     name[24];
 	int      frames, vsyncs, fps_min;
 	int      polis_max, polis_sum, ram_max;
 	int      col_max, col_sum, col_ticks;
@@ -1008,14 +1049,22 @@ static void bench_frame(int vs) {
 			break;
 		}
 		{
-			const BENCH_PT *bp = &bench_pts[bench.point];
-			if (g.level != bp->level) {          /* outra fase: começa ela (semente fixa) */
-				start_level(bp->level, BENCH_SEED);
-				printf("BENCH carga fase=%d nome=%s linhas=%d ms=%d\n", bp->level + 1,
-				       level_defs[bp->level].name, level_load_lines(), level_load_lines() * 635 / 10000);
+			bench.cur = bench_point(bench.point, &bench.seed, bench.name);
+			const BENCH_PT *bp = &bench.cur;
+			if (g.level != bp->level || g.seed != bench.seed) {   /* outro mapa: carrega */
+				bench_force_fixed = bench.seed == BENCH_SEED_FIXED;
+				start_level(bp->level, bench.seed);
+				const MAPGEN_STATS *ms = mapgen_stats();
+				printf("BENCH carga fase=%d nome=%s semente=%08x linhas=%d ms=%d tentativas=%d plano_b=%d janela=%d\n",
+				       bp->level + 1, level_defs[bp->level].name, (unsigned)bench.seed, level_load_lines(),
+				       level_load_lines() * 635 / 10000, ms->tries, ms->fallback, ms->win_weight / 4);
 			}
 			g.state = STATE_PLAY;                /* pula a introdução */
-			if (bp->pt >= 0)
+			if (bp->pt == 5)
+				teleport_to(mapgen_worst_point());
+			else if (bp->pt == 4)
+				teleport_to(mapgen_tree_point());
+			else if (bp->pt >= 0)
 				teleport_to(&mapgen_points(bp->level)[bp->pt]);
 			else
 				teleport_to(&bench_extra[-bp->pt - 1]);
@@ -1078,7 +1127,7 @@ static void bench_frame(int vs) {
 		       "arvores_modelo=%d arvores_plana=%d grade_erros=%d cam_max=%d cam_med=%d cam_celulas_max=%d arvores_transp=%d "
 		       "cpu_max=%d cpu_med=%d gpu_espera_max=%d gpu_espera_med=%d logica_med=%d "
 		       "desenho_blocos=%d desenho_arvores=%d desenho_resto=%d separacao=%d corte=%d\n",
-		       bench_pts[bench.point].name, bench.extras, n, bench.fps_min,
+		       bench.name, bench.extras, n, bench.fps_min,
 		       bench.vsyncs ? bench.frames * 60 / bench.vsyncs : 0,
 		       bench.polis_max, bench.frames ? bench.polis_sum / bench.frames : 0, bench.ram_max,
 		       bench.col_max, bench.col_ticks ? bench.col_sum / bench.col_ticks : 0,
@@ -1098,14 +1147,14 @@ static void bench_frame(int vs) {
 		if (bench.stage == 0) {              /* agora a "multidão" */
 			uint32_t before = 0, after = 0;
 			for (int i = 0; i < MAX_ENEMIES; i++) before |= (uint32_t)g.enemies[i].active << i;
-			switch (bench_pts[bench.point].crowd) {
+			switch (bench.cur.crowd) {
 			case CROWD_SPAWN8:  debug_spawn_enemies(); break;
 			case CROWD_GATHER:  bench.extras = bench_gather(); break;
 			case CROWD_SURVIVE: bench_survive_fill(); break;
 			}
 			for (int i = 0; i < MAX_ENEMIES; i++) after |= (uint32_t)g.enemies[i].active << i;
 			bench.spawned = after & ~before;
-			if (bench_pts[bench.point].crowd != CROWD_GATHER) {
+			if (bench.cur.crowd != CROWD_GATHER) {
 				bench.extras = 0;            /* contar bits sem builtin (libgcc) */
 				for (uint32_t m = bench.spawned; m; m &= m - 1)
 					bench.extras++;
