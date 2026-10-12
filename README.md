@@ -208,6 +208,7 @@ troque para `Debug` em [`CMakePresets.json`](CMakePresets.json) (`-Og`).
 | `events-test [N] [-D N=V]` | simula os eventos da etapa 06 no PC com N sementes por fase (objetivo alcançável, ninguém preso, determinismo, cancelamentos) |
 | `mapgen-test [N] [--bench] [-D N=V]` | testa o gerador de florestas no PC com N sementes por fase (inválidos, tentativas, densidade, tempo, determinismo); `--bench` grava as piores sementes em `src/bench_seeds.h` |
 | `replay-test [--save]` | partida roteirizada (60 s por fase, eventos forçados), hash de `g` + mapa a cada 10 s comparado com `tools/replay_ref.txt`: prova que a lógica não mudou |
+| `robo-test [--save]` | 24 partidas do robô (2 sementes × 4 fases × 3 personagens), hash de `g` + mapa no fim de cada uma comparado com `tools/robo_ref.txt`: cobre dano, morte, itens, caixas e personagens, que o replay não cobre |
 | `bench [-D N=V ...]` | benchmark automático: compila com `DEBUG_BENCHMARK` em `build-bench/` (variantes com `-D` em `build-bench-var/`), roda no DuckStation Linux, mostra a tabela (detalhes no GUIA) |
 
 ---

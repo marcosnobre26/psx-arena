@@ -534,6 +534,17 @@ dá IGUAL; uma mudança de lógica (`-D REACH_MAX_VISIT=60`) dá DIFERENTE.
 Se der DIFERENTE sem você ter mudado a lógica de propósito, há um bug de
 determinismo (algo visual, de tempo ou de VSync entrando na lógica).
 
+O replay não passa por tudo (no build dele o jogador não leva dano, não pega
+arma nem quebra caixa, e só joga com o Robô). Por isso há um segundo teste,
+com o robô jogando 24 partidas (2 sementes × 4 fases × 3 personagens):
+
+```bash
+./dev robo-test           # hash de g no fim de cada partida = tools/robo_ref.txt?
+./dev robo-test --save    # mudança de lógica de propósito: grava a nova referência
+```
+
+Ao mexer na lógica (inclusive números de `data.c`), rode os dois.
+
 ### Jogar com o registro de partida (balanceamento)
 
 ```bash

@@ -38,6 +38,7 @@ modificação: `docs/GUIA.md`.
 ./dev mapgen-test 1000 [--bench] [-D N=V]   # gerador no PC (N sementes/fase); --bench grava src/bench_seeds.h
 ./dev events-test 1000                       # eventos simulados no PC (alcance, ninguém preso, determinismo)
 ./dev replay-test                            # partida roteirizada: hash de g igual à referência?
+./dev robo-test [--save]                     # 24 partidas do robô: hash de g no fim de cada uma
 ./dev clean          # apaga build/
 VERBOSE=1 ./dev build
 ```
@@ -123,11 +124,17 @@ Gerados no build (não edite): `build/gen/assets_gen.{h,c}` (declara
   um gerador separado e não afeta `g`.
 - Nada de ler o controle direto do hardware dentro da lógica (use `g.in[]`).
 - Todo campo novo é inicializado em `*_spawn`/reset (o `memset` de `g` zera o resto).
-- **`./dev replay-test` sempre que mexer na lógica** (inimigos, jogador,
-  colisão, eventos, objetivo, gerador). Partida roteirizada de 60 s por fase
-  (entradas por passo, eventos forçados), hash de `g` + mapa a cada 10 s,
-  comparado com `tools/replay_ref.txt`. Otimização tem que dar IGUAL. Mudança
-  de lógica intencional: explique ao Marcos e regrave com `--save`.
+- **Mexeu na lógica? Rode OS DOIS testes: `./dev replay-test` e
+  `./dev robo-test`** (inimigos, jogador, armas, itens, caixas, colisão,
+  eventos, objetivo, gerador, tabelas de `data.c`). O replay é uma partida
+  roteirizada de 60 s por fase (entradas por passo, eventos forçados) com
+  hash de `g` + mapa a cada 10 s (`tools/replay_ref.txt`), mas no build de
+  bench o jogador não leva dano, nunca pega W nem bate em caixa e só joga
+  com o Robô. O robo-test cobre isso: 24 partidas do robô (2 sementes × 4
+  fases × 3 personagens, hab. 50) com hash de `g` + mapa no fim de cada uma
+  (`tools/robo_ref.txt`; não depende do número de fatias). Otimização tem
+  que dar IGUAL nos dois. Mudança de lógica intencional: explique ao Marcos
+  e regrave com `--save` o(s) que mudou(aram).
 - **Gerador de mapas:** só usa o RNG local semeado por `g.seed` + fase +
   tentativa (nunca `g.rng`, tempo ou `VSync`); deixa `g.rng` como estava.
   Mesma semente = mesmo mapa (o `./dev mapgen-test` compara o hash da grade).

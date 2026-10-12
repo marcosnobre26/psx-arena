@@ -744,3 +744,15 @@ automatizar testes visuais.
   `mapgen.c` 5c, um 'B' a ≤ 6 células de 'Q' ou 'X' vira 'F' (sem sorteio
   a mais: os outros mapas não mudam); exige `./dev mapgen-test 1000
   --bench` e `./dev bench`.
+- 2026-10-11 — Etapa 07b: **correção do gerador aprovada e aplicada**
+  (`mapgen.c`, `big_guards`: 'B' a ≤ 6 células de 'Q' ou 'X' vira 'F', sem
+  sorteio a mais). `./dev mapgen-test 1000 --bench`: 0 inválidos,
+  determinístico, densidades/janelas iguais; `src/bench_seeds.h` trocou uma
+  semente da f1 (empate na janela 69). `./dev bench`: pior quadro igual nas
+  fases 2–4, f1 por causa da semente trocada (CPU médio máx 419 → 399),
+  sempre 30 FPS. `./dev replay-test` IGUAL (nenhum mapa do roteiro tinha o
+  grande perto de Q/X). **Novo teste `./dev robo-test`**: 24 partidas do
+  robô (2 sementes × 4 fases × 3 personagens, hab. 50), hash de `g` + mapa
+  no fim de cada uma vs `tools/robo_ref.txt` (hash compartilhado com o
+  replay, `ROBOT_HASH`); detecta o dano do grande 22 → 23; igual com 2 ou 4
+  fatias. Regra nova: mudou a lógica, rode replay-test E robo-test.
