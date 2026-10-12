@@ -1810,6 +1810,14 @@ static void robot_after_tick(void) {
 	if (robot_over) return;
 #ifdef ROBOT_SHOTS
 	if (g.play_frames >= SHOT_AT || g.state == STATE_WIN || g.state == STATE_DEAD) {
+		/* foto representativa: espera (até +30 s) não haver inimigo a menos de
+		 * 3 m do jogador (um GRANDE colado tapava o personagem na 1a versão) */
+		int close = 0;
+		for (int i = 0; i < MAX_ENEMIES; i++)
+			if (g.enemies[i].active && dist2d(g.enemies[i].pos.vx - g.players[0].pos.vx,
+			                                  g.enemies[i].pos.vz - g.players[0].pos.vz) < 3 * TILE_SIZE)
+				close = 1;
+		if (close && g.state == STATE_PLAY && g.play_frames < SHOT_AT + 30 * 60) return;
 		robot_shots();
 		return;
 	}

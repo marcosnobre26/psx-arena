@@ -127,7 +127,9 @@ static void draw_goal(void) {
 	int y = PY + 10;
 	hud_print(PX + 8, y, "FASE %d: %s", g.level + 1, ld->name);     y += 16;
 	hud_print(PX + 8, y, "%s", ld->obj_text);                       y += 20;
-	hud_print(PX + 8, y, "AGORA: %s", objective_text());             y += 12;
+	if (g.has_exit && g.exit_open) {   /* só quando muda o que fazer; senão repetiria a linha abaixo */
+		hud_print(PX + 8, y, "AGORA: VA ATE A SAIDA");               y += 12;
+	}
 	switch (ld->objective) {
 	case OBJ_KILL_ALL:
 		hud_print(PX + 8, y, "INIMIGOS RESTANTES: %d", g.enemies_left); y += 12;
@@ -181,11 +183,15 @@ static void draw_weapons(void) {
 		switch (w->ammo) {
 		case AMMO_ARROW:  snprintf(ammo, sizeof(ammo), "FLECHAS %d", p->arrows); break;
 		case AMMO_BULLET: snprintf(ammo, sizeof(ammo), "BALAS %d", p->bullets); break;
-		case AMMO_MANA:   snprintf(ammo, sizeof(ammo), "MANA %d/%d", w->cost, p->energy); break;
+		case AMMO_MANA:   snprintf(ammo, sizeof(ammo), "CUSTO %d", w->cost); break;
 		default:          snprintf(ammo, sizeof(ammo), "-"); break;
 		}
-		hud_print(PX + 32, y, "%c %-13s %s", list[i] == p->weapon ? '*' : ' ', w->name, ammo);
+		/* colunas em x fixo (um hud_print por coluna): alinham com qualquer nome */
+		hud_print(PX + 32, y, "%c", list[i] == p->weapon ? '*' : ' ');
+		hud_print(PX + 48, y, "%s", w->name);
+		hud_print(PX + 168, y, "%s", ammo);
 	}
+	hud_print(PX + 8, PY + 10 + 8 * 18 + 6, "MANA %d/%d", p->energy, PLAYER_MAX_ENERGY);
 }
 
 static void draw_items(void) {
@@ -197,11 +203,12 @@ static void draw_items(void) {
 			icon(16 * (s->type - 1), PX + 24, y - 5);
 		if (i == g.menu_cursor)
 			render_rect(PX + 4, y - 6, PW - 8, 18, 70, 60, 30, 0);
-		if (s->type == IT_NONE)
-			hud_print(PX + 10, y, "%d", i + 1);
-		else
-			hud_print(PX + 10, y, "%d    %-13s X%d %s", i + 1, item_defs[s->type].name, s->count,
-			          item_defs[s->type].desc);
+		hud_print(PX + 10, y, "%d", i + 1);
+		if (s->type != IT_NONE) {          /* colunas em x fixo: alinham com qualquer nome */
+			hud_print(PX + 48, y, "%s", item_defs[s->type].name);
+			hud_print(PX + 160, y, "X%d", s->count);
+			hud_print(PX + 192, y, "%s", item_defs[s->type].desc);
+		}
 	}
 	y += 6;
 	hud_print(PX + 8, y, "VIDA %d/%d  MANA %d  PILHA %d%%", p->hp, p->max_hp, p->energy,
@@ -220,7 +227,7 @@ enum { MC_NONE, MC_UNSEEN, MC_DIRT, MC_LEAVES, MC_ROOTS, MC_THICKET, MC_BARRIER,
 #define RGB15(r, gg, b) (uint16_t)(((r) >> 3) | (((gg) >> 3) << 5) | (((b) >> 3) << 10))
 static const uint16_t map_clut[16] = {
 	0, RGB15(14, 14, 18), RGB15(150, 115, 70), RGB15(60, 85, 45), RGB15(110, 80, 50),
-	RGB15(25, 55, 25), RGB15(140, 70, 35), RGB15(10, 32, 12), RGB15(170, 120, 60), RGB15(6, 6, 6),
+	RGB15(25, 55, 25), RGB15(140, 70, 35), RGB15(10, 32, 12), RGB15(240, 225, 110), RGB15(6, 6, 6),
 };
 static uint8_t map_pix[128 * 128 / 2];
 static uint32_t map_sig = 0xffffffffu;
@@ -300,7 +307,7 @@ void menu_draw_map(void) {
 	render_rect(lx, y + 1, 6, 6, 200, 100, 255, 0);  hud_print(lx + 10, y, "RELIQUIA");  y += 12;
 	render_rect(lx, y + 1, 6, 6, 150, 115, 70, 0);   hud_print(lx + 10, y, "TRILHA");    y += 12;
 	render_rect(lx, y + 1, 6, 6, 25, 55, 25, 0);     hud_print(lx + 10, y, "MATA");      y += 12;
-	render_rect(lx, y + 1, 6, 6, 170, 120, 60, 0);   hud_print(lx + 10, y, "TRONCO");    y += 20;
+	render_rect(lx, y + 1, 6, 6, 240, 225, 110, 0);  hud_print(lx + 10, y, "TRONCO");    y += 20;
 	if (map_row >= 128) hud_print(lx, y, "VISTO %d%%", map_seen_pct);
 }
 

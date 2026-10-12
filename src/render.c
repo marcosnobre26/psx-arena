@@ -972,6 +972,17 @@ void hud_print(int x, int y, const char *fmt, ...) {
 	/* cada letra vira um sprite de 8x8 (~16 bytes); garante espaço */
 	if (nextpri + 24 * 96 >= fb[cur].pkt + PACKET_LEN)
 		return;
+	/* O "%" da fonte embutida parece um "x": troca por espaço e desenha um
+	 * "%" próprio (dois pontos 2x2 e uma diagonal) na mesma célula 8x8. */
+	for (int i = 0; buf[i]; i++) {
+		if (buf[i] != '%') continue;
+		buf[i] = ' ';
+		int cx = x + i * 8, cy = y;
+		render_rect(cx, cy, 2, 2, 255, 255, 255, 0);
+		render_rect(cx + 5, cy + 5, 2, 2, 255, 255, 255, 0);
+		for (int k = 0; k < 7; k++)
+			render_rect(cx + 6 - k, cy + k, 1, 1, 255, 255, 255, 0);
+	}
 	nextpri = (uint8_t *)FntSort(fb[cur].ot, nextpri, x, y, buf);
 }
 

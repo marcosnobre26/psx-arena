@@ -783,3 +783,16 @@ automatizar testes visuais.
   1,2 MB. `./dev capturas`: o robô joga 75 s da f3 e grava
   `docs/capturas/08-{jogo,mapa,objetivo,estatisticas,armas,itens}.png`
   (StoreImage → TTY → PNG). Opções (volume) ficam para a etapa 10/01b.
+- 2026-10-11 — Etapa 08, revisão das capturas pelo Marcos. O "tronco
+  escuro" que tapava o personagem em `08-jogo.png` era o **GRANDE** a 1 m
+  (perseguindo), não uma árvore: a transparência da 04d (só árvores entre
+  câmera e jogador) estava certa. A "marquinha branca" no alto era **um olho
+  do GRANDE** (quad sem luz; a cabeça escura saía da tela); confirmado
+  escondendo os olhos e listando os inimigos na hora da foto. Não era resto
+  de desenho: `./dev capturas` agora espera (até +30 s) não haver inimigo a
+  menos de 3 m. Ajustes só visuais (replay e robo IGUAL): Armas mostra
+  "CUSTO n" e a mana no rodapé; Itens e Armas em colunas de x fixo (um
+  `hud_print` por coluna); o "%" da fonte embutida parecia "x": o
+  `hud_print` troca por espaço e desenha um "%" próprio (2 pontos e uma
+  diagonal de `render_rect`); tronco no mapa em amarelo; Objetivo sem a
+  linha "AGORA" repetida (só aparece com a saída aberta).
