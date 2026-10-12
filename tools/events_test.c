@@ -63,14 +63,15 @@ void enemy_spawn(int type, int x, int z) {
 		return;
 	}
 }
-void pickup_spawn(int type, int x, int z) {
+int pickup_spawn(int type, int x, int z) {
 	for (int i = 0; i < MAX_PICKUPS; i++) {
 		PICKUP *p = &g.pickups[i];
 		if (p->active) continue;
 		p->active = 1; p->type = type; p->pos.vx = x; p->pos.vz = z;
 		if (type == PICK_QUEST) g.quest_total++;
-		return;
+		return i + 1;
 	}
+	return 0;
 }
 void crate_spawn(int cx, int cz) {
 	for (int i = 0; i < MAX_CRATES; i++)

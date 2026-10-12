@@ -38,7 +38,7 @@ void prof_end(int s) {}
 /* ---- entidades: só contamos (o mapa já registra o que importa) ---- */
 static int n_enemies, n_pickups, n_crates;
 void enemy_spawn(int t, int x, int z) { n_enemies++; rng_next(&g.rng); rng_next(&g.rng); }
-void pickup_spawn(int t, int x, int z) { n_pickups++; }
+int  pickup_spawn(int t, int x, int z) { n_pickups++; return 1; }
 void crate_spawn(int cx, int cz) { n_crates++; level_set_solid(cx, cz, 1); }
 void prop_spawn(int d, int cx, int cz) {}
 int  player_alive(const PLAYER *p) { return p->active && p->hp > 0; }

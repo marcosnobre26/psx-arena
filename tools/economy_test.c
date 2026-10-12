@@ -42,7 +42,7 @@ const VECTOR *render_camera_pos(void) { return &campos; }
 void prof_begin(int s) {}
 void prof_end(int s) {}
 void enemy_spawn(int t, int x, int z) { rng_next(&g.rng); rng_next(&g.rng); }
-void pickup_spawn(int t, int x, int z) {}
+int  pickup_spawn(int t, int x, int z) { return 1; }
 void crate_spawn(int cx, int cz) { level_set_solid(cx, cz, 1); }
 void prop_spawn(int d, int cx, int cz) {}
 int  player_alive(const PLAYER *p) { return p->active && p->hp > 0; }
