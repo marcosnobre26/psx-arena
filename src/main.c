@@ -1310,6 +1310,9 @@ static void replay_after_tick(void) {
 }
 #endif
 
+#ifdef BENCH_MENU
+static void bench_menu_start(void);
+#endif
 static void bench_start(void) {
 	sel[0].joined = 1; sel[0].ready = 1; sel[0].character = 0; sel[0].skin = 0;
 	sel[1].joined = 0;
@@ -1319,6 +1322,11 @@ static void bench_start(void) {
 	printf("BENCH INICIO replay fases=%d passos=%d\n", REPLAY_NLEVELS, REPLAY_TICKS);
 	replay_begin_level();
 	bench.phase = BENCH_DONE;                /* sem os pontos do bench */
+	return;
+#endif
+#ifdef BENCH_MENU
+	bench_menu_start();
+	bench.phase = BENCH_DONE;
 	return;
 #endif
 	start_level(BENCH_LEVEL, BENCH_SEED);
@@ -1401,7 +1409,74 @@ static void bench_tick(void) {
 }
 
 /* Depois de cada quadro desenhado. vs = retraços que o quadro anterior levou */
+#ifdef BENCH_MENU
+/* ./dev bench -D BENCH_MENU=1 (etapa 08): o menu aberto, com o mundo
+ * desenhado ao fundo, no pior mapa da f2 (128x128) e no ponto mais pesado
+ * dele, com o mapa todo visto (textura do mapa mais cheia). 60 quadros por
+ * aba; o 1o quadro da aba Mapa inclui montar a textura. */
+static struct { int stage, n, fps_min, cpu_max, cpu_sum, polys_max, bytes_max; } bm;
+
+static void bench_menu_start(void) {
+	start_level(1, bench_worst_seeds[1][0]);
+	g.state = STATE_PLAY;
+	memset(g.seen, 0xff, sizeof(g.seen));
+	teleport_to(mapgen_worst_point());
+	for (int k = 0, tries = 0; k < 10 && tries < 40; tries++) {   /* multidão em volta */
+		int x, z;
+		if (bench_ring_spot(tries, 10, &x, &z)) { enemy_spawn(k % num_enemy_types, x, z); k++; }
+	}
+	memset(&bm, 0, sizeof(bm));
+	printf("BENCH INICIO menu fase=2 semente=%08x\n", (unsigned)g.seed);
+}
+
+static void bench_menu_frame(int vs) {
+	static const char *const names[] = { "mapa", "objetivo", "estatisticas", "armas", "itens" };
+	int pc, pg, pv;
+	render_stats_time(&pc, &pg, &pv);
+	if (bm.stage == 0) {                         /* 2 s: blocos montam, câmera assenta; */
+		if (++bm.n > 60) {                       /* o 2o segundo mede SEM menu (comparação) */
+			int fps_now = vs > 0 ? 60 / vs : 60;
+			if (bm.n == 61) bm.fps_min = 60;
+			if (fps_now < bm.fps_min) bm.fps_min = fps_now;
+			if (pc > bm.cpu_max) bm.cpu_max = pc;
+			bm.cpu_sum += pc;
+			if (render_stats_polys() > bm.polys_max) bm.polys_max = render_stats_polys();
+			if (render_stats_bytes() > bm.bytes_max) bm.bytes_max = render_stats_bytes();
+		}
+		if (bm.n >= 120) {
+			printf("BENCH MENU aba=sem_menu fps_min=%d cpu_max=%d cpu_med=%d polis_max=%d ram_gpu_max=%d\n",
+			       bm.fps_min, bm.cpu_max, bm.cpu_sum / 60, bm.polys_max, bm.bytes_max);
+			bm.stage = 1; bm.n = bm.cpu_max = bm.cpu_sum = bm.polys_max = bm.bytes_max = 0;
+			menu_open(0); g.menu_tab = 0; bm.fps_min = 60;
+		}
+		return;
+	}
+	if (bm.stage > 5) return;
+	int fps_now = vs > 0 ? 60 / vs : 60;
+	if (bm.n > 0) {                              /* o quadro da troca de aba não conta no FPS */
+		if (fps_now < bm.fps_min) bm.fps_min = fps_now;
+	}
+	if (pc > bm.cpu_max) bm.cpu_max = pc;
+	bm.cpu_sum += pc;
+	if (render_stats_polys() > bm.polys_max) bm.polys_max = render_stats_polys();
+	if (render_stats_bytes() > bm.bytes_max) bm.bytes_max = render_stats_bytes();
+	if (++bm.n >= 60) {
+		printf("BENCH MENU aba=%s fps_min=%d cpu_max=%d cpu_med=%d polis_max=%d ram_gpu_max=%d\n",
+		       names[bm.stage - 1], bm.fps_min, bm.cpu_max, bm.cpu_sum / bm.n, bm.polys_max, bm.bytes_max);
+		bm.stage++;
+		bm.n = bm.cpu_max = bm.cpu_sum = bm.polys_max = bm.bytes_max = 0;
+		bm.fps_min = 60;
+		if (bm.stage <= 5) g.menu_tab = bm.stage - 1;
+		else printf("BENCH FIM\n");
+	}
+}
+#endif
+
 static void bench_frame(int vs) {
+#ifdef BENCH_MENU
+	bench_menu_frame(vs);
+	return;
+#endif
 	switch (bench.phase) {
 	case BENCH_TELEPORT:
 		bench_remove_extras();
@@ -1723,7 +1798,7 @@ static void robot_shots(void) {
 		menu_open(0);
 		g.menu_tab = t;
 		g.menu_cursor = 0;
-		shot(tabs[t], 3);
+		shot(tabs[t], t == 0 ? 12 : 3);      /* o mapa monta em 8 quadros */
 	}
 	printf("SHOT TUDO\nROBO FIM\n");
 	robot_over = 1;

@@ -89,12 +89,13 @@ void render_rect(int x, int y, int w, int h, int r, int g, int b, int semitrans)
 /* Pedaço (u,v,tw,th) de uma textura na tela em (x,y,w,h) (etapa 08: ícones e
  * mapa do menu). Mesma entrada da OT que render_rect (último = por baixo). */
 void render_sprite(const TEXTURE *t, int u, int v, int tw, int th, int x, int y, int w, int h);
-/* Troca os pixels (4 bits, 2 por byte) e a paleta de 16 cores de uma textura
- * 4 bits já carregada (a do mapa do menu). Vale a partir do próximo quadro. */
+/* Troca as linhas y0..y0+h-1 (4 bits, 2 pixels por byte; pix aponta para a
+ * linha y0) e a paleta de 16 cores (se clut16 != NULL) de uma textura 4 bits
+ * já carregada (a do mapa do menu). Vale a partir do próximo quadro. */
+void render_texture_update4(const TEXTURE *t, const uint8_t *pix, int y0, int h, const uint16_t *clut16);
 /* Copia da VRAM as linhas y0..y0+h-1 do ÚLTIMO quadro desenhado (só para
  * as capturas do ./dev capturas; espera a GPU terminar). dst: 320*h pixels. */
 void render_capture_rows(int y0, int h, uint16_t *dst);
-void render_texture_update4(const TEXTURE *t, const uint8_t *pix, const uint16_t *clut16);
 
 /* Texto na tela (fonte embutida do PSn00bSDK, só ASCII sem acentos) */
 void hud_print(int x, int y, const char *fmt, ...);

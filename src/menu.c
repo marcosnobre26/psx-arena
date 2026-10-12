@@ -224,33 +224,34 @@ static const uint16_t map_clut[16] = {
 };
 static uint8_t map_pix[128 * 128 / 2];
 static uint32_t map_sig = 0xffffffffu;
+static int map_row = 128, map_seen, map_seen_pct;    /* montagem em faixas */
+#define MAP_ROWS_PER_FRAME 16                      /* 8 quadros para 128 linhas */
 
-static int map_color(int cx, int cz) {
-	if (!explore_seen(cx, cz)) return MC_UNSEEN;
-	int c = level_cell_raw(cx, cz);
-	if (c & CELL_LOW) return MC_LOG;
-	if (collide_cell_has_obstacle(cx, cz)) return MC_TREE;
-	switch (c & CELL_TYPE_MASK) {
-	case CELL_DIRT:    return MC_DIRT;
-	case CELL_LEAVES:  return MC_LEAVES;
-	case CELL_ROOTS:   return MC_ROOTS;
-	case CELL_THICKET: return MC_THICKET;
-	case CELL_BARRIER: return MC_BARRIER;
-	}
-	return (c & CELL_SOLID) ? MC_VOID : MC_LEAVES;
-}
-
-static void map_build(void) {
+/* Uma faixa de linhas. Lê as tabelas DIRETO (células, obstáculos, g.seen):
+ * uma chamada de função por célula custava ~4x mais (16 mil células). */
+static void map_build_rows(int z0, int n) {
+	const uint8_t (*cells)[MAP_MAX_W] = level_cells();
+	const int16_t (*obst)[MAP_MAX_W] = collide_obst_heads();
 	int w = level_width(), h = level_height();
-	for (int z = 0; z < 128; z++) {
+	static const uint8_t type_color[8] = { MC_VOID, MC_DIRT, MC_LEAVES, MC_ROOTS, MC_THICKET, MC_BARRIER,
+	                                       MC_LEAVES, MC_LEAVES };
+	for (int z = z0; z < z0 + n; z++) {
 		uint8_t *row = &map_pix[z * 64];
 		for (int x = 0; x < 128; x += 2) {
-			int a = (x < w && z < h) ? map_color(x, z) : MC_VOID;
-			int b = (x + 1 < w && z < h) ? map_color(x + 1, z) : MC_VOID;
-			row[x >> 1] = (uint8_t)(a | (b << 4));      /* 4 bits: pixel da esquerda embaixo */
+			int col[2];
+			for (int k = 0; k < 2; k++) {
+				int cx = x + k;
+				if (cx >= w || z >= h) { col[k] = MC_VOID; continue; }
+				if (!((g.seen[z][cx >> 3] >> (cx & 7)) & 1)) { col[k] = MC_UNSEEN; continue; }
+				map_seen++;
+				int c = cells[z][cx];
+				col[k] = (c & CELL_LOW) ? MC_LOG : obst[z][cx] >= 0 ? MC_TREE : type_color[c & 7];
+			}
+			row[x >> 1] = (uint8_t)(col[0] | (col[1] << 4));   /* 4 bits: pixel da esquerda embaixo */
 		}
 	}
-	render_texture_update4(&tex_mapa_menu_t, map_pix, map_clut);
+	render_texture_update4(&tex_mapa_menu_t, &map_pix[z0 * 64], z0, n, z0 == 0 ? map_clut : NULL);
+	if (z0 + n >= 128) map_seen_pct = map_seen * 100 / (w * h);
 }
 
 /* Marcador quadrado de lado s no ponto do mundo (x,z) */
@@ -264,9 +265,14 @@ void menu_draw_map(void) {
 	int scale = (w <= 64 && h <= 64) ? 2 : 1;           /* 64x64 aparece em 128 px também */
 	int ox = PX + 8, oy = PY + 10;
 	uint32_t sig = (uint32_t)g.frame * 2654435761u ^ g.seed ^ (uint32_t)g.level;
-	if (sig != map_sig) {
+	if (sig != map_sig) {                               /* recomeça a montagem */
 		map_sig = sig;
-		map_build();
+		map_row = 0;
+		map_seen = 0;
+	}
+	if (map_row < 128) {
+		map_build_rows(map_row, MAP_ROWS_PER_FRAME);
+		map_row += MAP_ROWS_PER_FRAME;
 	}
 	/* marcadores ANTES do sprite (ficam por cima): jogadores, saída e
 	 * relíquias só se a célula já foi vista */
@@ -295,10 +301,7 @@ void menu_draw_map(void) {
 	render_rect(lx, y + 1, 6, 6, 150, 115, 70, 0);   hud_print(lx + 10, y, "TRILHA");    y += 12;
 	render_rect(lx, y + 1, 6, 6, 25, 55, 25, 0);     hud_print(lx + 10, y, "MATA");      y += 12;
 	render_rect(lx, y + 1, 6, 6, 170, 120, 60, 0);   hud_print(lx + 10, y, "TRONCO");    y += 20;
-	int seen = 0;
-	for (int z = 0; z < h; z++)
-		for (int x = 0; x < w; x++) seen += explore_seen(x, z);
-	hud_print(lx, y, "VISTO %d%%", seen * 100 / (w * h));
+	if (map_row >= 128) hud_print(lx, y, "VISTO %d%%", map_seen_pct);
 }
 
 /* O mundo já foi desenhado; por cima: escurece, painel, abas e a aba atual */

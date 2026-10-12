@@ -948,16 +948,18 @@ void render_capture_rows(int y0, int h, uint16_t *dst) {
 	DrawSync(0);
 }
 
-void render_texture_update4(const TEXTURE *t, const uint8_t *pix, const uint16_t *clut16) {
+void render_texture_update4(const TEXTURE *t, const uint8_t *pix, int y0, int h, const uint16_t *clut16) {
 	/* posição na VRAM a partir do tpage/u0/v0 (o inverso de render_load_texture) */
 	RECT r;
 	r.x = (int16_t)((t->tpage & 15) * 64 + t->u0 / 4);
-	r.y = (int16_t)(((t->tpage >> 4) & 1) * 256 + t->v0);
+	r.y = (int16_t)(((t->tpage >> 4) & 1) * 256 + t->v0 + y0);
 	r.w = (int16_t)(t->w / 4);
-	r.h = (int16_t)t->h;
+	r.h = (int16_t)h;
 	LoadImage(&r, (const uint32_t *)pix);
-	RECT c = { (int16_t)((t->clut & 63) * 16), (int16_t)(t->clut >> 6), 16, 1 };
-	LoadImage(&c, (const uint32_t *)clut16);
+	if (clut16) {
+		RECT c = { (int16_t)((t->clut & 63) * 16), (int16_t)(t->clut >> 6), 16, 1 };
+		LoadImage(&c, (const uint32_t *)clut16);
+	}
 }
 
 void hud_print(int x, int y, const char *fmt, ...) {
