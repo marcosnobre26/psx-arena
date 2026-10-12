@@ -756,3 +756,30 @@ automatizar testes visuais.
   no fim de cada uma vs `tools/robo_ref.txt` (hash compartilhado com o
   replay, `ROBOT_HASH`); detecta o dano do grande 22 → 23; igual com 2 ou 4
   fatias. Regra nova: mudou a lógica, rode replay-test E robo-test.
+- 2026-10-11 — **Etapa 08 (menu do START e inventário)**, branch
+  `etapa-08-menu`. Inventário de 8 espaços (`inventory.c`): bandagem (H,
+  +25, pilha 3), kit médico (J novo, +60, 1; 1 na f2 e na f3), poção de
+  mana (N, +40, 2), pilha (L, 2) ocupam; relíquias, chaves, gemas, armas,
+  flechas e balas não. Cheio = fica no chão; largar = volta ao chão (trava
+  até se afastar; chão cheio = some). CÍRCULO = bandagem, depois kit (magia
+  fora). Estatísticas por jogador em `g` (mortos por tipo, precisão, dano,
+  itens, distância); névoa de exploração `g.seen` (2 KB). Menu
+  (`menu.c`, `STATE_MENU` no lugar da pausa): abas Mapa (textura 4 bits da
+  névoa, marcadores, legenda, % visto), Objetivo, Estatísticas, Armas
+  (equipar), Itens (usar/largar); última aba em `g`, cursor zera; 2
+  jogadores: quem abriu controla, SELECT troca P1/P2. **Mudanças de lógica
+  intencionais** (referências regravadas, explicadas): itens guardados e
+  campos novos em `g`; a pausa congela `g.frame` (antes andava, e a visão
+  dos inimigos é escalonada por ele: pausar mudava a partida). Provas:
+  `replay-test -D REPLAY_MENU=1` e `robo-test -D ROBOT_MENU=1` IGUAL; sem o
+  congelamento, DIFERENTE. Robô usa o inventário (atalho; poção e pilha
+  pelo menu); vitórias hab. 50 (240 partidas) 212 → 223, mortes 17 → 8
+  (GRANDE 12 → 7). Desempenho (`bench -D BENCH_MENU=1`, pior mapa da f2,
+  10 inimigos, mapa todo visto): sem menu 372 linhas; abas 365–374, aba
+  Mapa 434 no quadro de montagem, sempre 30 FPS (a 1a versão, com o % visto
+  percorrendo 16 mil células por quadro, dava 8 FPS). Bench normal igual
+  (±1 linha). RAM 915 426 → 945 710 bytes (+30 284: `g` +~2,3 KB, imagem
+  do mapa 8 KB, código, ícones e a reserva do mapa); folga ~312 KB até
+  1,2 MB. `./dev capturas`: o robô joga 75 s da f3 e grava
+  `docs/capturas/08-{jogo,mapa,objetivo,estatisticas,armas,itens}.png`
+  (StoreImage → TTY → PNG). Opções (volume) ficam para a etapa 10/01b.

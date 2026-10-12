@@ -208,6 +208,7 @@ troque para `Debug` em [`CMakePresets.json`](CMakePresets.json) (`-Og`).
 | `events-test [N] [-D N=V]` | simula os eventos da etapa 06 no PC com N sementes por fase (objetivo alcançável, ninguém preso, determinismo, cancelamentos) |
 | `mapgen-test [N] [--bench] [-D N=V]` | testa o gerador de florestas no PC com N sementes por fase (inválidos, tentativas, densidade, tempo, determinismo); `--bench` grava as piores sementes em `src/bench_seeds.h` |
 | `replay-test [--save]` | partida roteirizada (60 s por fase, eventos forçados), hash de `g` + mapa a cada 10 s comparado com `tools/replay_ref.txt`: prova que a lógica não mudou |
+| `capturas` | o robô joga 75 s da f3 e grava telas do jogo e de cada aba do menu em `docs/capturas/08-*.png` (sem abrir janela) |
 | `robo-test [--save]` | 24 partidas do robô (2 sementes × 4 fases × 3 personagens), hash de `g` + mapa no fim de cada uma comparado com `tools/robo_ref.txt`: cobre dano, morte, itens, caixas e personagens, que o replay não cobre |
 | `bench [-D N=V ...]` | benchmark automático: compila com `DEBUG_BENCHMARK` em `build-bench/` (variantes com `-D` em `build-bench-var/`), roda no DuckStation Linux, mostra a tabela (detalhes no GUIA) |
 
@@ -333,8 +334,8 @@ stateDiagram-v2
     Selecao --> Titulo: CÍRCULO (jogador 1)
     Selecao --> Intro: todos confirmaram
     Intro --> Jogo: 3 s ou START/X
-    Jogo --> Pausa: START
-    Pausa --> Jogo: START
+    Jogo --> Menu: START (o jogo para)
+    Menu --> Jogo: START ou CÍRCULO
     Jogo --> Vitoria: objetivo cumprido
     Jogo --> GameOver: todos caídos
     Vitoria --> Intro: START (próxima fase)

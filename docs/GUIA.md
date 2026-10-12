@@ -41,10 +41,10 @@ Depois de qualquer mudança: `./dev run` (compila e abre no emulador) ou
 | **Quadrado** | atacar com a arma na mão. Arco: **segure** para carregar e **solte** para atirar |
 | **Triângulo** | próxima arma (corpo a corpo, arco, magias, armas de fogo que você tem) |
 | **R2** (segure) | andar devagar e **em silêncio** (os inimigos não ouvem seus passos) |
-| **Círculo** | (livre; menu do START na etapa 08) |
+| **Círculo** | cura rápida: usa uma **bandagem** (ou, sem bandagem, o **kit médico**) do inventário. A magia CURA nunca entra no atalho |
 | **L1 / R1** ou analógico direito | girar a câmera |
 | **Select** | liga/desliga a **lanterna** (a skin muda só na tela de seleção) |
-| **Start** | pausar |
+| **Start** | abre o **menu** (o jogo para): Mapa, Objetivo, Estatísticas, Armas, Itens |
 | **L2** (soltar) | depuração: névoa, memória do SPU, semente, polígonos, FPS, memória de primitivas, posição |
 | **L2 + Start** | (com o overlay aberto) pula para a próxima fase |
 | **L2 + direcional** | (com o overlay aberto) teleporta para os 4 pontos da fase (← início, → frente da barreira de raízes, se houver, ↑ canto mais denso, ↓ saída) |
@@ -57,8 +57,20 @@ Depois de qualquer mudança: `./dev run` (compila e abre no emulador) ou
 entra apertando **Start**; com dois jogadores, a partida começa quando os
 dois confirmam.
 
+**Menu do START:** **L1/R1** (ou esquerda/direita) troca a aba, cima/baixo
+escolhe a linha, **X** usa o item (aba Itens) ou equipa a arma (aba Armas),
+**Quadrado** larga o item no chão, **Círculo** ou **Start** sai. Com 2
+jogadores, quem abriu controla e **Select** mostra o inventário do outro.
+O menu volta na última aba aberta.
+
+**Inventário (8 espaços):** só ocupam espaço bandagem (+25 de vida, até 3
+por espaço), kit médico (+60, 1), poção de mana (+40, 2) e pilha da lanterna
+(2). Relíquias, chaves, gemas, armas, flechas e balas não ocupam. Inventário
+cheio: o item fica no chão. Item largado só volta para quem largou depois
+que ele se afasta. O inventário passa de fase e não se perde ao cair.
+
 **Objetivo:** o da fase. Gemas dão pontos e mana; caixas (quebram com
-golpe ou projétil) podem soltar vida ou mana; `W` dá a próxima arma (arco,
+golpe ou projétil) podem soltar bandagem ou poção; `W` dá a próxima arma (arco,
 pistola, machado, espingarda), `V`
 flechas e `M` balas. A mana volta sozinha bem devagar só até 25%. Com
 2 jogadores, quem cai volta em 5 s ao lado do parceiro; se os dois caírem,
@@ -587,6 +599,39 @@ munição e mana. O ajuste fino é sempre no teste jogando de verdade.
 Limites do robô: não anda agachado (R2), não usa o clarão a não ser contra
 o grande, abre caixa com o golpe (ou arco/bola de fogo de longe), não
 pula por cima de inimigos.
+
+### Menu, inventário e capturas (etapa 08)
+
+**Criar um item de inventário:** acrescente `IT_<NOME>` no fim do enum em
+`game.h`, uma linha em `item_defs` (`data.c`: nome, descrição, quantos por
+espaço, efeito, qual `PICK_*` o representa no chão), o efeito em
+`inv_use` (`inventory.c`) e um ícone 16x16 em `tools/make_menu_icons.py`
+(a folha `icones_menu-4bit.png`: item k fica em x = 16·(k−1)). Para ele
+aparecer no mapa, use um `PICK_*` com letra em `level_place` (`level.c`) e
+a quantidade por fase em `GEN_PARAMS.items` (`levels.c`; tipos novos
+sempre no FIM, para não mudar os outros itens dos mapas).
+
+**O menu para o jogo de verdade:** com ele aberto nenhum `*_update` roda e
+nem `g.frame` anda. Prova (abre o menu várias vezes e navega sem usar
+nada; tem que dar IGUAL):
+
+```bash
+./dev replay-test -D REPLAY_MENU=1
+./dev robo-test -D ROBOT_MENU=1
+```
+
+**Capturas de tela sem abrir o emulador:**
+
+```bash
+./dev capturas    # o robô joga 75 s da f3 e fotografa o jogo e cada aba
+```
+
+As imagens ficam em `docs/capturas/08-*.png`. O jogo copia a tela da VRAM
+(`StoreImage`) e a manda pelo TTY em hexadecimal; `tools/capturas.py`
+monta os PNGs. Funciona igual num console de verdade.
+
+**Desempenho do menu:** `./dev bench -D BENCH_MENU=1` mede cada aba no pior
+mapa da f2, com 10 inimigos em volta e o mapa todo visto.
 
 ## 4. Modelar no Blender
 

@@ -39,6 +39,8 @@ modificação: `docs/GUIA.md`.
 ./dev events-test 1000                       # eventos simulados no PC (alcance, ninguém preso, determinismo)
 ./dev replay-test                            # partida roteirizada: hash de g igual à referência?
 ./dev robo-test [--save]                     # 24 partidas do robô: hash de g no fim de cada uma
+./dev capturas                               # telas do menu em docs/capturas/08-*.png (robô + StoreImage)
+./dev bench -D BENCH_MENU=1                  # cada aba do menu aberta no pior mapa da f2
 ./dev clean          # apaga build/
 VERBOSE=1 ./dev build
 ```
@@ -78,6 +80,8 @@ VERBOSE=1 ./dev build
 | `input.c` | controles das portas 1 e 2 |
 | `sound.c` | efeitos no SPU: `sound_play`, `sound_play_at` (posicional), loops de ambiente nas vozes 0–1 |
 | `rng.c` | gerador aleatório determinístico: `g.rng` (lógica) e `fx_range` (visual) |
+| `inventory.c` | inventário (8 espaços: bandagem, kit, poção, pilha), atalho de cura no CÍRCULO, névoa de exploração (`g.seen`) |
+| `menu.c` | menu do START (`STATE_MENU`): abas Mapa (textura 4 bits da névoa), Objetivo, Estatísticas, Armas, Itens |
 | `playlog.c` / `robot.c` | só em builds de depuração: registro de partida (`DEBUG_PLAYLOG`) e jogador robô (`DEBUG_ROBOT`, `./dev robo`) |
 
 Gerados no build (não edite): `build/gen/assets_gen.{h,c}` (declara
@@ -233,6 +237,18 @@ uma branch. As regras do ROADMAP (determinismo, orçamentos de desempenho,
   rastejador cacador grande` (`tools/make_combat_models.py`). Bench:
   `f{N}_combate` (multidão perseguindo + ataque sem parar + o grande +
   flechas no chão + clarão) ≤ 450.
+- **Menu e inventário (etapa 08):** com `STATE_MENU` nada da lógica roda e
+  `g.frame` NÃO anda (abrir/fechar também não). Mexeu no menu? Rode
+  `./dev replay-test -D REPLAY_MENU=1` e `./dev robo-test -D ROBOT_MENU=1`
+  (IGUAL). Estado do menu em `g` (última aba fica; cursor zera ao fechar).
+  Estatísticas que o menu mostra ficam em `PLAYER.st` (build normal); o
+  playlog conta o resto. `render_rect`/`render_sprite` vão para a entrada
+  1 da OT: o ÚLTIMO colocado fica POR BAIXO (destaques antes dos painéis);
+  texto (`hud_print`) sempre por cima. O mapa do menu é uma textura 4 bits
+  (`mapa_menu-4bit.png` só reserva a VRAM) remontada em faixas de 16
+  linhas por quadro, lendo `level_cells()`/`collide_obst_heads()`/`g.seen`
+  direto (função por célula derrubava para 8 FPS). Mudou o visual do menu?
+  Rode `./dev capturas` e confira as imagens.
 - Carga de fase: `start_level` desenha um quadro `CARREGANDO...` antes. Se a
   geração passar de ~1 s, divida-a entre quadros SEM rodar `game_tick` até
   o mapa ficar pronto (resultado idêntico ao de uma vez).
