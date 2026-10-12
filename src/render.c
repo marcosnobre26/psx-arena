@@ -925,6 +925,41 @@ void render_rect(int x, int y, int w, int h, int r, int g, int b, int semitrans)
 	nextpri += sizeof(TILE);
 }
 
+void render_sprite(const TEXTURE *t, int u, int v, int tw, int th, int x, int y, int w, int h) {
+	if (nextpri + sizeof(POLY_FT4) >= fb[cur].pkt + PACKET_LEN)
+		return;
+	POLY_FT4 *q = (POLY_FT4 *)nextpri;
+	setPolyFT4(q);
+	setXYWH(q, x, y, w, h);
+	u += t->u0; v += t->v0;
+	setUVWH(q, u, v, tw - 1, th - 1);
+	setRGB0(q, 128, 128, 128);             /* 128 = cor da textura sem mudar */
+	q->tpage = t->tpage;
+	q->clut = t->clut;
+	addPrim(fb[cur].ot + 1, q);
+	nextpri += sizeof(POLY_FT4);
+}
+
+void render_capture_rows(int y0, int h, uint16_t *dst) {
+	DrawSync(0);
+	const DRAWENV *d = &fb[cur ^ 1].draw;      /* o quadro que acabou de ir para a GPU */
+	RECT r = { d->clip.x, (int16_t)(d->clip.y + y0), SCREEN_W, (int16_t)h };
+	StoreImage(&r, (uint32_t *)dst);
+	DrawSync(0);
+}
+
+void render_texture_update4(const TEXTURE *t, const uint8_t *pix, const uint16_t *clut16) {
+	/* posição na VRAM a partir do tpage/u0/v0 (o inverso de render_load_texture) */
+	RECT r;
+	r.x = (int16_t)((t->tpage & 15) * 64 + t->u0 / 4);
+	r.y = (int16_t)(((t->tpage >> 4) & 1) * 256 + t->v0);
+	r.w = (int16_t)(t->w / 4);
+	r.h = (int16_t)t->h;
+	LoadImage(&r, (const uint32_t *)pix);
+	RECT c = { (int16_t)((t->clut & 63) * 16), (int16_t)(t->clut >> 6), 16, 1 };
+	LoadImage(&c, (const uint32_t *)clut16);
+}
+
 void hud_print(int x, int y, const char *fmt, ...) {
 	char buf[96];
 	va_list ap;

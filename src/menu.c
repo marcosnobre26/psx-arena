@@ -26,6 +26,7 @@
 #include <stdio.h>
 #include <string.h>
 #include "game.h"
+#include "models.h"
 
 enum { TAB_MAP, TAB_GOAL, TAB_STATS, TAB_WEAPONS, TAB_ITEMS, NUM_TABS };
 static const char *const tab_names[NUM_TABS] = { "MAPA", "OBJETIVO", "ESTAT.", "ARMAS", "ITENS" };
@@ -104,6 +105,12 @@ void menu_update(void) {
 #define PW (SCREEN_W - 32)
 #define PH 172
 
+/* Ícone 16x16 da folha (item k: 16*(k-1); arma w: 64 + 16*w) */
+static void icon(int u, int x, int y) {
+	render_sprite(&tex_icones_menu_t, u, 0, 16, 16, x, y, 16, 16);
+}
+
+
 static void draw_tabs(void) {
 	int x = 24;
 	for (int t = 0; t < NUM_TABS; t++) {
@@ -165,10 +172,11 @@ static void draw_stats(void) {
 static void draw_weapons(void) {
 	const PLAYER *p = shown();
 	int list[NUM_WEAPON_SLOTS], n = owned_list(p, list), y = PY + 10;
-	for (int i = 0; i < n; i++, y += 14) {
+	for (int i = 0; i < n; i++, y += 18) {
 		const WEAPON_DEF *w = &weapon_defs[list[i]];
+		icon(64 + 16 * list[i], PX + 12, y - 5);
 		if (i == g.menu_cursor)
-			render_rect(PX + 4, y - 3, PW - 8, 13, 70, 60, 30, 0);
+			render_rect(PX + 4, y - 6, PW - 8, 18, 70, 60, 30, 0);
 		char ammo[24];
 		switch (w->ammo) {
 		case AMMO_ARROW:  snprintf(ammo, sizeof(ammo), "FLECHAS %d", p->arrows); break;
@@ -176,21 +184,23 @@ static void draw_weapons(void) {
 		case AMMO_MANA:   snprintf(ammo, sizeof(ammo), "MANA %d/%d", w->cost, p->energy); break;
 		default:          snprintf(ammo, sizeof(ammo), "-"); break;
 		}
-		hud_print(PX + 12, y, "%c %-13s %s", list[i] == p->weapon ? '*' : ' ', w->name, ammo);
+		hud_print(PX + 32, y, "%c %-13s %s", list[i] == p->weapon ? '*' : ' ', w->name, ammo);
 	}
 }
 
 static void draw_items(void) {
 	const PLAYER *p = shown();
 	int y = PY + 10;
-	for (int i = 0; i < INV_SLOTS; i++, y += 14) {
-		if (i == g.menu_cursor)
-			render_rect(PX + 4, y - 3, PW - 8, 13, 70, 60, 30, 0);
+	for (int i = 0; i < INV_SLOTS; i++, y += 18) {
 		const INV_SLOT *s = &p->inv[i];
+		if (s->type != IT_NONE)
+			icon(16 * (s->type - 1), PX + 24, y - 5);
+		if (i == g.menu_cursor)
+			render_rect(PX + 4, y - 6, PW - 8, 18, 70, 60, 30, 0);
 		if (s->type == IT_NONE)
-			hud_print(PX + 12, y, "%d -", i + 1);
+			hud_print(PX + 10, y, "%d", i + 1);
 		else
-			hud_print(PX + 12, y, "%d %-13s X%d  %s", i + 1, item_defs[s->type].name, s->count,
+			hud_print(PX + 10, y, "%d    %-13s X%d %s", i + 1, item_defs[s->type].name, s->count,
 			          item_defs[s->type].desc);
 	}
 	y += 6;
@@ -198,9 +208,97 @@ static void draw_items(void) {
 	          p->battery * 100 / BATTERY_MAX);
 }
 
-/* Aba Mapa: textura da névoa de exploração (passo seguinte) */
+/* ------------------------------------------------------------------ */
+/* Aba Mapa                                                             */
+/* ------------------------------------------------------------------ */
+/* A grade (até 128x128) vira uma textura 4 bits de 128x128 (8 KB aqui) que
+ * substitui a reserva tex_mapa_menu_t na VRAM; um único sprite na tela.
+ * Desenhar célula a célula seriam até 16 mil retângulos por quadro. Só é
+ * remontada quando algo pode ter mudado (com o menu aberto o jogo para:
+ * uma vez por abertura). Células nunca vistas (g.seen) ficam escuras. */
+enum { MC_NONE, MC_UNSEEN, MC_DIRT, MC_LEAVES, MC_ROOTS, MC_THICKET, MC_BARRIER, MC_TREE, MC_LOG, MC_VOID };
+#define RGB15(r, gg, b) (uint16_t)(((r) >> 3) | (((gg) >> 3) << 5) | (((b) >> 3) << 10))
+static const uint16_t map_clut[16] = {
+	0, RGB15(14, 14, 18), RGB15(150, 115, 70), RGB15(60, 85, 45), RGB15(110, 80, 50),
+	RGB15(25, 55, 25), RGB15(140, 70, 35), RGB15(10, 32, 12), RGB15(170, 120, 60), RGB15(6, 6, 6),
+};
+static uint8_t map_pix[128 * 128 / 2];
+static uint32_t map_sig = 0xffffffffu;
+
+static int map_color(int cx, int cz) {
+	if (!explore_seen(cx, cz)) return MC_UNSEEN;
+	int c = level_cell_raw(cx, cz);
+	if (c & CELL_LOW) return MC_LOG;
+	if (collide_cell_has_obstacle(cx, cz)) return MC_TREE;
+	switch (c & CELL_TYPE_MASK) {
+	case CELL_DIRT:    return MC_DIRT;
+	case CELL_LEAVES:  return MC_LEAVES;
+	case CELL_ROOTS:   return MC_ROOTS;
+	case CELL_THICKET: return MC_THICKET;
+	case CELL_BARRIER: return MC_BARRIER;
+	}
+	return (c & CELL_SOLID) ? MC_VOID : MC_LEAVES;
+}
+
+static void map_build(void) {
+	int w = level_width(), h = level_height();
+	for (int z = 0; z < 128; z++) {
+		uint8_t *row = &map_pix[z * 64];
+		for (int x = 0; x < 128; x += 2) {
+			int a = (x < w && z < h) ? map_color(x, z) : MC_VOID;
+			int b = (x + 1 < w && z < h) ? map_color(x + 1, z) : MC_VOID;
+			row[x >> 1] = (uint8_t)(a | (b << 4));      /* 4 bits: pixel da esquerda embaixo */
+		}
+	}
+	render_texture_update4(&tex_mapa_menu_t, map_pix, map_clut);
+}
+
+/* Marcador quadrado de lado s no ponto do mundo (x,z) */
+static void map_mark(int ox, int oy, int scale, int x, int z, int s, int r, int gg, int b) {
+	int px = ox + (x * scale) / TILE_SIZE, py = oy + (z * scale) / TILE_SIZE;
+	render_rect(px - s / 2, py - s / 2, s, s, r, gg, b, 0);
+}
+
 void menu_draw_map(void) {
-	hud_print(PX + 8, PY + 10, "MAPA");
+	int w = level_width(), h = level_height();
+	int scale = (w <= 64 && h <= 64) ? 2 : 1;           /* 64x64 aparece em 128 px também */
+	int ox = PX + 8, oy = PY + 10;
+	uint32_t sig = (uint32_t)g.frame * 2654435761u ^ g.seed ^ (uint32_t)g.level;
+	if (sig != map_sig) {
+		map_sig = sig;
+		map_build();
+	}
+	/* marcadores ANTES do sprite (ficam por cima): jogadores, saída e
+	 * relíquias só se a célula já foi vista */
+	for (int i = 0; i < MAX_PLAYERS; i++) {
+		const PLAYER *p = &g.players[i];
+		if (!player_alive(p)) continue;
+		int dx = (isin(p->angle) * 4) >> 12, dz = (icos(p->angle) * 4) >> 12;   /* para onde olha */
+		render_rect(ox + (p->pos.vx * scale) / TILE_SIZE + dx - 1, oy + (p->pos.vz * scale) / TILE_SIZE + dz - 1,
+		            2, 2, 255, 255, 255, 0);
+		map_mark(ox, oy, scale, p->pos.vx, p->pos.vz, 4, i ? 255 : 80, i ? 90 : 160, i ? 90 : 255);
+	}
+	if (g.has_exit && explore_seen(g.exit_x / TILE_SIZE, g.exit_z / TILE_SIZE))
+		map_mark(ox, oy, scale, g.exit_x, g.exit_z, 5, g.exit_open ? 120 : 90, g.exit_open ? 230 : 90, 255);
+	for (int i = 0; i < MAX_PICKUPS; i++) {
+		const PICKUP *it = &g.pickups[i];
+		if (it->active && it->type == PICK_QUEST && explore_seen(it->pos.vx / TILE_SIZE, it->pos.vz / TILE_SIZE))
+			map_mark(ox, oy, scale, it->pos.vx, it->pos.vz, 4, 200, 100, 255);
+	}
+	render_sprite(&tex_mapa_menu_t, 0, 0, w < 128 ? w : 128, h < 128 ? h : 128, ox, oy, w * scale, h * scale);
+
+	/* legenda à direita */
+	int lx = ox + 140, y = oy;
+	render_rect(lx, y + 1, 6, 6, 80, 160, 255, 0);   hud_print(lx + 10, y, "VOCE");      y += 12;
+	render_rect(lx, y + 1, 6, 6, 120, 230, 255, 0);  hud_print(lx + 10, y, "SAIDA");     y += 12;
+	render_rect(lx, y + 1, 6, 6, 200, 100, 255, 0);  hud_print(lx + 10, y, "RELIQUIA");  y += 12;
+	render_rect(lx, y + 1, 6, 6, 150, 115, 70, 0);   hud_print(lx + 10, y, "TRILHA");    y += 12;
+	render_rect(lx, y + 1, 6, 6, 25, 55, 25, 0);     hud_print(lx + 10, y, "MATA");      y += 12;
+	render_rect(lx, y + 1, 6, 6, 170, 120, 60, 0);   hud_print(lx + 10, y, "TRONCO");    y += 20;
+	int seen = 0;
+	for (int z = 0; z < h; z++)
+		for (int x = 0; x < w; x++) seen += explore_seen(x, z);
+	hud_print(lx, y, "VISTO %d%%", seen * 100 / (w * h));
 }
 
 /* O mundo já foi desenhado; por cima: escurece, painel, abas e a aba atual */

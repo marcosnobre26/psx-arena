@@ -55,7 +55,7 @@ const ITEM_DEF item_defs[NUM_ITEM_TYPES] = {
 	{ "BANDAGEM",      "+25 VIDA",              3,    25,     PICK_HEALTH },
 	{ "KIT MEDICO",    "+60 VIDA",              1,    60,     PICK_MEDKIT },
 	{ "POCAO DE MANA", "+40 MANA",              2,    40,     PICK_ENERGY },
-	{ "PILHA",         "RECARREGA A LANTERNA",  2,    BATTERY_PICKUP, PICK_BATTERY },
+	{ "PILHA",         "+40% PILHA",            2,    BATTERY_PICKUP, PICK_BATTERY },
 };
 
 /* ------------------------------------------------------------------ */

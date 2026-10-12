@@ -10,6 +10,7 @@
 #   ./dev economia [N]   munição/mana/cura x inimigos por fase, no PC (N sementes)
 #   ./dev robo [N]       o robô joga N sementes x 4 fases x 3 personagens (sem janela)
 #   ./dev robo-test       24 partidas do robô: a lógica mudou? (hash de g no fim)
+#   ./dev capturas        telas do menu em docs/capturas/ (o robô joga e fotografa)
 #   ./dev models         exporta os .blend de assets/blender/ para models/ (Blender do Windows)
 #   ./dev watch          recompila sozinho sempre que você salvar um arquivo
 #   ./dev clean          apaga a pasta build/
@@ -591,6 +592,9 @@ src, dst, k, n = sys.argv[1], sys.argv[2], sys.argv[3], sys.argv[4]
 data = open(src, "rb").read()
 old = b"ROBOSHARD=0/1;"
 if data.count(old) != 1:
+    if n == "1":                       # uma fatia só (ex.: capturas): não precisa trocar
+        open(dst, "wb").write(data)
+        sys.exit(0)
     sys.exit("marcador ROBOSHARD não encontrado no .exe")
 open(dst, "wb").write(data.replace(old, ("ROBOSHARD=%s/%s;" % (k, n)).encode()))
 PY
@@ -671,6 +675,19 @@ cmd_robo_test() {
 	fi
 }
 
+# Capturas de tela do menu (etapa 08): build do robô com ROBOT_SHOTS (joga
+# 75 s da f3 com o Batedor, abre cada aba e manda a tela pelo TTY);
+# tools/capturas.py monta docs/capturas/08-*.png.
+cmd_capturas() {
+	ROBO_BDIR=build-shots ROBO_LOG="$ROOT/build-shots/shots.txt" ROBO_QUIET=1 ROBO_FATIAS=1 \
+		cmd_robo 1 -D ROBOT_SHOTS=1 > "$ROOT/build-shots.log" 2>&1 ||
+		{ cat "$ROOT/build-shots.log"; c_err "As capturas não rodaram."; return 1; }
+	sdk python3 tools/capturas.py build-shots/fatia-0.log docs/capturas 08- ||
+		{ c_err "Sem capturas no log (build-shots/fatia-0.log)."; return 1; }
+	rm -f "$ROOT/build-shots.log"
+	c_ok "Capturas em docs/capturas/"
+}
+
 case "${1:-build}" in
 	build)  cmd_build ;;
 	run)    shift; cmd_run "$@" ;;
@@ -690,5 +707,6 @@ case "${1:-build}" in
 	economia) shift; cmd_economia "$@" ;;
 	robo)   shift; cmd_robo "$@" ;;
 	robo-test) shift; cmd_robo_test "$@" ;;
-	*)      sed -n '3,23p' "$0" | sed 's/^#//' ;;
+	capturas) cmd_capturas ;;
+	*)      sed -n '3,24p' "$0" | sed 's/^#//' ;;
 esac

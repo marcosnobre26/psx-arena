@@ -71,6 +71,11 @@ int robot_limit_ticks(int level) {
 /* Partida k: 1 = rodar (preenche fase/semente/personagem), 0 = é de outra
  * fatia, -1 = acabou. Mesmas sementes do ./dev economia (0x3000 + k*7919). */
 int robot_match(int k, int *level, uint32_t *seed, int *character) {
+#ifdef ROBOT_SHOTS                     /* ./dev capturas: uma partida só (f3, Batedor) */
+	if (k > 0) return -1;
+	*level = 2; *seed = 0x3000u; *character = 2;
+	return 1;
+#endif
 	int total = ROBOT_SEEDS * ROBOT_LEVELS * num_characters;
 	if (k >= total) return -1;
 	int shard = shard_digit(10), shards = shard_digit(12);

@@ -1688,9 +1688,57 @@ static void robot_next(void) {
 	robot_begin((uint32_t)robot_k);
 }
 
+#ifdef ROBOT_SHOTS
+/* ./dev capturas (etapa 08): depois de SHOT_AT de jogo, abre o menu em cada
+ * aba, desenha de verdade e manda a tela pelo TTY em hexadecimal (linhas
+ * curtas: o DuckStation corta as longas). tools/capturas.py monta os PNGs. */
+#define SHOT_AT (75 * 60)
+static void shot(const char *name, int frames) {
+	static uint16_t rows[8 * SCREEN_W];
+	for (int k = 0; k < frames; k++) {       /* blocos do mapa montam; o buffer duplo se acerta */
+		camera_view_update(1);
+		game_draw();
+		render_end_frame();
+	}
+	printf("SHOT INICIO %s %d %d\n", name, SCREEN_W, SCREEN_H);
+	for (int y = 0; y < SCREEN_H; y += 8) {
+		render_capture_rows(y, 8, rows);
+		for (int r = 0; r < 8; r++)
+			for (int x = 0; x < SCREEN_W; x += 32) {
+				char line[32 * 4 + 1];
+				for (int i = 0; i < 32; i++)
+					sprintf(line + i * 4, "%04x", rows[r * SCREEN_W + x + i]);
+				printf("SHOT %d %d %s\n", y + r, x, line);
+			}
+	}
+	printf("SHOT FIM %s\n", name);
+}
+
+static void robot_shots(void) {
+	static const char *const tabs[] = { "mapa", "objetivo", "estatisticas", "armas", "itens" };
+	g.state = STATE_PLAY;
+	camera_snap();                           /* o robô não desenhava: câmera no lugar */
+	shot("jogo", 60);
+	for (int t = 0; t < 5; t++) {
+		menu_open(0);
+		g.menu_tab = t;
+		g.menu_cursor = 0;
+		shot(tabs[t], 3);
+	}
+	printf("SHOT TUDO\nROBO FIM\n");
+	robot_over = 1;
+}
+#endif
+
 /* Depois de CADA game_tick (o pl_tick já fechou vitória/morte) */
 static void robot_after_tick(void) {
 	if (robot_over) return;
+#ifdef ROBOT_SHOTS
+	if (g.play_frames >= SHOT_AT || g.state == STATE_WIN || g.state == STATE_DEAD) {
+		robot_shots();
+		return;
+	}
+#endif
 	const char *why = g.state == STATE_WIN ? "vitoria" : g.state == STATE_DEAD ? "morte" : NULL;
 	if (!why && g.play_frames < robot_limit_ticks(g.level)) return;
 	if (!why) {
