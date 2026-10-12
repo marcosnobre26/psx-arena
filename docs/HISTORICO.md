@@ -811,3 +811,32 @@ automatizar testes visuais.
   é sempre desenhado (o pisca também congelava na pausa); `./dev capturas`
   espera, além de nenhum inimigo a < 3 m, o jogador não estar piscando e
   não haver mensagem na tela.
+- 2026-10-11 — **Etapa 09 (floresta viva)**, branch `etapa-09-ambiente`.
+  `src/ambient.c`, SÓ VISUAL (estado fora de `g`, `fx_range`; lê posições,
+  lanterna e uma cópia dos barulhos): céu em degradê (alto escuro,
+  horizonte claro de luar, volta à névoa logo abaixo), lua com halo
+  aditivo, bandos de 3–8 pássaros (2 triângulos, 2 poses) no céu ou
+  levantando voo de uma árvore (perto ou depois de barulho forte), olhos no
+  escuro que somem com a lanterna (1 em 3 encaram antes), vulto preto que
+  atravessa recortado no céu, bicho de olhos brilhantes saltando entre
+  troncos, galho estalando (só som). `DRAW_NOFOG` no `render_mesh`. Fato
+  medido: a câmera de jogo vê só ~7° acima do horizonte (faixa de ~28 px),
+  então os pássaros voam baixo; a câmera não mudou (decisão do Marcos).
+  Achados nas capturas: pássaros quase pretos num céu quase preto não
+  apareciam → horizonte claro; olhos de 5 cm a 11 m = 1 px → 3x e 5–8 m;
+  olhos girados 180° eram descartados (face de costas); vulto com névoa
+  sumia no chão → silhueta sem névoa a 9–12 m; salto exige 2 árvores à
+  vista (sem elas o evento espera e desiste). Freio: evento novo ESPERA até
+  5 s se o quadro anterior passou de 420 linhas; o céu sempre aparece.
+  Overlay: L2 duas vezes = página AMBIENTE (atalhos de cada evento).
+  **Desempenho** (bench completo, antes → depois, pior quadro em linhas):
+  f1 419 → 420 (evento 430 → 432), f2 433 → 434 (evento 449 → 450), f3 385
+  → 384 (400 → 402), f4 407 → 408 (398 → 399), fase 5 457 → 459; sempre 30
+  FPS. Pontos novos `fN_ambiente` (multidão + céu, bando, olhos, vulto e
+  salto forçados): pior 425; ambiente 14–17 linhas e 29–35 polígonos (meta
+  ~150). SPU ~127 KB de 450 (+20,6 KB: asas, corvo, galho, folhas,
+  respiro, sintetizados). RAM 945 710 → 980 030 bytes (+34 KB); folga ~278
+  KB até 1,2 MB. `replay-test` e `robo-test` IGUAL em todos os passos.
+  **Ideia para depois:** "bando alerta os inimigos" (um bando que levanta
+  voo faria um barulho que atrai inimigos) — vira LÓGICA com `g.rng` e
+  `noise_emit`, referências regravadas; decidido deixar só visual por ora.

@@ -46,6 +46,7 @@ Depois de qualquer mudança: `./dev run` (compila e abre no emulador) ou
 | **Select** | liga/desliga a **lanterna** (a skin muda só na tela de seleção) |
 | **Start** | abre o **menu** (o jogo para): Mapa, Objetivo, Estatísticas, Armas, Itens |
 | **L2** (soltar) | depuração: névoa, memória do SPU, semente, polígonos, FPS, memória de primitivas, posição |
+| **L2 duas vezes** (rápido) | página **AMBIENTE** do overlay (etapa 09); outro toque fecha. Nela: **L2 + Quadrado** bando levanta voo, **+ Círculo** olhos no escuro, **+ X** vulto, **+ Triângulo** salto entre troncos, **+ R1** galho estalando, **+ L1** lua à frente da câmera, **+ R2** bando cruzando o céu |
 | **L2 + Start** | (com o overlay aberto) pula para a próxima fase |
 | **L2 + direcional** | (com o overlay aberto) teleporta para os 4 pontos da fase (← início, → frente da barreira de raízes, se houver, ↑ canto mais denso, ↓ saída) |
 | **L2 + Quadrado / Círculo / X / L1 / R1 / R2** | (com o overlay aberto) dispara na hora: névoa avança / árvore cai / caminho abre (mesmo sem chave) / mata fecha atrás / onda / silêncio |
@@ -632,6 +633,45 @@ monta os PNGs. Funciona igual num console de verdade.
 
 **Desempenho do menu:** `./dev bench -D BENCH_MENU=1` mede cada aba no pior
 mapa da f2, com 10 inimigos em volta e o mapa todo visto.
+
+### Floresta viva: céu, pássaros e animais (etapa 09)
+
+Tudo isto é **só visual e som** (`src/ambient.c`): não muda a partida.
+
+| Evento | O que se vê / ouve | Quando |
+|---|---|---|
+| Céu e lua | degradê do alto (escuro) ao horizonte (claro de luar); a lua de relance | sempre |
+| Bando no céu | 3–8 pássaros em silhueta cruzam o alto da tela | a cada 40–90 s |
+| Bando levanta voo | pássaros saem de uma árvore, com asas e grito | ao chegar perto de uma árvore de pouso ou depois de um barulho forte (ataque, tiro) perto |
+| Olhos | um par de olhos no escuro a 5–8 m; some com a lanterna (1 em 3 vezes encara um instante antes) | a cada 25–60 s |
+| Vulto | uma silhueta preta atravessa ao longe, recortada no céu | a cada 45–90 s |
+| Salto | um bicho de olhos brilhantes pula de um tronco para outro | a cada 35–70 s, se houver 2 árvores perto |
+| Galho | só o som de um galho estalando atrás de você | a cada 20–50 s |
+
+Para forçar cada um: L2 duas vezes (página AMBIENTE) e os botões da
+tabela de controles. Fotos: `docs/capturas/09-*.png` (`./dev capturas`).
+
+**Criar um evento de ambiente:**
+
+1. Modelo (poucas faces) em `tools/make_ambient_models.py` e som em
+   `tools/make_ambient_sounds.py` (ou do Blender/de terceiros, com o
+   `CREDITS.md`); rode os dois scripts.
+2. Em `ambient.c`: um `AM_<NOME>` no enum, o intervalo em `every_min/max`
+   (segundos), o estado numa struct dentro de `am`, a função que começa
+   (`start_...`, devolve 0 se não deu: fica esperando), o andar em
+   `ambient_update` e o desenho em `ambient_draw`.
+3. Regras: sorteios com `fx_range` (nunca `g.rng`), nada escreve em `g`;
+   som com `sound_play_at`. Silhueta no céu ou olhos no escuro: `DRAW_NOFOG`
+   (+ `DRAW_UNLIT`). Se o evento precisar mudar o jogo (ex.: assustar
+   inimigos), ele vira lógica com `g.rng` — converse antes.
+4. Um atalho na página AMBIENTE (`ambient_debug`, `debug_input` em
+   `main.c`) e, se quiser, uma foto em `robot_shots`.
+5. Confira: `./dev replay-test` e `./dev robo-test` IGUAL; `./dev bench`
+   (pontos `fN_ambiente` e a linha `BENCH ambiente`: linhas e polígonos).
+
+**Freio:** se o quadro anterior passou de 420 linhas (`AMB_CPU_LIMIT`), o
+evento que ia começar **espera** (até 5 s) e aparece quando aliviar. O céu
+sempre aparece.
 
 ## 4. Modelar no Blender
 

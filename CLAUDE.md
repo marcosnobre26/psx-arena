@@ -82,6 +82,7 @@ VERBOSE=1 ./dev build
 | `rng.c` | gerador aleatório determinístico: `g.rng` (lógica) e `fx_range` (visual) |
 | `inventory.c` | inventário (8 espaços: bandagem, kit, poção, pilha), atalho de cura no CÍRCULO, névoa de exploração (`g.seen`) |
 | `menu.c` | menu do START (`STATE_MENU`): abas Mapa (textura 4 bits da névoa), Objetivo, Estatísticas, Armas, Itens |
+| `ambient.c` | **só visual** (etapa 09): céu em degradê, lua, bandos de pássaros, olhos, vulto, salto, galho; freio por CPU |
 | `playlog.c` / `robot.c` | só em builds de depuração: registro de partida (`DEBUG_PLAYLOG`) e jogador robô (`DEBUG_ROBOT`, `./dev robo`) |
 
 Gerados no build (não edite): `build/gen/assets_gen.{h,c}` (declara
@@ -249,6 +250,15 @@ uma branch. As regras do ROADMAP (determinismo, orçamentos de desempenho,
   linhas por quadro, lendo `level_cells()`/`collide_obst_heads()`/`g.seen`
   direto (função por célula derrubava para 8 FPS). Mudou o visual do menu?
   Rode `./dev capturas` e confira as imagens.
+- **Ambiente (etapa 09):** `ambient.c` é SÓ VISUAL: estado fora de `g`,
+  `fx_range`, nunca escreve em `g`; lê posições, lanterna, estado e a cópia
+  dos barulhos (`ambient_note_noise`, chamada no `noise_emit`). Anda em
+  `ambient_update(ticks)` no laço principal (o robô não desenha: não roda).
+  Céu = 2 `POLY_G4` em `OT_LEN-1`; lua em `OT_LEN-2` (tudo cobre). Silhuetas
+  e olhos: `DRAW_NOFOG`. Freio: evento novo espera se o quadro anterior
+  passou de `AMB_CPU_LIMIT` (420). Custo medido: 14–17 linhas, ≤ 35
+  polígonos (bench `fN_ambiente`, linha `BENCH ambiente`). Câmera vê só
+  ~7° acima do horizonte (faixa de ~28 px): pássaros voam baixo.
 - Carga de fase: `start_level` desenha um quadro `CARREGANDO...` antes. Se a
   geração passar de ~1 s, divida-a entre quadros SEM rodar `game_tick` até
   o mapa ficar pronto (resultado idêntico ao de uma vez).
