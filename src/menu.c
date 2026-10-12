@@ -16,6 +16,8 @@
  *
  * Controles: L1/R1 ou esquerda/direita = aba; cima/baixo = linha;
  * X = usar/equipar; QUADRADO = largar o item no chão; CÍRCULO ou START = sair.
+ * Aba Opções (etapa 10): esquerda/direita = volume dos efeitos (ali só
+ * L1/R1 trocam de aba); X em SALVAR JOGO = salva o começo da fase.
  *
  * Desenho (menu_draw) só LÊ g. Lembrete do PS1: render_rect põe tudo na
  * entrada 1 da Ordering Table e o ÚLTIMO colocado é desenhado PRIMEIRO
@@ -28,8 +30,9 @@
 #include "game.h"
 #include "models.h"
 
-enum { TAB_MAP, TAB_GOAL, TAB_STATS, TAB_WEAPONS, TAB_ITEMS, NUM_TABS };
-static const char *const tab_names[NUM_TABS] = { "MAPA", "OBJETIVO", "ESTAT.", "ARMAS", "ITENS" };
+enum { TAB_MAP, TAB_GOAL, TAB_STATS, TAB_WEAPONS, TAB_ITEMS, TAB_OPTIONS, NUM_TABS };
+static const char *const tab_names[NUM_TABS] = { "MAPA", "OBJET.", "ESTAT.", "ARMAS", "ITENS", "OPCOES" };
+enum { OPT_SFX, OPT_SAVE, NUM_OPTS };            /* linhas da aba Opções (etapa 10) */
 
 static PLAYER *shown(void) { return &g.players[g.menu_player]; }
 
@@ -46,6 +49,7 @@ static int rows(void) {
 	switch (g.menu_tab) {
 	case TAB_WEAPONS: return owned_list(shown(), list);
 	case TAB_ITEMS:   return INV_SLOTS;
+	case TAB_OPTIONS: return NUM_OPTS;
 	}
 	return 0;
 }
@@ -68,8 +72,11 @@ void menu_update(void) {
 	uint16_t pr = in->pressed;
 	if (pr & (PAD_START | PAD_CIRCLE)) { menu_close(); return; }
 
-	if (pr & (PAD_R1 | PAD_RIGHT)) { g.menu_tab = (g.menu_tab + 1) % NUM_TABS; g.menu_cursor = 0; }
-	if (pr & (PAD_L1 | PAD_LEFT))  { g.menu_tab = (g.menu_tab + NUM_TABS - 1) % NUM_TABS; g.menu_cursor = 0; }
+	/* na aba Opções, esquerda/direita mudam o valor: ali só L1/R1 trocam de aba */
+	uint16_t next = PAD_R1, prev = PAD_L1;
+	if (g.menu_tab != TAB_OPTIONS) { next |= PAD_RIGHT; prev |= PAD_LEFT; }
+	if (pr & next) { g.menu_tab = (g.menu_tab + 1) % NUM_TABS; g.menu_cursor = 0; pr &= ~(PAD_LEFT | PAD_RIGHT); }
+	else if (pr & prev) { g.menu_tab = (g.menu_tab + NUM_TABS - 1) % NUM_TABS; g.menu_cursor = 0; pr &= ~(PAD_LEFT | PAD_RIGHT); }
 	if ((pr & PAD_SELECT) && g.num_players > 1) {       /* inventário do outro jogador */
 		for (int k = 1; k < MAX_PLAYERS; k++) {
 			int o = (g.menu_player + k) % MAX_PLAYERS;
@@ -95,6 +102,18 @@ void menu_update(void) {
 		if (pr & PAD_CROSS)  inv_use(p, g.menu_cursor);
 		if (pr & PAD_SQUARE) inv_drop(p, g.menu_cursor);
 	}
+	if (g.menu_tab == TAB_OPTIONS) {
+		if (g.menu_cursor == OPT_SFX && (pr & (PAD_LEFT | PAD_RIGHT))) {
+			/* volume dos efeitos em 10 passos (fora de g: é ajuste, não partida) */
+			int step = (sound_sfx_volume() * 10 + 64) / 128 + ((pr & PAD_RIGHT) ? 1 : -1);
+			if (step < 0) step = 0;
+			if (step > 10) step = 10;
+			sound_set_volume(step * 128 / 10, sound_music_volume());
+			sound_play(&sfx_item, VOL_ITEM);              /* para ouvir o volume novo */
+		}
+		if (g.menu_cursor == OPT_SAVE && (pr & PAD_CROSS))
+			show_message(game_save_checkpoint() == 0 ? "SALVO (INICIO DA FASE)" : "NAO SALVOU (MEMORY CARD?)", 90);
+	}
 }
 
 /* ------------------------------------------------------------------ */
@@ -112,14 +131,37 @@ static void icon(int u, int x, int y) {
 
 
 static void draw_tabs(void) {
-	int x = 24;
+	int x = 14;                                         /* 6 abas: cabem em 320 com 8 px entre elas */
 	for (int t = 0; t < NUM_TABS; t++) {
 		int w = (int)strlen(tab_names[t]) * 8;
 		if (t == g.menu_tab)
-			render_rect(x - 4, 14, w + 8, 12, 90, 70, 30, 0);   /* aba atual */
+			render_rect(x - 3, 14, w + 6, 12, 90, 70, 30, 0);   /* aba atual */
 		hud_print(x, 16, "%s", tab_names[t]);
-		x += w + 16;
+		x += w + 8;
 	}
+}
+
+/* Opções (etapa 10): volume dos efeitos e salvar (o volume da música entra
+ * com o CD-DA, etapa 01b) */
+static void draw_options(void) {
+	int y = PY + 14;
+	static const char *const names[NUM_OPTS] = { "EFEITOS", "SALVAR JOGO" };
+	int vol = (sound_sfx_volume() * 10 + 64) / 128;
+	for (int i = 0; i < NUM_OPTS; i++, y += 18) {
+		if (i == g.menu_cursor)
+			render_rect(PX + 4, y - 4, PW - 8, 14, 70, 60, 30, 0);
+		hud_print(PX + 16, y, "%s", names[i]);
+		if (i == OPT_SFX) {
+			hud_print(PX + 120, y, "<");
+			for (int k = 0; k < 10; k++)                 /* barra de 10 passos */
+				render_rect(PX + 132 + k * 9, y, 7, 7, k < vol ? 230 : 60, k < vol ? 200 : 60, k < vol ? 90 : 70, 0);
+			hud_print(PX + 226, y, "> %d%%", vol * 10);
+		}
+	}
+	y += 8;
+	hud_print(PX + 16, y, "SALVA O COMECO DESTA FASE");          y += 10;
+	hud_print(PX + 16, y, "(TAMBEM SALVA SOZINHO AO VENCER)");   y += 18;
+	hud_print(PX + 16, y, "MUSICA: NA PROXIMA VERSAO");
 }
 
 static void draw_goal(void) {
@@ -328,6 +370,7 @@ void menu_draw(void) {
 		"L1/R1 ABA   O SAIR",
 		"X EQUIPAR   L1/R1 ABA   O SAIR",
 		"X USAR  QUAD LARGAR  O SAIR",
+		"SETAS VOLUME  X SALVAR  O SAIR",
 	};
 	draw_tabs();
 	switch (g.menu_tab) {
@@ -336,6 +379,7 @@ void menu_draw(void) {
 	case TAB_STATS:   draw_stats(); break;
 	case TAB_WEAPONS: draw_weapons(); break;
 	case TAB_ITEMS:   draw_items(); break;
+	case TAB_OPTIONS: draw_options(); break;
 	}
 	hud_print(PX + 8, PY + PH + 8, "%s", help[g.menu_tab]);
 	if (g.num_players > 1)

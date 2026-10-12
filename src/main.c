@@ -1342,8 +1342,8 @@ static const int replay_menu_at[] = { 450, 1300, 2650 };
 /* Sessão de menu (também usada pelo robô em ROBOT_MENU): um botão por
  * passo; as 5 abas dão a volta e voltam à mesma (a última aba fica em g) */
 static const uint16_t menu_session[] = {
-	PAD_START, 0, PAD_R1, 0, PAD_R1, PAD_DOWN, PAD_R1, PAD_DOWN, PAD_R1, PAD_UP, PAD_R1, 0,
-	PAD_LEFT, 0, PAD_RIGHT, 0, PAD_START };
+	PAD_START, 0, PAD_R1, 0, PAD_R1, PAD_DOWN, PAD_R1, PAD_DOWN, PAD_R1, PAD_UP, PAD_R1, PAD_DOWN,
+	PAD_R1, 0, PAD_L1, 0, PAD_R1, 0, PAD_START };   /* 6 abas: R1 x6 volta à mesma */
 #define MENU_SESSION_LEN ((int)(sizeof(menu_session) / sizeof(menu_session[0])))
 static const int replay_levels[] = { 0, 1, 2, 3, 4 };
 #define REPLAY_NLEVELS ((int)(sizeof(replay_levels) / sizeof(replay_levels[0])))

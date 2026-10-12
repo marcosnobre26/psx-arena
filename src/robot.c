@@ -598,8 +598,8 @@ void robot_begin(uint32_t salt) {
  * menu e passeia pelas abas sem usar nada. O tempo do jogo não anda no menu,
  * então o hash no fim de cada partida tem que dar IGUAL ao sem menu. */
 static const uint16_t menu_session[] = {
-	PAD_START, 0, PAD_R1, 0, PAD_R1, PAD_DOWN, PAD_R1, PAD_DOWN, PAD_R1, PAD_UP, PAD_R1, 0,
-	PAD_LEFT, 0, PAD_RIGHT, 0, PAD_START };
+	PAD_START, 0, PAD_R1, 0, PAD_R1, PAD_DOWN, PAD_R1, PAD_DOWN, PAD_R1, PAD_UP, PAD_R1, PAD_DOWN,
+	PAD_R1, 0, PAD_L1, 0, PAD_R1, 0, PAD_START };   /* 6 abas: R1 x6 volta à mesma */
 #endif
 
 void robot_input(INPUT *in) {
