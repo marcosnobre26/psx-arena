@@ -47,6 +47,7 @@ static uint16_t prof_start;        /* perfil do quadro (ver render_end_frame) */
 static int      prof_cpu, prof_gpu, prof_vs;
 
 static MATRIX   view;          /* matriz da câmera (mundo -> câmera) */
+static int      clear_r, clear_g, clear_b;   /* fundo (= névoa): o céu desce até ele */
 static VECTOR   cam_pos;
 
 /* Luz direcional: cada linha aponta PARA a luz (4096 = 1.0).
@@ -316,8 +317,9 @@ int render_mesh(const MESH *m, const VECTOR *pos, const SVECTOR *rot,
 	/* Descarte rápido: longe demais ou atrás da câmera */
 	int dx = pos->vx - cam_pos.vx, dy = pos->vy - cam_pos.vy, dz = pos->vz - cam_pos.vz;
 	int r  = (m->radius * scale) >> 12;
-	if (dx > draw_dist + r || dx < -draw_dist - r ||
-	    dz > draw_dist + r || dz < -draw_dist - r)
+	const int nofog = opt->flags & DRAW_NOFOG;    /* silhueta no céu: além da névoa */
+	if (!nofog && (dx > draw_dist + r || dx < -draw_dist - r ||
+	               dz > draw_dist + r || dz < -draw_dist - r))
 		return 0;
 	/* Frustum culling: posição do centro no espaço da câmera.
 	 * Se a esfera do modelo está toda fora do campo de visão, nem processa. */
@@ -330,7 +332,7 @@ int render_mesh(const MESH *m, const VECTOR *pos, const SVECTOR *rot,
 	 * para um teste por objeto e "acenderiam" em degraus) */
 	const FOG *fog = (!(opt->flags & DRAW_FIXEDFOG) && num_lamps &&
 	                  in_lantern(pos->vx, pos->vz)) ? &fog_lamp : &fog_base;
-	if (vz - r > fog->far)
+	if (vz - r > fog->far && !nofog)
 		return 0;                                  /* inteiro dentro da névoa */
 	fog_use(fog);
 	int vx = (view.m[0][0] * dx + view.m[0][1] * dy + view.m[0][2] * dz) >> 12;
@@ -434,7 +436,7 @@ int render_mesh(const MESH *m, const VECTOR *pos, const SVECTOR *rot,
 		gte_stsz3(&z0, &z1, &z2);
 		if (z0 < NEAR_Z || z1 < NEAR_Z || z2 < NEAR_Z)
 			continue;
-		if (z0 > fog->far && z1 > fog->far && z2 > fog->far)
+		if (z0 > fog->far && z1 > fog->far && z2 > fog->far && !nofog)
 			continue;               /* sumiu na névoa: economiza a primitiva */
 
 		/* Cor da face (ou da paleta do material) */
@@ -498,7 +500,7 @@ int render_mesh(const MESH *m, const VECTOR *pos, const SVECTOR *rot,
 			setSemiTrans(pr, 1);
 
 		setRGB0(pr, cr, cg, cb);
-		if (!(opt->flags & DRAW_FLASH)) {
+		if (!(opt->flags & (DRAW_FLASH | DRAW_NOFOG))) {
 			/* IR0 (fator de névoa) veio da última projeção, de um vértice
 			 * desta face: a névoa é por face, como a cor. */
 			GTE_BARRIER();          /* setRGB0 acima escreveu na memória que gte_ldrgb lê */
@@ -925,6 +927,97 @@ void render_rect(int x, int y, int w, int h, int r, int g, int b, int semitrans)
 	nextpri += sizeof(TILE);
 }
 
+/* ------------------------------------------------------------------ */
+/* Céu e lua (etapa 09)                                                  */
+/* ------------------------------------------------------------------ */
+int render_project_dir(int dx, int dy, int dz, int *sx, int *sy) {
+	int cx = (view.m[0][0] * dx + view.m[0][1] * dy + view.m[0][2] * dz) >> 12;
+	int cy = (view.m[1][0] * dx + view.m[1][1] * dy + view.m[1][2] * dz) >> 12;
+	int cz = (view.m[2][0] * dx + view.m[2][1] * dy + view.m[2][2] * dz) >> 12;
+	if (cz <= 64) return 0;
+	*sx = SCREEN_W / 2 + (FOV_H * cx) / cz;
+	*sy = SCREEN_H / 2 + (FOV_H * cy) / cz;
+	return 1;
+}
+
+/* Horizonte: a direção "para a frente" da câmera deitada no chão (y = 0) */
+int render_horizon_y(void) {
+	int sx, sy;
+	if (!render_project_dir(view.m[2][0], 0, view.m[2][2], &sx, &sy))
+		return -1;
+	return sy;
+}
+
+/* Dois degradês no fundo da OT: do alto (escuro) até o horizonte (claro,
+ * brilho de luar: as árvores ao longe e os pássaros viram silhuetas) e, logo
+ * abaixo do horizonte, de volta à cor do fundo (névoa), sem linha dura. */
+void render_sky(int horizon_y, int tr, int tg, int tb, int hr, int hg, int hb) {
+	if (horizon_y <= 0) return;                 /* a câmera não vê céu */
+	if (horizon_y > SCREEN_H) horizon_y = SCREEN_H;
+	if (nextpri + 2 * sizeof(POLY_G4) >= fb[cur].pkt + PACKET_LEN) return;
+	const int fade = 14;                          /* faixa abaixo do horizonte */
+	POLY_G4 *p = (POLY_G4 *)nextpri;
+	setPolyG4(p);
+	setXY4(p, 0, 0, SCREEN_W, 0, 0, horizon_y, SCREEN_W, horizon_y);
+	setRGB0(p, tr, tg, tb); setRGB1(p, tr, tg, tb);   /* alto: escuro */
+	setRGB2(p, hr, hg, hb); setRGB3(p, hr, hg, hb);   /* horizonte: claro */
+	addPrim(fb[cur].ot + OT_LEN - 1, p);              /* o mais ao fundo: tudo cobre */
+	nextpri += sizeof(POLY_G4);
+	POLY_G4 *q = (POLY_G4 *)nextpri;
+	setPolyG4(q);
+	setXY4(q, 0, horizon_y, SCREEN_W, horizon_y, 0, horizon_y + fade, SCREEN_W, horizon_y + fade);
+	setRGB0(q, hr, hg, hb); setRGB1(q, hr, hg, hb);
+	setRGB2(q, clear_r, clear_g, clear_b); setRGB3(q, clear_r, clear_g, clear_b);
+	addPrim(fb[cur].ot + OT_LEN - 1, q);
+	nextpri += sizeof(POLY_G4);
+	polys += 2;
+}
+
+void render_moon(const TEXTURE *t, int sx, int sy, int size) {
+	if (sx < -size * 2 || sx > SCREEN_W + size * 2 || sy < -size * 2 || sy > SCREEN_H) return;
+	if (nextpri + sizeof(POLY_FT4) + 8 * sizeof(POLY_G3) + 2 * sizeof(DR_TPAGE) >= fb[cur].pkt + PACKET_LEN)
+		return;
+	uint32_t *ot = fb[cur].ot + OT_LEN - 2;          /* logo acima do céu */
+	/* a mesma entrada é desenhada do ÚLTIMO colocado para o primeiro: a lua
+	 * vai primeiro (fica por cima), o halo depois (fica por baixo) */
+	POLY_FT4 *q = (POLY_FT4 *)nextpri;
+	setPolyFT4(q);
+	setXYWH(q, sx - size / 2, sy - size / 2, size, size);
+	setUVWH(q, t->u0, t->v0, t->w - 1, t->h - 1);
+	setRGB0(q, 128, 128, 128);
+	q->tpage = t->tpage;
+	q->clut = t->clut;
+	addPrim(ot, q);
+	nextpri += sizeof(POLY_FT4);
+	polys++;
+
+	uint16_t add  = getTPage(0, 1, 0, 0) | (fb[cur].draw.dtd << 9);   /* abr 1 = somar */
+	uint16_t half = getTPage(0, 0, 0, 0) | (fb[cur].draw.dtd << 9);
+	DR_TPAGE *after = (DR_TPAGE *)nextpri;            /* volta ao modo 50% */
+	setDrawTPage(after, 0, 1, half);
+	addPrim(ot, after);
+	nextpri += sizeof(DR_TPAGE);
+	int g = size * 2;                                 /* halo: octógono aditivo */
+	static const int8_t dir[9][2] = { { 0, -10 }, { 7, -7 }, { 10, 0 }, { 7, 7 }, { 0, 10 },
+	                                  { -7, 7 }, { -10, 0 }, { -7, -7 }, { 0, -10 } };
+	for (int k = 0; k < 8; k++) {
+		POLY_G3 *p = (POLY_G3 *)nextpri;
+		setPolyG3(p);
+		setSemiTrans(p, 1);
+		setXY3(p, sx, sy, sx + dir[k][0] * g / 10, sy + dir[k][1] * g / 10,
+		       sx + dir[k + 1][0] * g / 10, sy + dir[k + 1][1] * g / 10);
+		setRGB0(p, 34, 36, 44);                       /* centro: claro */
+		setRGB1(p, 0, 0, 0);                          /* borda: some */
+		setRGB2(p, 0, 0, 0);
+		addPrim(ot, p);
+		nextpri += sizeof(POLY_G3);
+	}
+	DR_TPAGE *before = (DR_TPAGE *)nextpri;           /* liga o modo somar */
+	setDrawTPage(before, 0, 1, add);
+	addPrim(ot, before);
+	nextpri += sizeof(DR_TPAGE);
+}
+
 void render_sprite(const TEXTURE *t, int u, int v, int tw, int th, int x, int y, int w, int h) {
 	if (nextpri + sizeof(POLY_FT4) >= fb[cur].pkt + PACKET_LEN)
 		return;
@@ -1053,6 +1146,7 @@ void render_end_frame(void) {
 }
 
 void render_set_clear_color(int r, int g, int b) {
+	clear_r = r; clear_g = g; clear_b = b;
 	for (int i = 0; i < 2; i++)
 		setRGB0(&fb[i].draw, r, g, b);
 }
@@ -1067,6 +1161,8 @@ int render_bytes_used(void) {
 
 /* Polígonos de modelos (render_mesh) no último quadro; o HUD não conta.
  * Orçamento do roteiro: ~2 500 por quadro. */
+int render_stats_polys_now(void) { return polys; }
+
 int render_stats_polys(void) {
 	return last_polys;
 }

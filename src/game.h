@@ -654,6 +654,16 @@ void inv_quick_heal(PLAYER *p);                 /* CÍRCULO: bandagem, depois ki
 void explore_update(void);                      /* névoa de exploração (todo passo) */
 int  explore_seen(int cx, int cz);
 
+/* ambient.c (etapa 09): céu, lua, pássaros e animais. SÓ VISUAL (fx_range,
+ * nada em g). update uma vez por quadro, depois da lógica. */
+void ambient_update(int ticks);
+void ambient_draw_sky(void);                    /* céu e lua (fundo da OT) */
+void ambient_draw(void);                        /* pássaros e animais */
+void ambient_note_noise(int x, int z, int r);   /* cópia visual de um barulho (noise_emit) */
+void ambient_debug(int what);                   /* 0 bando da árvore, 1 olhos, 2 vulto, 3 salto,
+                                                   4 galho, 5 lua à frente, 6 bando no céu */
+void ambient_stats(int *active, int *polys, int *delayed, int *cpu);
+
 /* menu.c (etapa 08): menu do START */
 void menu_open(int who);                        /* who = controle que apertou START */
 void menu_update(void);                         /* um passo com o menu aberto (lógica) */

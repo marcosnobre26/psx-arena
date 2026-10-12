@@ -204,6 +204,11 @@
 #define VOL_RAIZES      0x3000
 #define VOL_VENTO       0x1400  /* loops de ambiente durante a partida */
 #define VOL_GRILOS      0x0c00
+#define VOL_AMB_ASAS    0x2400  /* ambiente (etapa 09): bando levantando voo */
+#define VOL_AMB_CORVO   0x1c00
+#define VOL_AMB_GALHO   0x2c00  /* galho estalando atrás do jogador */
+#define VOL_AMB_FOLHAS  0x2000
+#define VOL_AMB_RESPIRO 0x1800  /* olhos no escuro */
 /* rosnado: inimigo perto e fora da tela "se denuncia" de vez em quando */
 #define GROWL_DIST      1800    /* distância máxima até a câmera */
 #define GROWL_CHANCE    240     /* 1 chance em N por passo, por inimigo (~4 s) */

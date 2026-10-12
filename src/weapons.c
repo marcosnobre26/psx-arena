@@ -33,6 +33,7 @@
 void noise_emit(int x, int z, int cells) {
 	if (cells <= 0) return;
 	int r = cells * TILE_SIZE;
+	ambient_note_noise(x, z, cells);      /* cópia só para o ambiente (pássaros); não muda g */
 	if (g.nnoise < MAX_NOISES) {
 		g.noise[g.nnoise].x = x; g.noise[g.nnoise].z = z; g.noise[g.nnoise].r = r;
 		g.nnoise++;

@@ -123,6 +123,11 @@ const SOUND_DEF sound_defs[] = {
 	{ &sfx_clarao,    3,    0  },
 	{ &sfx_pisada,    2,    4  },
 	{ &sfx_grito,     3,   10  },
+	{ &sfx_asas,      1,   10  },       /* ambiente (etapa 09): só visual/som */
+	{ &sfx_corvo,     1,   12  },
+	{ &sfx_galho,     2,    8  },
+	{ &sfx_folhas,    1,   10  },
+	{ &sfx_respiro,   1,    6  },
 	{ NULL }
 };
 

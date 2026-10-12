@@ -527,6 +527,7 @@ static void lanterns_draw(int with_players) {
 }
 
 static void draw_world(int with_players) {
+	ambient_draw_sky();            /* céu e lua: no fundo da OT, tudo cobre (etapa 09) */
 	lanterns_draw(with_players);   /* antes dos modelos: eles consultam as lanternas */
 	level_draw();
 	prof_begin(PROF_OTHER);
@@ -541,6 +542,7 @@ static void draw_world(int with_players) {
 	prof_end(PROF_ENEMIES);
 	bullets_draw();
 	effects_draw();
+	ambient_draw();                /* pássaros e animais (etapa 09: só visual) */
 	if (with_players)
 		for (int i = 0; i < MAX_PLAYERS; i++)
 			player_draw(&g.players[i]);
@@ -1772,6 +1774,7 @@ static void shot(const char *name, int frames) {
 	static uint16_t rows[8 * SCREEN_W];
 	for (int k = 0; k < frames; k++) {       /* blocos do mapa montam; o buffer duplo se acerta */
 		camera_view_update(1);
+		ambient_update(1);                   /* pássaros e animais andam (etapa 09) */
 		game_draw();
 		render_end_frame();
 	}
@@ -1790,16 +1793,49 @@ static void shot(const char *name, int frames) {
 }
 
 static void robot_shots(void) {
-	static const char *const tabs[] = { "mapa", "objetivo", "estatisticas", "armas", "itens" };
+	static const char *const tabs[] = { "08-mapa", "08-objetivo", "08-estatisticas", "08-armas", "08-itens" };
 	g.state = STATE_PLAY;
 	camera_snap();                           /* o robô não desenhava: câmera no lugar */
-	shot("jogo", 60);
+	shot("08-jogo", 60);
 	for (int t = 0; t < 5; t++) {
 		menu_open(0);
 		g.menu_tab = t;
 		g.menu_cursor = 0;
 		shot(tabs[t], t == 0 ? 12 : 3);      /* o mapa monta em 8 quadros */
 	}
+	/* etapa 09: o ambiente forçado na hora, quadros suficientes para ficar
+	 * no meio da animação */
+	void camera_shot_tilt(int up);
+	g.state = STATE_PLAY;
+	ambient_debug(6);                        /* bando cruzando o céu */
+	shot("09-ceu", 95);
+	camera_shot_tilt(600);                   /* horizonte no terço de baixo da tela */
+	ambient_debug(6);
+	ambient_debug(5);                        /* lua à frente */
+	shot("09-ceu-demo", 95);
+	camera_shot_tilt(0);
+	ambient_debug(7);                        /* a lua volta ao lugar dela */
+	int lantern = g.players[0].lantern_on;
+	g.players[0].lantern_on = 0;             /* (a run acaba aqui) olhos no escuro, sem luz */
+	ambient_debug(1);
+	shot("09-olhos", 20);
+	g.players[0].lantern_on = lantern;
+	ambient_debug(2);                        /* vulto: no meio da travessia */
+	shot("09-vulto", 55);
+	{                                        /* o salto precisa de 2 árvores perto, à vista */
+		int ambient_shot_spot(int *px, int *pz, int *yaw);
+		int x, z, yaw;
+		if (ambient_shot_spot(&x, &z, &yaw)) {
+			g.players[0].pos.vx = x; g.players[0].pos.vz = z;
+			collide_track(&g.players[0]);
+			g.cam_yaw = yaw;
+			g.players[0].angle = yaw;
+			camera_snap();
+		}
+	}
+	shot("09-salto", 30);                    /* blocos do lugar novo montam */
+	ambient_debug(3);                        /* salto: no meio do arco */
+	shot("09-salto", 24);
 	printf("SHOT TUDO\nROBO FIM\n");
 	robot_over = 1;
 }
@@ -1931,8 +1967,10 @@ int main(void) {
 		continue;                      /* robô: ninguém olha; só a lógica (bem mais rápido) */
 #endif
 		/* câmera visual: segue o grupo depois da lógica (fora de g) */
-		if (g.state != STATE_TITLE && g.state != STATE_SELECT)
+		if (g.state != STATE_TITLE && g.state != STATE_SELECT) {
 			camera_view_update(ticks);
+			ambient_update(ticks);     /* céu/pássaros/animais: só visual (etapa 09) */
+		}
 		ambience_update();
 		game_draw();
 		render_end_frame();

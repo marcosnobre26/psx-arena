@@ -214,11 +214,27 @@ void camera_stats(int *tests, int *cells) {
 	*cells = cam_cells_last;
 }
 
+#ifdef ROBOT_SHOTS
+/* SÓ nas capturas (./dev capturas, 09-ceu-demo): mira mais para cima, para
+ * mostrar o céu. O jogo nunca muda a câmera assim. */
+static int shot_tilt;
+void camera_shot_tilt(int up) { shot_tilt = up; }
+#endif
+
 void camera_apply(void) {
 	/* tremor do impacto (evento): só desenho, gerador VISUAL (fx_range); lê
 	 * g.ev.shake, não muda g. Desloca a imagem, não a câmera (custo zero). */
 	int a = g.ev.shake / 4;
 	render_set_shake(a ? fx_range(-a, a) : 0, a ? fx_range(-a, a) : 0);
+#ifdef ROBOT_SHOTS
+	if (shot_tilt) {
+		VECTOR lk = look, ey = eye;
+		lk.vy -= shot_tilt;
+		ey.vy += shot_tilt / 3;                  /* olho mais baixo, olhando para cima */
+		render_set_camera(&ey, &lk);
+		return;
+	}
+#endif
 	render_set_camera(&eye, &look);
 }
 

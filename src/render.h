@@ -29,6 +29,8 @@ typedef struct {
 #define DRAW_FLASH      0x04  /* pinta tudo de branco (efeito de dano) */
 #define DRAW_NOCULL     0x08  /* desenha as duas faces do polígono */
 #define DRAW_FIXEDFOG   0x10  /* ignora a lanterna (blocos do mapa) */
+#define DRAW_NOFOG      0x20  /* sem névoa e sem limite de distância: silhuetas no
+                                 céu e olhos no escuro (etapa 09; use com DRAW_UNLIT) */
 
 typedef struct {
 	const CVECTOR *palette;  /* troca a cor por material: palette[face.mat] */
@@ -97,6 +99,15 @@ void render_texture_update4(const TEXTURE *t, const uint8_t *pix, int y0, int h,
  * as capturas do ./dev capturas; espera a GPU terminar). dst: 320*h pixels. */
 void render_capture_rows(int y0, int h, uint16_t *dst);
 
+/* Céu (etapa 09). Direção do mundo (dx,dy,dz em ONE) -> ponto da tela;
+ * 0 = atrás da câmera. Altura do horizonte na tela (pode sair da tela). */
+int  render_project_dir(int dx, int dy, int dz, int *sx, int *sy);
+int  render_horizon_y(void);
+/* Degradê do topo da tela até o horizonte, no FUNDO da OT (tudo cobre) */
+void render_sky(int horizon_y, int tr, int tg, int tb, int hr, int hg, int hb);
+/* Lua: sprite (textura 4 bits) com halo aditivo, no fundo da OT (sobre o céu) */
+void render_moon(const TEXTURE *t, int sx, int sy, int size);
+
 /* Texto na tela (fonte embutida do PSn00bSDK, só ASCII sem acentos) */
 void hud_print(int x, int y, const char *fmt, ...);
 
@@ -131,6 +142,7 @@ void render_set_clear_color(int r, int g, int b);
 int render_stats_bytes(void);
 int render_bytes_used(void);     /* bytes de primitivas já usados NESTE quadro */
 int render_stats_polys(void);
+int render_stats_polys_now(void);       /* polígonos já enviados NESTE quadro */
 /* Perfil por categoria (linhas no último quadro): só para depuração */
 enum { PROF_CHUNKS, PROF_TREES, PROF_OTHER, PROF_ENEMIES, PROF_SLOTS };
 void prof_begin(int slot);
