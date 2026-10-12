@@ -675,14 +675,15 @@ cmd_robo_test() {
 	fi
 }
 
-# Capturas de tela do menu (etapa 08): build do robô com ROBOT_SHOTS (joga
-# 75 s da f3 com o Batedor, abre cada aba e manda a tela pelo TTY);
-# tools/capturas.py monta docs/capturas/08-*.png.
+# Capturas de tela (etapas 08 e 09): build do robô com ROBOT_SHOTS (joga
+# 75 s da f3 com o Batedor, abre cada aba do menu, força cada evento de
+# ambiente e manda a tela pelo TTY); tools/capturas.py monta
+# docs/capturas/08-*.png e 09-*.png.
 cmd_capturas() {
 	ROBO_BDIR=build-shots ROBO_LOG="$ROOT/build-shots/shots.txt" ROBO_QUIET=1 ROBO_FATIAS=1 \
 		cmd_robo 1 -D ROBOT_SHOTS=1 > "$ROOT/build-shots.log" 2>&1 ||
 		{ cat "$ROOT/build-shots.log"; c_err "As capturas não rodaram."; return 1; }
-	sdk python3 tools/capturas.py build-shots/fatia-0.log docs/capturas 08- ||
+	sdk python3 tools/capturas.py build-shots/fatia-0.log docs/capturas "" ||
 		{ c_err "Sem capturas no log (build-shots/fatia-0.log)."; return 1; }
 	rm -f "$ROOT/build-shots.log"
 	c_ok "Capturas em docs/capturas/"
