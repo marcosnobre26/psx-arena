@@ -210,6 +210,7 @@ troque para `Debug` em [`CMakePresets.json`](CMakePresets.json) (`-Og`).
 | `robo-test [--save]` | 24 partidas do robô (2 sementes × 4 fases × 3 personagens), hash de `g` + mapa no fim de cada uma comparado com `tools/robo_ref.txt`: cobre dano, morte, itens, caixas e personagens, que o replay não cobre |
 | `save-test` | memory card: o robô vence a f1, salva o começo da f2, bagunça, carrega e compara o hash de `g`; save corrompido, de outra versão e cartão vazio têm que ser recusados |
 | `maratona [MIN]` | o robô joga campanhas por MIN minutos de jogo (padrão 120) **desenhando**: travamento, pools, primitivas, pilha, pior quadro, cartão (`build-soak/maratona-resumo.txt`) |
+| `redux-test` | roda o build do replay no **PCSX-Redux** sem janela e compara os 30 hashes com os do DuckStation (~6 min) |
 | `release` | build do zero e `dist/mata-escura-vX.Y.Z.{cue,bin,exe,zip}` (o `.cue` aponta para o `.bin` novo) |
 | `bench [-D N=V ...]` | benchmark automático: compila com `DEBUG_BENCHMARK` em `build-bench/` (variantes com `-D` em `build-bench-var/`), roda no DuckStation Linux, mostra a tabela (detalhes no GUIA) |
 
@@ -709,7 +710,7 @@ Só é necessário ao mudar os modelos padrão por código; o fluxo normal é ed
 - [ ] As 4 fases em sequência; game over recomeça a fase; fim de jogo volta ao título
 - [ ] Menu do START: as 6 abas; salvar pelo menu; volume dos efeitos
 - [ ] Overlay L2: FPS estável e memória de primitivas abaixo do limite
-- [ ] `.cue` inicia no DuckStation (e no PCSX-Redux, se instalado)
+- [ ] `./dev redux-test`: o replay no PCSX-Redux dá os mesmos hashes do DuckStation
 - [ ] `./dev release` e anexar `dist/` à Release do GitHub (comando em `docs/NOTAS-v0.9.md`)
 
 ### Limitações conhecidas

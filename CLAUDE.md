@@ -20,6 +20,10 @@ modificação: `docs/GUIA.md`.
   (`dev.conf`, pessoal, fora do git). A pasta de dados dele
   (`~/.local/share/duckstation`) só é LIDA (controles, BIOS); bench e
   `./dev run` usam uma cópia portátil em `build-bench/duckstation`.
+- **PCSX-Redux** (segundo emulador, testes): `~/emuladores/pcsx-redux/`, AppImage
+  do distrib.app extraído (`squashfs-root/AppRun`; no WSL não há FUSE). Sem
+  janela: `-no-ui -stdout -run -loadexe arquivo.exe` (BIOS livre embutido;
+  use um `HOME` separado). Roda perto da velocidade real (lento para o robô).
 - Blender 5.2 no Windows (`/mnt/c/Program Files/Blender Foundation/...`).
 
 ## Comandos
@@ -44,6 +48,7 @@ modificação: `docs/GUIA.md`.
 ./dev save-test                              # memory card: salvar, carregar, hash de g IGUAL, save inválido recusado
 ./dev maratona [MIN]                         # robô joga MIN min (120) DESENHANDO: travou? pools? pilha? pior quadro?
 ./dev release                                # build do zero + dist/mata-escura-vX.Y.Z.{cue,bin,exe,zip}
+./dev redux-test                             # o replay no PCSX-Redux sem janela: hashes iguais aos do DuckStation? (~6 min)
 ./dev bench -D BENCH_MENU=1                  # cada aba do menu aberta no pior mapa da f2
 ./dev clean          # apaga build/
 VERBOSE=1 ./dev build

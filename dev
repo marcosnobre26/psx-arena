@@ -14,6 +14,7 @@
 #   ./dev save-test       memory card: salva, carrega e compara o hash de g
 #   ./dev maratona [MIN]  robô joga MIN minutos (120) desenhando: travou? pools? memória?
 #   ./dev release         build do zero + dist/mata-escura-vX.Y.Z.{cue,bin,exe,zip}
+#   ./dev redux-test      o replay no PCSX-Redux (sem janela): hashes iguais aos do DuckStation?
 #   ./dev models         exporta os .blend de assets/blender/ para models/ (Blender do Windows)
 #   ./dev watch          recompila sozinho sempre que você salvar um arquivo
 #   ./dev clean          apaga a pasta build/
@@ -44,6 +45,7 @@ SDK_DIR="/opt/psn00bsdk"
 DUCKSTATION_LINUX="$HOME/emuladores/duckstation/AppRun"   # ./dev bench
 DUCKSTATION_DATA="$HOME/.local/share/duckstation"         # de onde vêm config e BIOS
 BENCH_TIMEOUT=${BENCH_TIMEOUT:-300}                         # segundos
+PCSX_REDUX="$HOME/emuladores/pcsx-redux/squashfs-root/AppRun"   # ./dev redux-test (AppImage extraído)
 
 # Configuração pessoal (não vai para o git)
 if [[ ! -f dev.conf && -f dev.conf.example ]]; then
@@ -731,6 +733,33 @@ cmd_release() {
 	c_ok "Release em dist/ ($name). Publique com o comando do docs/NOTAS-v0.9.md."
 }
 
+# PCSX-Redux (etapa 10): roda o build do replay no PCSX-Redux sem janela
+# (-no-ui -stdout, BIOS livre embutido) e compara os 30 hashes com a
+# referência do DuckStation: a lógica tem que dar igual nos dois. ~6 min
+# (ele roda perto da velocidade real). HOME separado: nada vai para a sua pasta.
+cmd_redux_test() {
+	if [[ ! -x "$PCSX_REDUX" ]]; then
+		c_err "PCSX-Redux não encontrado em $PCSX_REDUX (veja docs/GUIA.md: Emuladores)."; return 1
+	fi
+	cmd_bench -D BENCH_REPLAY=1 > "$ROOT/build-replay.log" 2>&1 ||
+		{ cat "$ROOT/build-replay.log"; c_err "O build do replay falhou."; return 1; }
+	rm -f "$ROOT/build-replay.log"
+	local dir; dir="$(dirname "$(dirname "$PCSX_REDUX")")"
+	local log="$ROOT/build-bench-var/redux.log"
+	mkdir -p "$dir/home-teste"
+	c_info "Rodando o replay no PCSX-Redux (sem janela, ~6 min)..."
+	( cd "$dir" && HOME="$dir/home-teste" timeout 900 "$PCSX_REDUX" -no-ui -stdout -run \
+		-loadexe "$ROOT/build-bench-var/arena.exe" > "$log" 2>&1 ) || true
+	local got; got="$(grep -o 'BENCH REPLAY .*' "$log" | sed 's/^BENCH REPLAY //' | tr -d '\r')"
+	if diff <(printf '%s\n' "$got") "$ROOT/tools/replay_ref.txt" > /dev/null; then
+		c_ok "PCSX-REDUX IGUAL: $(wc -l < "$ROOT/tools/replay_ref.txt") hashes iguais aos do DuckStation"
+	else
+		c_err "PCSX-REDUX DIFERENTE ($(printf '%s\n' "$got" | grep -c hash=) hashes; log: $log)"
+		diff <(printf '%s\n' "$got") "$ROOT/tools/replay_ref.txt" | head -6
+		return 1
+	fi
+}
+
 # Teste do memory card (etapa 10): o robô vence a f1, começa a f2, salva,
 # bagunça, carrega e compara o hash de g; save estragado, de outra versão e
 # cartão vazio têm que ser recusados sem mudar nada. Cartão da cópia
@@ -786,5 +815,6 @@ case "${1:-build}" in
 	save-test) cmd_save_test ;;
 	maratona) shift; cmd_maratona "$@" ;;
 	release) cmd_release ;;
-	*)      sed -n '3,27p' "$0" | sed 's/^#//' ;;
+	redux-test) cmd_redux_test ;;
+	*)      sed -n '3,28p' "$0" | sed 's/^#//' ;;
 esac

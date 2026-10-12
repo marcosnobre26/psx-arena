@@ -107,7 +107,8 @@ memória); **1 duas vezes** abre a página AMBIENTE; com o overlay aberto,
 - [ ] Overlay **1**: FPS 30 nas partes mais densas de cada fase.
   *Pergunta:* viu queda, "câmera lenta" ou tremida em algum lugar? Anote a
   fase e a SEED que aparece no overlay.
-- [ ] **PCSX-Redux:** não foi testado (o GitHub do projeto não publica o
-  AppImage; ver `docs/NOTAS-v0.9.md`). Se quiser, instale e abra o
-  `dist/mata-escura-v0.9.0.cue`. *Pergunta:* abriu igual ao DuckStation?
+- [ ] **PCSX-Redux:** já testado sem janela (replay com hashes iguais,
+  save-test OK, telas iguais). Se quiser ver com os seus olhos: abra
+  `~/emuladores/pcsx-redux/PCSX-Redux-HEAD-x86_64.AppImage` e carregue o
+  `dist/mata-escura-v0.9.0.cue`. *Pergunta:* os controles e o som estão ok nele?
 - [ ] **Console real (CD-R),** se tiver: o mesmo `.cue/.bin`.

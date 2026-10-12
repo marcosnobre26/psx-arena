@@ -38,3 +38,7 @@ USE_DOCKER=1
 #DUCKSTATION_LINUX="$HOME/emuladores/duckstation/AppRun"
 #DUCKSTATION_DATA="$HOME/.local/share/duckstation"
 #BENCH_TIMEOUT=300
+
+# PCSX-Redux (./dev redux-test): o AppImage do distrib.app (indicado pelo site
+# do projeto) extraído com --appimage-extract (no WSL não há FUSE).
+#PCSX_REDUX="$HOME/emuladores/pcsx-redux/squashfs-root/AppRun"

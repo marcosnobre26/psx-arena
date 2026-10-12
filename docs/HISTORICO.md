@@ -911,3 +911,18 @@ automatizar testes visuais.
   `dist/mata-escura-v0.9.0.{cue,bin,exe,zip}`; notas e comando `gh release
   create` em `docs/NOTAS-v0.9.md`; teste final do Marcos em
   `docs/TESTE-FINAL.md`; diferenças do manual em `docs/MANUAL-MUDANCAS.md`.
+- 2026-10-12 — Etapa 10, revisão das capturas. Título: câmera FIXA e baixa
+  (1,6 m) escolhida uma vez por mapa (só visual): ponto de trilha com o
+  caminho livre à frente (sem caixa, mata, tronco) e o máximo de pinheiros a
+  6–14 m no quadro, olhando 5° acima do horizonte com balanço lento; lua do
+  título no alto à direita; faixas escuras só atrás do texto; no título os
+  blocos são montados em volta da câmera. Estatísticas: PONTOS na coluna
+  TOTAL. **PCSX-Redux** (autorizado pelo Marcos: AppImage do distrib.app,
+  build `54e83a9c`, SHA-1/MD5 conferidos com o manifesto; extraído com
+  `--appimage-extract`, sem FUSE no WSL): roda SEM janela (`-no-ui -stdout
+  -run -loadexe`, BIOS livre embutido, `HOME` separado). Replay: **30
+  hashes iguais** aos do DuckStation; save-test **OK** (o memory card
+  funciona também com o OpenBIOS); capturas: 1–6 pixels diferentes em 76 800
+  por tela (borda de polígono). Limite: ~velocidade real (sem modo ilimitado
+  sem janela), por isso o robô/maratona continuam no DuckStation. Novo
+  `./dev redux-test`. replay-test e robo-test IGUAL.

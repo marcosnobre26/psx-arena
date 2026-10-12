@@ -47,6 +47,7 @@ outro emulador de PS1; ou grave `.cue/.bin` num CD-R para um console. O
 | Maratona (robô, 2 h de jogo desenhando) | sem travar; 41 fases; pools com folga; pilha ~1,3 KB; 0 quadros abaixo de 30 FPS |
 | Memory card (`./dev save-test`) | carregar dá o **mesmo estado** (hash igual); save corrompido/de outra versão recusado |
 | Lógica (`replay-test`, `robo-test`) | iguais às referências |
+| PCSX-Redux (além do DuckStation) | replay com os **30 hashes iguais**, save-test OK (com o BIOS livre dele), telas iguais (1–6 pixels de 76 800) |
 | RAM / SPU | ~977 KB de 2 MB (orçamento 1,2 MB) / ~127 KB de 450 KB |
 
 ## Limitações conhecidas
@@ -54,7 +55,7 @@ outro emulador de PS1; ou grave `.cue/.bin` num CD-R para um console. O
 - Sem música (v1.0). O save guarda o **começo** da fase atual.
 - Sem recorte de polígonos no plano próximo; ordenação por profundidade média
   (sobreposições ocasionais, típicas do PS1).
-- Testado no DuckStation; **não** testado no PCSX-Redux nem em console real.
+- Testado no DuckStation e no PCSX-Redux; **não** testado em console real.
 - Modo link (2 consoles) ainda não existe.
 
 ## Publicar no GitHub (para o Marcos)
