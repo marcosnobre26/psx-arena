@@ -876,6 +876,32 @@ static void debug_input(INPUT *in) {
 /* ------------------------------------------------------------------ */
 /* Benchmark automático (./dev bench)                                  */
 /* ------------------------------------------------------------------ */
+#if defined(BENCH_REPLAY) || defined(ROBOT_HASH)
+/* Hash de g + mapa (células, árvores, alcance): replay-test e robo-test */
+static uint32_t fnv(uint32_t h, const void *p, int n) {
+	const uint8_t *b = (const uint8_t *)p;
+	for (int i = 0; i < n; i++) h = (h ^ b[i]) * 16777619u;
+	return h;
+}
+
+static uint32_t replay_hash(void) {
+	uint32_t h = fnv(2166136261u, &g, sizeof(g));
+	const uint8_t (*c)[MAP_MAX_W] = level_cells();
+	for (int z = 0; z < level_height(); z++)
+		h = fnv(h, c[z], level_width());
+	int x, z, t;
+	for (int i = 0; (t = level_tree_get(i, &x, &z)) >= 0; i++) {
+		int v[3] = { t, x, z };
+		h = fnv(h, v, sizeof(v));
+	}
+	for (int zz = 0; zz < level_height(); zz++)
+		for (int xx = 0; xx < level_width(); xx++)
+			h = (h ^ (uint32_t)reach_get(xx, zz)) * 16777619u;
+	return h;
+}
+
+#endif
+
 #ifdef DEBUG_BENCHMARK
 /*
  * O jogo mede sozinho: começa direto na fase de teste (semente fixa), passa
@@ -1184,28 +1210,6 @@ static void bench_survive_fill(void) {
 static struct { int level, t, done; } rp;
 static const int replay_levels[] = { 0, 1, 2, 3, 4 };
 #define REPLAY_NLEVELS ((int)(sizeof(replay_levels) / sizeof(replay_levels[0])))
-
-static uint32_t fnv(uint32_t h, const void *p, int n) {
-	const uint8_t *b = (const uint8_t *)p;
-	for (int i = 0; i < n; i++) h = (h ^ b[i]) * 16777619u;
-	return h;
-}
-
-static uint32_t replay_hash(void) {
-	uint32_t h = fnv(2166136261u, &g, sizeof(g));
-	const uint8_t (*c)[MAP_MAX_W] = level_cells();
-	for (int z = 0; z < level_height(); z++)
-		h = fnv(h, c[z], level_width());
-	int x, z, t;
-	for (int i = 0; (t = level_tree_get(i, &x, &z)) >= 0; i++) {
-		int v[3] = { t, x, z };
-		h = fnv(h, v, sizeof(v));
-	}
-	for (int zz = 0; zz < level_height(); zz++)
-		for (int xx = 0; xx < level_width(); xx++)
-			h = (h ^ (uint32_t)reach_get(xx, zz)) * 16777619u;
-	return h;
-}
 
 static void replay_begin_level(void) {
 	int lv = replay_levels[rp.level];
@@ -1664,6 +1668,10 @@ static void robot_after_tick(void) {
 		pl_end(why);
 	}
 	robot_report(why);
+#ifdef ROBOT_HASH                            /* ./dev robo-test: estado final da partida */
+	printf("ROBO HASH k=%d fase=%d semente=%08x personagem=%d motivo=%s t=%d hash=%08x\n", robot_k,
+	       g.level + 1, (unsigned)g.seed, g.players[0].character, why, g.play_frames, (unsigned)replay_hash());
+#endif
 	robot_next();
 }
 #endif
