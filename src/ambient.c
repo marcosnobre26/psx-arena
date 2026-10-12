@@ -10,12 +10,14 @@
  *
  * Pilar "ver pouco, ouvir muito": os animais inquietam, não enfeitam.
  *   CÉU     degradê do alto da tela até o horizonte + lua de relance
- *   BANDO   3-8 pássaros (2 triângulos cada) cruzam a faixa de céu no alto
- *           da tela, ou LEVANTAM VOO de uma árvore quando o jogador chega
+ *   BANDO   3-8 pássaros (2 triângulos cada) cruzam a faixa clara do
+ *           horizonte a 6-8 m, ou passam RASANTES pela área da lanterna, ou
+ *           LEVANTAM VOO de uma árvore quando o jogador chega
  *           perto ou há um barulho forte (ataque, tiro). Silhuetas sem névoa.
  *   OLHOS   um par de olhos no escuro a 5-8 m; some quando a lanterna
  *           aponta (1 em 3 vezes ENCARA um instante antes de sumir)
- *   VULTO   uma silhueta preta atravessa ao longe (9-12 m), recortada no céu
+ *   VULTO   uma figura pálida (~2,4 m), meio dissolvida na névoa, atravessa
+ *           depressa a 4-5,5 m (olhos escuros)
  *   SALTO   um bicho pula de um tronco para outro, num arco
  *   GALHO   só som: um galho estala atrás do jogador
  *
@@ -57,7 +59,7 @@ static struct {
 	int      last_polys, delayed;   /* medidas (bench/overlay) */
 	/* bando */
 	struct {
-		int active, t, life, n;
+		int active, t, life, n, scale;
 		int x, y, z, vx, vy, vz;
 		int16_t ox[MAX_BIRDS], oy[MAX_BIRDS], oz[MAX_BIRDS], ph[MAX_BIRDS];
 	} fl;
@@ -129,13 +131,18 @@ static int tree_near(int x, int z, int rmin, int rmax, int *tx, int *tz, int ski
 	return tree_pick(x, z, rmin, rmax, tx, tz, skip_x, skip_z, 0);
 }
 
-static void start_flock(int from_tree, int tx, int tz) {
+enum { FLOCK_HORIZON, FLOCK_TREE, FLOCK_LOW };
+
+static void start_flock(int mode, int tx, int tz) {
 	const PLAYER *p = me();
 	const VECTOR *eye = camera_eye();
 	am.fl.active = 1;
 	am.fl.t = 0;
 	am.fl.n = rnd(3, MAX_BIRDS);
-	if (from_tree) {                              /* levanta voo: para longe do jogador */
+	int s = isin(g.cam_yaw), c = icos(g.cam_yaw), side = rnd(0, 1) ? 1 : -1;
+	int spread = 260, spread_y = 120;
+	am.fl.scale = ONE * 2;                        /* ~1,4 m de asa: corvo */
+	if (mode == FLOCK_TREE) {                     /* levanta voo: para longe do jogador */
 		int a = angle_of(tx - p->pos.vx, tz - p->pos.vz) + rnd(-300, 300);
 		am.fl.x = tx; am.fl.z = tz; am.fl.y = -900;
 		am.fl.vx = (isin(a & 4095) * 14) >> 12;
@@ -144,24 +151,43 @@ static void start_flock(int from_tree, int tx, int tz) {
 		am.fl.life = 170;
 		sound_play_at(&sfx_asas, tx, tz, VOL_AMB_ASAS);
 		sound_play_at(&sfx_corvo, tx, tz, VOL_AMB_CORVO);
-	} else {                                      /* cruza a faixa de céu no alto da tela */
-		int s = isin(g.cam_yaw), c = icos(g.cam_yaw);
-		int d = rnd(1800, 2800), side = rnd(0, 1) ? 1 : -1;
-		/* altura: um pouco acima do horizonte visto do olho (2-4 graus) */
-		int up = (d * rnd(35, 70)) / 1000;
-		am.fl.x = eye->vx + ((s * d) >> 12) - ((c * 1500 * side) >> 12);
-		am.fl.z = eye->vz + ((c * d) >> 12) + ((s * 1500 * side) >> 12);
-		am.fl.y = eye->vy - up;
-		am.fl.vx = (c * 16 * side) >> 12;
-		am.fl.vz = -(s * 16 * side) >> 12;
+	} else if (mode == FLOCK_HORIZON) {
+		/* cruza a FAIXA CLARA do horizonte (a câmera de jogo vê só ~7 graus
+		 * acima dele): a 6-8 m do olho, quase na altura dele. Um ponto h
+		 * acima do olho a d aparece ~160*h/d px acima do horizonte. */
+		int d = rnd(1500, 2000), o = rnd(-10, 2);   /* o: px acima(-)/abaixo(+) do horizonte */
+		int lat = d * 115 / 100;                     /* começa fora da tela, de lado */
+		am.fl.x = eye->vx + ((s * d) >> 12) - ((c * lat * side) >> 12);
+		am.fl.z = eye->vz + ((c * d) >> 12) + ((s * lat * side) >> 12);
+		am.fl.y = eye->vy + (o * d) / 160;
+		am.fl.vx = (c * 18 * side) >> 12;
+		am.fl.vz = -(s * 18 * side) >> 12;
 		am.fl.vy = 0;
-		am.fl.life = 200;
+		am.fl.life = 2 * lat / 18;
+		spread = 200; spread_y = 50;
+		am.fl.n = rnd(5, MAX_BIRDS);                 /* bando cheio: alguns somem atrás das copas */
 		if (rnd(0, 2) == 0) sound_play_at(&sfx_corvo, am.fl.x, am.fl.z, VOL_AMB_CORVO / 2);
+	} else {
+		/* RASANTE: 0,4-0,7 m do chão, 3,5-5 m à frente do jogador (na ponta
+		 * do cone da lanterna, sem o corpo dele na frente), atravessando
+		 * depressa: silhuetas escuras sobre o chão claro */
+		int d = rnd(900, 1250), lat = 1400;         /* além do jogador (não é tapado por ele) */
+		s = isin(p->angle); c = icos(p->angle);      /* para onde o jogador olha: a lanterna */
+		am.fl.x = p->pos.vx + ((s * d) >> 12) - ((c * lat * side) >> 12);
+		am.fl.z = p->pos.vz + ((c * d) >> 12) + ((s * lat * side) >> 12);
+		am.fl.y = -rnd(100, 180);                  /* baixo: sobre a ponta iluminada do cone */
+		am.fl.vx = (c * 26 * side) >> 12;
+		am.fl.vz = -(s * 26 * side) >> 12;
+		am.fl.vy = 0;
+		am.fl.life = 2 * lat / 26;
+		spread = 400; spread_y = 40;                 /* espalhado sobre o chão claro */
+		am.fl.scale = ONE * 5 / 2;
+		sound_play_at(&sfx_asas, p->pos.vx + ((s * d) >> 12), p->pos.vz + ((c * d) >> 12), VOL_AMB_ASAS / 2);
 	}
 	for (int i = 0; i < am.fl.n; i++) {
-		am.fl.ox[i] = (int16_t)rnd(-260, 260);
-		am.fl.oy[i] = (int16_t)rnd(-120, 120);
-		am.fl.oz[i] = (int16_t)rnd(-260, 260);
+		am.fl.ox[i] = (int16_t)rnd(-spread, spread);
+		am.fl.oy[i] = (int16_t)rnd(-spread_y, spread_y);
+		am.fl.oz[i] = (int16_t)rnd(-spread, spread);
 		am.fl.ph[i] = (int16_t)rnd(0, 15);
 	}
 }
@@ -192,11 +218,11 @@ static int start_eyes(void) {
 
 static int start_shadow(void) {
 	int x, z;
-	ahead(rnd(2400, 3000), 200, &x, &z);       /* além do chão visível: recorta no céu */
+	ahead(rnd(1100, 1400), 200, &x, &z);       /* 4-5,5 m do jogador: a névoa dissolve pela metade */
 	int s = isin(g.cam_yaw), c = icos(g.cam_yaw), side = rnd(0, 1) ? 1 : -1;
-	am.sh.active = 1; am.sh.t = 0; am.sh.life = 110;
-	am.sh.vx = (c * 22 * side) >> 12;             /* atravessa de lado */
-	am.sh.vz = -(s * 22 * side) >> 12;
+	am.sh.active = 1; am.sh.t = 0; am.sh.life = 72;    /* ~1,2 s em cena */
+	am.sh.vx = (c * 30 * side) >> 12;             /* atravessa de lado, depressa */
+	am.sh.vz = -(s * 30 * side) >> 12;
 	am.sh.x = x - am.sh.vx * am.sh.life / 2;
 	am.sh.z = z - am.sh.vz * am.sh.life / 2;
 	sound_play_at(&sfx_folhas, x, z, VOL_AMB_FOLHAS);
@@ -228,13 +254,13 @@ static int try_start(int k) {
 	switch (k) {
 	case AM_FLOCK_SKY:
 		if (am.fl.active) return 0;
-		start_flock(0, 0, 0);
+		start_flock(rnd(0, 1) ? FLOCK_HORIZON : FLOCK_LOW, 0, 0);   /* meio a meio */
 		return 1;
 	case AM_FLOCK_TREE: {
 		int tx, tz;
 		if (am.fl.active) return 0;
 		if (!tree_near(me()->pos.vx, me()->pos.vz, 0, 1400, &tx, &tz, -1, -1)) return 0;
-		start_flock(1, tx, tz);
+		start_flock(FLOCK_TREE, tx, tz);
 		return 1;
 	}
 	case AM_EYES:   return !am.ey.active && start_eyes();
@@ -328,8 +354,12 @@ void ambient_draw_sky(void) {
 	/* lua: um pouco acima do horizonte, numa direção fixa por mapa */
 	int az = am.moon_front ? g.cam_yaw : am.moon_az;
 	int sx, sy;
-	if (h > 0 && render_project_dir(isin(az), -260, icos(az), &sx, &sy))
-		render_moon(&tex_lua_t, sx, sy, 18);
+	if (h > 0 && render_project_dir(isin(az), -260, icos(az), &sx, &sy)) {
+		/* nunca por baixo do HUD (barras no alto: esquerda, e direita com 2 jogadores) */
+		int under_hud = sy < 64 && (sx < 150 || (g.num_players > 1 && sx > 170));
+		if (!under_hud)
+			render_moon(&tex_lua_t, sx, sy, 18);
+	}
 	prof_end(PROF_AMBIENT);
 }
 
@@ -346,7 +376,7 @@ void ambient_draw(void) {
 		for (int i = 0; i < am.fl.n; i++) {
 			int flap = ((am.fl.t + am.fl.ph[i]) >> 2) & 1;      /* bate as asas */
 			VECTOR pos = { am.fl.x + am.fl.ox[i], am.fl.y + am.fl.oy[i] + (flap ? 6 : -6), am.fl.z + am.fl.oz[i] };
-			render_mesh(flap ? &passaro_a_mesh : &passaro_b_mesh, &pos, &rot, ONE * 2, &sil);   /* ~1,4 m de asa: corvo */
+			render_mesh(flap ? &passaro_a_mesh : &passaro_b_mesh, &pos, &rot, am.fl.scale, &sil);
 		}
 	}
 	if (am.ey.active && ((am.ey.t / 6) % 16) != 15) {          /* pisca de vez em quando */
@@ -358,9 +388,17 @@ void ambient_draw(void) {
 		render_mesh(&olhos_mesh, &pos, &rot, ONE * 3, &eo);        /* algo grande */
 	}
 	if (am.sh.active) {
-		SVECTOR rot = { 0, angle_of(am.sh.vx, am.sh.vz) + 2048, 0 };
+		const PLAYER *pl = me();                /* desliza de lado, OLHANDO para o jogador */
+		SVECTOR rot = { 0, angle_of(pl->pos.vx - am.sh.x, pl->pos.vz - am.sh.z), 0 };
 		VECTOR pos = { am.sh.x, 0, am.sh.z };
-		render_mesh(&vulto_mesh, &pos, &rot, ONE, &sil);          /* silhueta preta, sem névoa */
+		/* PÁLIDO e com névoa: no escuro, preto não se lê; uma figura clara
+		 * meio dissolvida na névoa, de olhos escuros, é notada de relance */
+		static const CVECTOR vpal[2] = { { 150, 150, 165 }, { 10, 6, 6 } };
+		DRAWOPT vo = { 0 };
+		vo.flags = DRAW_UNLIT | DRAW_NOCULL;
+		vo.palette = vpal;
+		vo.npalette = 2;
+		render_mesh(&vulto_mesh, &pos, &rot, ONE * 13 / 10, &vo);  /* ~2,4 m */
 	}
 	if (am.jp.active) {
 		int t = am.jp.t, L = am.jp.life;
@@ -406,7 +444,14 @@ void ambient_debug(int what) {
 	case 3: am.jp.active = 0; try_start(AM_JUMP); break;
 	case 4: try_start(AM_BRANCH); break;
 	case 5: am.moon_front = S(10); break;
-	case 6: am.fl.active = 0; try_start(AM_FLOCK_SKY); break;
+	case 6: {                                   /* R2: alterna horizonte / rasante */
+		static int alt;
+		am.fl.active = 0;
+		start_flock((alt ^= 1) ? FLOCK_HORIZON : FLOCK_LOW, 0, 0);
+		break;
+	}
+	case 8: am.fl.active = 0; start_flock(FLOCK_HORIZON, 0, 0); break;   /* capturas */
+	case 9: am.fl.active = 0; start_flock(FLOCK_LOW, 0, 0); break;
 	case 7: am.moon_front = 0; break;
 	}
 }

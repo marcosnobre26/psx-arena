@@ -9,7 +9,7 @@ Saída (nomes FIXOS: para trocar por um modelo do Blender, exporte um objeto
 com o mesmo nome na coleção PSX; o código não muda):
     models/passaro_a.h   pássaro, asas para CIMA   (2 triângulos)
     models/passaro_b.h   pássaro, asas para BAIXO  (2 triângulos)
-    models/vulto.h       silhueta alta e magra que cruza a trilha ao longe (~12 faces)
+    models/vulto.h       silhueta alta e magra com olhos fracos (~14 faces)
     models/bicho.h       bicho pequeno que salta entre troncos (~10 faces, olhos que brilham)
     models/olhos.h       par de olhos que brilham no escuro (2 quads, sem luz)
     assets/textures/lua-4bit.png   a lua, 32x32 (fundo transparente)
@@ -45,12 +45,16 @@ def make_passaro(up):
 
 
 def make_vulto():
-    """Alto e magro, ombros caídos: lê-se como 'alguém' de longe."""
-    s = Shape(["Corpo"])
+    """Alto e magro, ombros caídos: lê-se como 'alguém' de longe. Dois olhos
+    fracos (sem luz): no escuro é o que se nota de relance."""
+    s = Shape(["Corpo", "Olhos"])
     s.box(-0.16, -0.10, 0.0, 0.16, 0.10, 1.55, BLACK, 0)          # corpo (5)
     s.box(-0.11, -0.12, 1.55, 0.11, 0.08, 1.85, BLACK, 0)         # cabeça (5)
     s.poly([(-0.16, 0, 1.5), (-0.30, 0, 0.8), (-0.24, 0, 0.75)], BLACK, 0, outward=(0, -1, 0))
     s.poly([(0.16, 0, 1.5), (0.30, 0, 0.8), (0.24, 0, 0.75)], BLACK, 0, outward=(0, -1, 0))
+    for x in (-0.05, 0.05):                                        # olhos (2), sem luz
+        s.poly([(x - 0.025, -0.125, 1.72), (x + 0.025, -0.125, 1.72), (x + 0.025, -0.125, 1.76),
+                (x - 0.025, -0.125, 1.76)], (190, 40, 30), 1, outward=(0, -1, 0), unlit=True)
     return s
 
 

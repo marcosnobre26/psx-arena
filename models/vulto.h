@@ -1,11 +1,11 @@
 /* Gerado por tools/blender_export_psx.py a partir de: tools/make_default_assets.py
- * 46 vertices, 12 faces. Nao edite a mao: exporte de novo.
+ * 54 vertices, 14 faces. Nao edite a mao: exporte de novo.
  */
 #ifndef VULTO_MESH_H
 #define VULTO_MESH_H
 #include "mesh.h"
 
-static const SVECTOR vulto_verts[46] = {
+static const SVECTOR vulto_verts[54] = {
 	{ 41, 0, 26, 0 },
 	{ -41, 0, 26, 0 },
 	{ -41, -397, 26, 0 },
@@ -52,6 +52,14 @@ static const SVECTOR vulto_verts[46] = {
 	{ -41, -384, 0, 0 },
 	{ -61, -192, 0, 0 },
 	{ -77, -205, 0, 0 },
+	{ 19, -440, 32, 0 },
+	{ 6, -440, 32, 0 },
+	{ 6, -451, 32, 0 },
+	{ 19, -451, 32, 0 },
+	{ -6, -440, 32, 0 },
+	{ -19, -440, 32, 0 },
+	{ -19, -451, 32, 0 },
+	{ -6, -451, 32, 0 },
 };
 
 static const SVECTOR vulto_norms[5] = {
@@ -62,7 +70,7 @@ static const SVECTOR vulto_norms[5] = {
 	{ 0, -4096, 0, 0 },
 };
 
-static const MESH_FACE vulto_faces[12] = {
+static const MESH_FACE vulto_faces[14] = {
 	/* { v0,v1,v2,v3 }, r,g,b, flags, material, 0, { u0,v0,u1,v1,u2,v2,u3,v3 }, normal */
 	{ { 0, 3, 1, 2 }, 12, 12, 14, 0x01, 0, 0, { 0, 0, 0, 0, 0, 0, 0, 0 }, 0 },
 	{ { 4, 7, 5, 6 }, 12, 12, 14, 0x01, 0, 0, { 0, 0, 0, 0, 0, 0, 0, 0 }, 1 },
@@ -76,10 +84,12 @@ static const MESH_FACE vulto_faces[12] = {
 	{ { 36, 39, 37, 38 }, 12, 12, 14, 0x01, 0, 0, { 0, 0, 0, 0, 0, 0, 0, 0 }, 4 },
 	{ { 40, 42, 41, 0 }, 12, 12, 14, 0x00, 0, 0, { 0, 0, 0, 0, 0, 0, 0, 0 }, 0 },
 	{ { 43, 45, 44, 0 }, 12, 12, 14, 0x00, 0, 0, { 0, 0, 0, 0, 0, 0, 0, 0 }, 0 },
+	{ { 46, 49, 47, 48 }, 190, 40, 30, 0x05, 1, 0, { 0, 0, 0, 0, 0, 0, 0, 0 }, 0 },
+	{ { 50, 53, 51, 52 }, 190, 40, 30, 0x05, 1, 0, { 0, 0, 0, 0, 0, 0, 0, 0 }, 0 },
 };
 
 const MESH vulto_mesh = {
-	46, 12, vulto_verts, vulto_norms, vulto_faces, 476
+	54, 14, vulto_verts, vulto_norms, vulto_faces, 476
 };
 
 #endif

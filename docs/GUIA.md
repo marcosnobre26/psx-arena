@@ -46,7 +46,7 @@ Depois de qualquer mudança: `./dev run` (compila e abre no emulador) ou
 | **Select** | liga/desliga a **lanterna** (a skin muda só na tela de seleção) |
 | **Start** | abre o **menu** (o jogo para): Mapa, Objetivo, Estatísticas, Armas, Itens |
 | **L2** (soltar) | depuração: névoa, memória do SPU, semente, polígonos, FPS, memória de primitivas, posição |
-| **L2 duas vezes** (rápido) | página **AMBIENTE** do overlay (etapa 09); outro toque fecha. Nela: **L2 + Quadrado** bando levanta voo, **+ Círculo** olhos no escuro, **+ X** vulto, **+ Triângulo** salto entre troncos, **+ R1** galho estalando, **+ L1** lua à frente da câmera, **+ R2** bando cruzando o céu |
+| **L2 duas vezes** (rápido) | página **AMBIENTE** do overlay (etapa 09); outro toque fecha. Nela: **L2 + Quadrado** bando levanta voo, **+ Círculo** olhos no escuro, **+ X** vulto, **+ Triângulo** salto entre troncos, **+ R1** galho estalando, **+ L1** lua à frente da câmera, **+ R2** bando no céu (alterna: horizonte / rasante) |
 | **L2 + Start** | (com o overlay aberto) pula para a próxima fase |
 | **L2 + direcional** | (com o overlay aberto) teleporta para os 4 pontos da fase (← início, → frente da barreira de raízes, se houver, ↑ canto mais denso, ↓ saída) |
 | **L2 + Quadrado / Círculo / X / L1 / R1 / R2** | (com o overlay aberto) dispara na hora: névoa avança / árvore cai / caminho abre (mesmo sem chave) / mata fecha atrás / onda / silêncio |
@@ -640,11 +640,11 @@ Tudo isto é **só visual e som** (`src/ambient.c`): não muda a partida.
 
 | Evento | O que se vê / ouve | Quando |
 |---|---|---|
-| Céu e lua | degradê do alto (escuro) ao horizonte (claro de luar); a lua de relance | sempre |
-| Bando no céu | 3–8 pássaros em silhueta cruzam o alto da tela | a cada 40–90 s |
+| Céu e lua | degradê do alto (escuro) ao horizonte (claro de luar); a lua de relance (nunca sob o HUD) | sempre |
+| Bando no céu | 5–8 pássaros em silhueta cruzam a faixa clara do horizonte (a 6–8 m) **ou** passam rasantes pela ponta iluminada da lanterna | a cada 40–90 s (meio a meio) |
 | Bando levanta voo | pássaros saem de uma árvore, com asas e grito | ao chegar perto de uma árvore de pouso ou depois de um barulho forte (ataque, tiro) perto |
 | Olhos | um par de olhos no escuro a 5–8 m; some com a lanterna (1 em 3 vezes encara um instante antes) | a cada 25–60 s |
-| Vulto | uma silhueta preta atravessa ao longe, recortada no céu | a cada 45–90 s |
+| Vulto | uma figura pálida e alta (~2,4 m), meio dissolvida na névoa, desliza de lado olhando para você, em ~1,2 s | a cada 45–90 s |
 | Salto | um bicho de olhos brilhantes pula de um tronco para outro | a cada 35–70 s, se houver 2 árvores perto |
 | Galho | só o som de um galho estalando atrás de você | a cada 20–50 s |
 

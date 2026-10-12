@@ -840,3 +840,17 @@ automatizar testes visuais.
   **Ideia para depois:** "bando alerta os inimigos" (um bando que levanta
   voo faria um barulho que atrai inimigos) — vira LÓGICA com `g.rng` e
   `noise_emit`, referências regravadas; decidido deixar só visual por ora.
+- 2026-10-11 — Etapa 09, revisão das capturas. (1) Na câmera de jogo o
+  bando não aparecia: agora cruza a FAIXA CLARA do horizonte a 6–8 m (um
+  ponto h acima do olho a d fica ~160·h/d px acima do horizonte; sorteio de
+  -10 a +2 px) com 5–8 pássaros, ou passa RASANTE (0,4–0,7 m, 3,5–5 m à
+  frente, na ponta do cone da lanterna: mais perto o corpo do jogador o
+  tapava; espalhado ~1,6 m, 2,5x). Medido nas capturas: aves na tela onde
+  previsto. (2) O vulto preto não se lia no escuro (preto sobre troncos
+  pretos, 43 px no centro da tela): virou figura PÁLIDA sem luz própria,
+  com névoa, a 4–5,5 m do jogador, ~2,4 m, olhos escuros, de frente para o
+  jogador (de perfil parecia um poste), ~1,2 s em cena. (3) Lua nunca sob
+  o HUD (escondida no alto à esquerda; e à direita com 2 jogadores).
+  Bench: pior quadro f1 420/432, f2 434/450, f3 384/402, f4 406/400
+  (normal/evento), 30 FPS; ambiente 14–18 linhas, 27–39 polígonos.
+  `replay-test` e `robo-test` IGUAL. Capturas novas: `09-ceu-rasante.png`.

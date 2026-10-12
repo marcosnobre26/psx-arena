@@ -1865,8 +1865,14 @@ static void robot_shots(void) {
 	 * no meio da animação */
 	void camera_shot_tilt(int up);
 	g.state = STATE_PLAY;
-	ambient_debug(6);                        /* bando cruzando o céu */
-	shot("09-ceu", 95);
+	ambient_debug(8);                        /* bando cruzando a faixa clara do horizonte */
+	shot("09-ceu", 100);
+	int lamp = g.players[0].lantern_on;
+	g.players[0].lantern_on = 1;             /* (a run acaba aqui) o rasante passa pela luz */
+	g.players[0].angle = g.cam_yaw;          /* lanterna para a frente da câmera */
+	ambient_debug(9);                        /* bando rasante pela área da lanterna */
+	shot("09-ceu-rasante", 54);
+	g.players[0].lantern_on = lamp;
 	camera_shot_tilt(600);                   /* horizonte no terço de baixo da tela */
 	ambient_debug(6);
 	ambient_debug(5);                        /* lua à frente */
@@ -1879,7 +1885,7 @@ static void robot_shots(void) {
 	shot("09-olhos", 20);
 	g.players[0].lantern_on = lantern;
 	ambient_debug(2);                        /* vulto: no meio da travessia */
-	shot("09-vulto", 55);
+	shot("09-vulto", 36);
 	{                                        /* o salto precisa de 2 árvores perto, à vista */
 		int ambient_shot_spot(int *px, int *pz, int *yaw);
 		int x, z, yaw;
