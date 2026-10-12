@@ -319,6 +319,7 @@ void ambient_update(int ticks) {
 /* Desenho (só lê)                                                       */
 /* ------------------------------------------------------------------ */
 void ambient_draw_sky(void) {
+	prof_begin(PROF_AMBIENT);
 	const LEVEL_DEF *ld = &level_defs[g.level];
 	int h = render_horizon_y();
 	/* alto: a cor da névoa pela metade; horizonte: ~2,5x mais claro (luar) */
@@ -329,9 +330,11 @@ void ambient_draw_sky(void) {
 	int sx, sy;
 	if (h > 0 && render_project_dir(isin(az), -260, icos(az), &sx, &sy))
 		render_moon(&tex_lua_t, sx, sy, 18);
+	prof_end(PROF_AMBIENT);
 }
 
 void ambient_draw(void) {
+	prof_begin(PROF_AMBIENT);           /* (soma com a do céu: prof_end acumula) */
 	int polys0 = render_stats_polys_now();
 	static const CVECTOR black = { 0, 0, 0 };
 	DRAWOPT sil = { 0 };
@@ -369,6 +372,7 @@ void ambient_draw(void) {
 		render_mesh(&bicho_mesh, &pos, &rot, ONE * 2, NULL);
 	}
 	am.last_polys = render_stats_polys_now() - polys0;
+	prof_end(PROF_AMBIENT);
 }
 
 #ifdef ROBOT_SHOTS

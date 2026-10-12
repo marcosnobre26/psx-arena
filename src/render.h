@@ -144,7 +144,7 @@ int render_bytes_used(void);     /* bytes de primitivas já usados NESTE quadro 
 int render_stats_polys(void);
 int render_stats_polys_now(void);       /* polígonos já enviados NESTE quadro */
 /* Perfil por categoria (linhas no último quadro): só para depuração */
-enum { PROF_CHUNKS, PROF_TREES, PROF_OTHER, PROF_ENEMIES, PROF_SLOTS };
+enum { PROF_CHUNKS, PROF_TREES, PROF_OTHER, PROF_ENEMIES, PROF_AMBIENT, PROF_SLOTS };
 void prof_begin(int slot);
 void prof_end(int slot);
 int  prof_get(int slot);

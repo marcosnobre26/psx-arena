@@ -19,6 +19,7 @@
 GAME    g;
 
 static int show_debug = 0;
+static int debug_page = 0;       /* 0 = depuração geral; 1 = AMBIENTE (L2 duas vezes, etapa 09) */
 static int show_collision = 0;   /* depuração: marcadores nas células sólidas */
 static int fps = 60, fps_frames = 0, fps_last = 0;
 
@@ -285,7 +286,16 @@ static void draw_hud(void) {
 	if (g.message_timer > 0)
 		draw_center(70, g.message);
 
-	if (show_debug) {
+	if (show_debug && debug_page == 1) {      /* página AMBIENTE (etapa 09) */
+		int act, pol, del, cpu;
+		ambient_stats(&act, &pol, &del, &cpu);
+		hud_print(12, 136, "AMBIENTE (L2 2X)  ATIVOS %d", act);
+		hud_print(12, 146, "POLIS %d  ADIADOS %d  CPU %d", pol, del, cpu);
+		hud_print(12, 160, "L2+QUAD BANDO VOA  L2+O OLHOS");
+		hud_print(12, 170, "L2+X VULTO  L2+TRI SALTO");
+		hud_print(12, 180, "L2+R1 GALHO  L2+L1 LUA  L2+R2 CEU");
+		hud_print(12, 196, "FPS %d  RAM GPU %d/%d", fps, render_stats_bytes(), PACKET_LEN);
+	} else if (show_debug) {
 		const PLAYER *p = &g.players[0];
 #ifdef DEBUG_FOG_TUNING
 		hud_print(12, 166, "FOG %d/%d  R2+DIR", render_fog_near(), render_fog_far());
@@ -815,8 +825,23 @@ static void debug_spawn_enemies(void) {
  *       cima/baixo = far +-100, direita/esquerda = near +-50
  * Os botões usados aqui são "comidos" para não pausar nem mover o jogador. */
 static void debug_input(INPUT *in) {
-	static int l2_was_held = 0, l2_combo = 0;
+	static int l2_was_held = 0, l2_combo = 0, frames = 0, last_tap = -100;
 	int l2 = in->held & PAD_L2;
+	frames++;
+
+	/* página AMBIENTE (etapa 09): eventos de ambiente na hora, sem freio */
+	if (l2 && show_debug && debug_page == 1) {
+		static const uint16_t keys[7] = { PAD_SQUARE, PAD_CIRCLE, PAD_CROSS, PAD_TRIANGLE,
+		                                  PAD_R1, PAD_L1, PAD_R2 };
+		for (int k = 0; k < 7; k++)
+			if (in->pressed & keys[k]) {
+				in->pressed &= ~keys[k];
+				l2_combo = 1;
+				ambient_debug(k);   /* 0 bando voa, 1 olhos, 2 vulto, 3 salto, 4 galho, 5 lua, 6 céu */
+			}
+		in->held &= ~(PAD_SQUARE | PAD_CIRCLE | PAD_CROSS | PAD_TRIANGLE | PAD_R1 | PAD_L1 | PAD_R2);
+	}
+	if (debug_page == 1) goto release;          /* os atalhos da página 0 ficam desligados */
 
 	if (l2 && show_debug && (in->pressed & PAD_SELECT)) {
 		in->pressed &= ~PAD_SELECT;      /* não liga/desliga a lanterna */
@@ -855,9 +880,15 @@ static void debug_input(INPUT *in) {
 		in->held    &= ~(PAD_UP | PAD_DOWN | PAD_LEFT | PAD_RIGHT);
 		in->pressed &= ~(PAD_UP | PAD_DOWN | PAD_LEFT | PAD_RIGHT);
 	}
+release:
 	if (!l2 && l2_was_held) {          /* soltou o L2 */
-		if (!l2_combo)
-			show_debug ^= 1;
+		if (!l2_combo) {
+			/* 1 toque abre (página 0); 2o toque em até ~0,4 s: página
+			 * AMBIENTE; outro toque fecha */
+			if (!show_debug) { show_debug = 1; debug_page = 0; last_tap = frames; }
+			else if (debug_page == 0 && frames - last_tap < 25) debug_page = 1;
+			else { show_debug = 0; debug_page = 0; }
+		}
 		l2_combo = 0;
 	}
 	l2_was_held = l2;
@@ -945,6 +976,7 @@ typedef struct {
 	int two;            /* 1 = com o jogador 2 no limite de distância */
 	int walk;           /* 1 = anda do início até a saída (remontagem ao andar) */
 	int combat;         /* 1 = multidão + o jogador atacando sem parar (etapa 07) */
+	int ambient;        /* 1 = multidão + céu, pássaros e animais forçados (etapa 09) */
 } BENCH_PT;
 #include "bench_seeds.h"                   /* ./dev mapgen-test --bench */
 
@@ -960,7 +992,7 @@ static const BENCH_PT bench_fixed[] = {
 #define BENCH_NFIXED ((int)(sizeof(bench_fixed) / sizeof(bench_fixed[0])))
 /* Depois: fases 1-4, cada uma nas 5 sementes de PIOR janela (no ponto 2 =
  * centro da janela mais densa), e o CERCO com 2 jogadores na pior delas */
-#define BENCH_POINTS (BENCH_NFIXED + 4 * 5 + 1 + 4 * 5 + 4 * 2 + 4 + 4)
+#define BENCH_POINTS (BENCH_NFIXED + 4 * 5 + 1 + 4 * 5 + 4 * 2 + 4 + 4 + 4)
 #define BENCH_CROWD_VS 600    /* multidão parada: 10 s (o pior aparece depois dos 3 s) */
 #define BENCH_WALK_VS  1500   /* andar: até 25 s (ou até o fim do caminho) */
 #define BENCH_SECS     26
@@ -998,6 +1030,13 @@ static BENCH_PT bench_point(int i, uint32_t *seed, char *name) {
 		p.two = 1;
 		*seed = bench_worst_seeds[3][0];
 		strcpy(name, "f4_pior1_2j");
+	} else if (i >= 57) {                         /* AMBIENTE: multidão + céu/pássaros/animais */
+		i -= 57;
+		p.level = i;
+		p.pt = 4;                                 /* o ponto de mais árvores */
+		p.ambient = 1;
+		*seed = bench_worst_seeds[i][0];
+		sprintf(name, "f%d_ambiente", p.level + 1);
 	} else if (i >= 53) {                         /* COMBATE: multidão + ataque sem parar */
 		i -= 53;
 		p.level = i;
@@ -1147,6 +1186,7 @@ static struct {
 	int      cam_max, cam_sum, cam_cells_max;   /* custo da câmera por quadro */
 	int      trans_max;                         /* árvores a 50% (tapando o jogador) */
 	int      cpu_max, cpu_sum, gpu_max, gpu_sum;  /* perfil do quadro, em linhas */
+	int      amb_max, amb_sum, amb_polys;     /* ambiente (etapa 09): linhas e polígonos */
 	int      logic_sum, logic_last;               /* parte da CPU gasta na lógica */
 	int      p_chunks, p_trees, p_other;          /* desenho por categoria (soma) */
 	int      build_max;                           /* pior montagem de bloco (linhas) */
@@ -1362,6 +1402,7 @@ static void bench_reset_stats(void) {
 	bench.cam_max = bench.cam_sum = bench.cam_cells_max = 0;
 	bench.trans_max = 0;
 	bench.cpu_max = bench.cpu_sum = bench.gpu_max = bench.gpu_sum = 0;
+	bench.amb_max = bench.amb_sum = bench.amb_polys = 0;
 	bench.logic_sum = 0;
 	bench.p_chunks = bench.p_trees = bench.p_other = 0;
 	bench.build_max = 0;
@@ -1588,6 +1629,17 @@ static void bench_frame(int vs) {
 			if (c > bench.ev_check) bench.ev_check = c;
 		}
 		bench.p_chunks += prof_get(PROF_CHUNKS);
+		{                                    /* ambiente (etapa 09): linhas e polígonos */
+			int a = prof_get(PROF_AMBIENT), act, pol, del, cpu;
+			ambient_stats(&act, &pol, &del, &cpu);
+			if (a > bench.amb_max) bench.amb_max = a;
+			bench.amb_sum += a;
+			if (pol > bench.amb_polys) bench.amb_polys = pol;
+			if (bench.cur.ambient && bench.stage == 1 && (bench.frames % 30) == 0) {
+				/* mantém tudo acontecendo: bando no céu, olhos, vulto, salto */
+				if (act < 4) { ambient_debug(6); ambient_debug(1); ambient_debug(2); ambient_debug(3); }
+			}
+		}
 		{
 			int b;
 			level_build_stats(&b);
@@ -1664,6 +1716,12 @@ static void bench_frame(int vs) {
 		{ extern int yaw_mismatch, yaw_checks;
 		  printf("BENCH yaw ponto=%s diferentes=%d de=%d\n", bench.name, yaw_mismatch, yaw_checks); }
 #endif
+		if (bench.cur.ambient && bench.stage == 1) {
+			int act, pol, del, cpu;
+			ambient_stats(&act, &pol, &del, &cpu);
+			printf("BENCH ambiente ponto=%s linhas_max=%d linhas_med=%d polis_max=%d adiados=%d\n", bench.name,
+			       bench.amb_max, bench.frames ? bench.amb_sum / bench.frames : 0, bench.amb_polys, del);
+		}
 		if (bench.stage == 1 || bench.stage == 9)   /* a série, 1 linha por segundo */
 			for (int si = 0; si < BENCH_SECS && bench.sec[si].frames; si++) {
 				const BENCH_SEC *sc = &bench.sec[si];
@@ -1717,7 +1775,7 @@ static void bench_frame(int vs) {
 			bench.stage++;
 			bench.timer = 10;                /* espera o printf (lento) sair do quadro */
 			bench.phase = BENCH_WAIT;
-		} else if (bench.stage == 1 && bench.cur.combat) {   /* combate: só a multidão */
+		} else if (bench.stage == 1 && (bench.cur.combat || bench.cur.ambient)) {   /* só a multidão */
 			bench.point++;
 			bench.dirty = 1;
 			bench.phase = BENCH_TELEPORT;
@@ -1836,6 +1894,10 @@ static void robot_shots(void) {
 	shot("09-salto", 30);                    /* blocos do lugar novo montam */
 	ambient_debug(3);                        /* salto: no meio do arco */
 	shot("09-salto", 24);
+	show_debug = 1;                          /* a página AMBIENTE do overlay (L2 duas vezes) */
+	debug_page = 1;
+	shot("09-overlay-ambiente", 3);
+	show_debug = debug_page = 0;
 	printf("SHOT TUDO\nROBO FIM\n");
 	robot_over = 1;
 }
