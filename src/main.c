@@ -1811,12 +1811,16 @@ static void robot_after_tick(void) {
 #ifdef ROBOT_SHOTS
 	if (g.play_frames >= SHOT_AT || g.state == STATE_WIN || g.state == STATE_DEAD) {
 		/* foto representativa: espera (até +30 s) não haver inimigo a menos de
-		 * 3 m do jogador (um GRANDE colado tapava o personagem na 1a versão) */
+		 * 3 m do jogador (um GRANDE colado tapava o personagem na 1a versão) e
+		 * o jogador não estar piscando: a foto não roda passos, o pisca
+		 * congelaria apagado (2a versão: personagem invisível) */
 		int close = 0;
 		for (int i = 0; i < MAX_ENEMIES; i++)
 			if (g.enemies[i].active && dist2d(g.enemies[i].pos.vx - g.players[0].pos.vx,
 			                                  g.enemies[i].pos.vz - g.players[0].pos.vz) < 3 * TILE_SIZE)
 				close = 1;
+		if (g.players[0].invuln > 0) close = 1;    /* piscando (levou dano): espera */
+		if (g.message_timer > 0) close = 1;        /* mensagem na tela: espera */
 		if (close && g.state == STATE_PLAY && g.play_frames < SHOT_AT + 30 * 60) return;
 		robot_shots();
 		return;

@@ -326,7 +326,9 @@ void player_draw_model(const VECTOR *pos, const SVECTOR *rot, int character, int
 void player_draw(PLAYER *p) {
 	if (!player_alive(p))
 		return;
-	if (p->invuln > 0 && (p->invuln & 4))     /* pisca quando invulnerável */
+	/* pisca quando invulnerável. Com o menu aberto o tempo para e o pisca
+	 * congelaria (personagem sumido a pausa inteira): aí desenha sempre. */
+	if (p->invuln > 0 && (p->invuln & 4) && g.state != STATE_MENU)
 		return;
 
 	VECTOR pos = p->pos;

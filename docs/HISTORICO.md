@@ -796,3 +796,18 @@ automatizar testes visuais.
   `hud_print` troca por espaço e desenha um "%" próprio (2 pontos e uma
   diagonal de `render_rect`); tronco no mapa em amarelo; Objetivo sem a
   linha "AGORA" repetida (só aparece com a saída aberta).
+- 2026-10-11 — Etapa 08, 2a revisão: na `08-jogo.png` "uma árvore tapava o
+  personagem". Investigado com dados no instante da foto: nenhuma árvore em
+  pé perto do segmento olho→jogador (só um tronco caído a 7 m de lado),
+  nenhuma marcada por `level_mark_occluders`, nenhuma desenhada a 50%; o
+  segmento só passava por folhas/raízes; a câmera a 3,1 m do jogador e 2,1
+  m de altura. O bloco verde era a MATA ALTA uma célula ATRÁS do jogador. O
+  personagem não aparecia porque **não estava sendo desenhado**: `invuln`
+  = 13 (levou dano; pisca com `invuln & 4`) e a foto não roda passos, então
+  o pisca congelou apagado. Com o pisca zerado ele aparece na frente da
+  parede, com ou sem uma correção de ordenação testada (ordenar paredes
+  pela base) — essa correção foi descartada (sem evidência de falha).
+  Correções (só visuais; replay e robo IGUAL): com o menu aberto o jogador
+  é sempre desenhado (o pisca também congelava na pausa); `./dev capturas`
+  espera, além de nenhum inimigo a < 3 m, o jogador não estar piscando e
+  não haver mensagem na tela.
