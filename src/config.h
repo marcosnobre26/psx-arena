@@ -170,6 +170,12 @@
 #define MAX_BULLETS     48
 #define MAX_PICKUPS     24
 #define INV_SLOTS        8      /* espaços do inventário (etapa 08: escassez) */
+#define SAVE_VERSION     1      /* formato do save no memory card (etapa 10): mudou o
+                                   conteúdo (CARRY, PSTATS...)? some 1: o save antigo
+                                   vira SAVE INVALIDO em vez de carregar errado */
+#ifndef LINK_MODE
+#define SAVE_ENABLED     1      /* modo link (etapa 11): o save fica desligado */
+#endif
 #define EXPLORE_R_DARK   4      /* névoa de exploração: raio visto sem lanterna (células) */
 #define EXPLORE_R_LIGHT  6      /* ... com a lanterna ligada */
 #define MAX_CRATES      32

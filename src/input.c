@@ -16,9 +16,16 @@ static uint8_t  pad_buf[MAX_PLAYERS][34];
 static uint16_t prev_held[MAX_PLAYERS];
 
 void input_init(void) {
+	/* controle e memory card usam a mesma porta e o mesmo driver do BIOS:
+	 * InitCARD depois do InitPAD, os dois ligados, e só então o driver de
+	 * arquivos do cartão (card_init -> _bu_init). ChangeClearPAD(0) no fim:
+	 * o BIOS não "consome" a interrupção que o resto do sistema usa. */
 	InitPAD(pad_buf[0], 34, pad_buf[1], 34);
+	InitCARD(1);
 	StartPAD();
+	StartCARD();
 	ChangeClearPAD(0);
+	card_init();
 }
 
 static int stick(uint8_t v) {

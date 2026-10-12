@@ -190,6 +190,9 @@ void sound_loop_stop(int voice) {
 	loop_sound[voice] = NULL;
 }
 
+int sound_sfx_volume(void)   { return sfx_master; }
+int sound_music_volume(void) { return music_master; }
+
 void sound_set_volume(int sfx, int music) {
 	sfx_master   = sfx;
 	music_master = music;

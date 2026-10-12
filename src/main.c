@@ -131,11 +131,12 @@ typedef struct {
 	PSTATS   total;                   /* estatísticas das fases vencidas (etapa 10) */
 } CARRY;
 
-static struct {
+typedef struct {
 	int   score;
 	int   time_total;                 /* passos das fases vencidas (etapa 10) */
 	CARRY p[MAX_PLAYERS];
-} progress;
+} PROGRESS;
+static PROGRESS progress;
 
 /* Guarda o estado atual (chamado ao vencer uma fase) */
 static void progress_save(void) {
@@ -197,6 +198,72 @@ static void start_level(int level, uint32_t seed) {
 	g.state = STATE_INTRO;
 	g.state_timer = INTRO_TIME;
 	PL(pl_begin());
+}
+
+/* ------------------------------------------------------------------ */
+/* Memory card (etapa 10): o ponto de partida da fase atual             */
+/* ------------------------------------------------------------------ */
+/* Tudo o que é preciso para recomeçar ESTA fase igual: fase, semente (o
+ * mesmo mapa), quem joga com quê, e o que levaram para ela (progress). */
+typedef struct {
+	int32_t  level;
+	uint32_t seed;
+	int32_t  joined[MAX_PLAYERS], character[MAX_PLAYERS], skin[MAX_PLAYERS];
+	PROGRESS prog;
+	int32_t  sfx_volume;
+} SAVE_DATA;
+
+static void save_build(SAVE_DATA *sp) {
+	SAVE_DATA s;
+	memset(&s, 0, sizeof(s));
+	s.level = g.level;
+	s.seed = g.seed;
+	for (int i = 0; i < MAX_PLAYERS; i++) {
+		s.joined[i] = sel[i].joined;
+		s.character[i] = sel[i].character;
+		s.skin[i] = sel[i].skin;
+	}
+	s.prog = progress;                       /* o retrato do começo da fase */
+	s.sfx_volume = sound_sfx_volume();
+	*sp = s;
+}
+
+int game_save_checkpoint(void) {
+#ifndef SAVE_ENABLED
+	return -1;                               /* modo link: sem save */
+#else
+	static SAVE_DATA s;
+	save_build(&s);
+	return card_save(&s, sizeof(s));
+#endif
+}
+
+/* Lê o save e começa a fase dele. 1 = ok; 0 = não há save; -1 = inválido
+ * (versão, checksum ou valores fora do lugar: nada é aplicado) */
+static int game_load_and_start(void) {
+#ifndef SAVE_ENABLED
+	return 0;
+#else
+	static SAVE_DATA s;
+	int r = card_load(&s, sizeof(s));
+	if (r != 1) return r;
+	if (s.level < 0 || s.level >= num_levels || s.sfx_volume < 0 || s.sfx_volume > 128 || !s.joined[0])
+		return -1;
+	for (int i = 0; i < MAX_PLAYERS; i++)
+		if (s.joined[i] && (s.character[i] < 0 || s.character[i] >= num_characters ||
+		                    s.skin[i] < 0 || s.skin[i] >= num_skins))
+			return -1;
+	for (int i = 0; i < MAX_PLAYERS; i++) {
+		sel[i].joined = s.joined[i];
+		sel[i].character = s.character[i];
+		sel[i].skin = s.skin[i];
+		sel[i].ready = 1;
+	}
+	progress = s.prog;
+	sound_set_volume(s.sfx_volume, sound_music_volume());
+	start_level(s.level, s.seed);            /* mesma semente = mesmo mapa */
+	return 1;
+#endif
 }
 
 /* Jogo novo (saindo da seleção): zera o progresso */
@@ -648,6 +715,10 @@ static void game_tick(void) {
 			} else if (g.level + 1 < num_levels) {    /* próxima fase, levando tudo */
 				progress_save();
 				start_level(g.level + 1, g.frame);
+#ifdef SAVE_ENABLED
+				/* salva sozinho o começo da fase nova (etapa 10) */
+				show_message(game_save_checkpoint() == 0 ? "JOGO SALVO" : "NAO SALVOU (MEMORY CARD?)", 90);
+#endif
 			} else {                                  /* era a última */
 				progress_save();
 				g.state = STATE_END;
@@ -1916,9 +1987,83 @@ static void robot_shots(void) {
 }
 #endif
 
+#ifdef ROBOT_SAVETEST
+/* ./dev save-test (etapa 10): o robô venceu a f1 (progresso de verdade:
+ * armas, inventário, estatísticas). Começa a f2 com isso, guarda o hash de
+ * g, salva no cartão, bagunça tudo, carrega e compara. Depois: save
+ * estragado, de outra versão e cartão sem save têm que ser RECUSADOS sem
+ * mudar nada. */
+int card_corrupt_for_test(void);
+int card_old_version_for_test(const void *data, int len);
+int card_erase_for_test(void);
+
+static void save_test(void) {
+	int ok = 1;
+	INPUT pads[MAX_PLAYERS];
+	input_update(pads);                      /* o controle ainda responde com o cartão ligado? */
+	printf("SAVE controle_porta1=%d\n", pads[0].connected);
+	ok &= pads[0].connected;
+
+	progress_save();
+	memset(g.in, 0, sizeof(g.in));
+	start_level(g.level + 1, 0x5AFE1234u);
+	uint32_t h1 = replay_hash();
+	int r = game_save_checkpoint();
+	printf("SAVE gravar=%d fase=%d semente=%08x hash=%08x\n", r, g.level + 1, (unsigned)g.seed, (unsigned)h1);
+	ok &= r == 0;
+
+	sel[0].character = (sel[0].character + 1) % num_characters;   /* bagunça */
+	memset(&progress, 0, sizeof(progress));
+	memset(g.in, 0, sizeof(g.in));
+	start_level(3, 0x11112222u);
+	printf("SAVE baguncado hash=%08x\n", (unsigned)replay_hash());
+
+	memset(g.in, 0, sizeof(g.in));
+	r = game_load_and_start();
+	uint32_t h2 = replay_hash();
+	printf("SAVE carregar=%d fase=%d semente=%08x hash=%08x %s\n", r, g.level + 1, (unsigned)g.seed,
+	       (unsigned)h2, h2 == h1 ? "IGUAL" : "DIFERENTE");
+	ok &= r == 1 && h2 == h1;
+
+	static SAVE_DATA s;
+	save_build(&s);
+	card_corrupt_for_test();                 /* checksum não bate */
+	uint32_t hb = replay_hash();
+	r = game_load_and_start();
+	printf("SAVE corrompido=%d estado_intacto=%d\n", r, replay_hash() == hb);
+	ok &= r == -1 && replay_hash() == hb;
+
+	card_old_version_for_test(&s, sizeof(s));   /* outra versão */
+	r = game_load_and_start();
+	printf("SAVE outra_versao=%d estado_intacto=%d\n", r, replay_hash() == hb);
+	ok &= r == -1 && replay_hash() == hb;
+
+	card_erase_for_test();                   /* cartão sem save */
+	r = game_load_and_start();
+	printf("SAVE sem_save=%d estado_intacto=%d\n", r, replay_hash() == hb);
+	ok &= r == 0 && replay_hash() == hb;
+
+	printf("SAVE RESULTADO %s\nROBO FIM\n", ok ? "OK" : "FALHOU");
+	robot_over = 1;
+}
+#endif
+
 /* Depois de CADA game_tick (o pl_tick já fechou vitória/morte) */
 static void robot_after_tick(void) {
 	if (robot_over) return;
+#ifdef ROBOT_SAVETEST
+	if (g.state == STATE_WIN) { save_test(); return; }
+	if (g.state == STATE_DEAD || g.play_frames >= robot_limit_ticks(g.level)) {   /* de novo */
+		static int tries;
+		if (++tries > 8) { printf("SAVE RESULTADO FALHOU (o robo nao venceu a f1)\nROBO FIM\n"); robot_over = 1; return; }
+		memset(g.in, 0, sizeof(g.in));
+		start_level(g.level, g.seed + (uint32_t)tries);
+		g.state = STATE_PLAY;
+		robot_begin((uint32_t)tries);
+		return;
+	}
+	return;
+#endif
 #ifdef ROBOT_SHOTS
 	if (g.play_frames >= SHOT_AT || g.state == STATE_WIN || g.state == STATE_DEAD) {
 		/* foto representativa: espera (até +30 s) não haver inimigo a menos de

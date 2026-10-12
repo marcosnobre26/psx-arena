@@ -667,6 +667,13 @@ void ambient_debug(int what);                   /* 0 bando da árvore, 1 olhos, 
                                                    4 galho, 5 lua à frente, 6 bando no céu */
 void ambient_stats(int *active, int *polys, int *delayed, int *cpu);
 
+/* savegame.c (etapa 10): memory card. card_load: 1 ok, 0 não há, -1 inválido */
+void card_init(void);
+int  card_save(const void *data, int len);
+int  card_load(void *data, int len);
+/* main.c: o ponto de partida da fase atual no cartão (menu SALVAR, fim de fase) */
+int  game_save_checkpoint(void);                /* 0 = salvou */
+
 /* menu.c (etapa 08): menu do START */
 void menu_open(int who);                        /* who = controle que apertou START */
 void menu_update(void);                         /* um passo com o menu aberto (lógica) */

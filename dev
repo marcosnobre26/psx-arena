@@ -11,6 +11,7 @@
 #   ./dev robo [N]       o robô joga N sementes x 4 fases x 3 personagens (sem janela)
 #   ./dev robo-test       24 partidas do robô: a lógica mudou? (hash de g no fim)
 #   ./dev capturas        telas do menu em docs/capturas/ (o robô joga e fotografa)
+#   ./dev save-test       memory card: salva, carrega e compara o hash de g
 #   ./dev models         exporta os .blend de assets/blender/ para models/ (Blender do Windows)
 #   ./dev watch          recompila sozinho sempre que você salvar um arquivo
 #   ./dev clean          apaga a pasta build/
@@ -675,6 +676,24 @@ cmd_robo_test() {
 	fi
 }
 
+# Teste do memory card (etapa 10): o robô vence a f1, começa a f2, salva,
+# bagunça, carrega e compara o hash de g; save estragado, de outra versão e
+# cartão vazio têm que ser recusados sem mudar nada. Cartão da cópia
+# portátil (o seu nunca é tocado).
+cmd_save_test() {
+	ROBO_BDIR=build-save ROBO_LOG="$ROOT/build-save/save.txt" ROBO_QUIET=1 ROBO_FATIAS=1 \
+		cmd_robo 1 -D ROBOT_SAVETEST=1 -D ROBOT_HASH=1 > "$ROOT/build-save.log" 2>&1 ||
+		{ cat "$ROOT/build-save.log"; c_err "O save-test não rodou."; return 1; }
+	local lines; lines="$(sed 's/\x1b\[[0-9;]*m//g' "$ROOT/build-save/fatia-0.log" | grep -o "SAVE .*" | tr -d '\r')"
+	printf '%s\n' "$lines" | sed 's/^SAVE /  /'
+	rm -f "$ROOT/build-save.log"
+	if printf '%s\n' "$lines" | grep -q "SAVE RESULTADO OK"; then
+		c_ok "SAVE-TEST OK: salvar, carregar e recusar save inválido funcionam"
+	else
+		c_err "SAVE-TEST FALHOU (log: build-save/fatia-0.log)"; return 1
+	fi
+}
+
 # Capturas de tela (etapas 08 e 09): build do robô com ROBOT_SHOTS (joga
 # 75 s da f3 com o Batedor, abre cada aba do menu, força cada evento de
 # ambiente e manda a tela pelo TTY); tools/capturas.py monta
@@ -709,5 +728,6 @@ case "${1:-build}" in
 	robo)   shift; cmd_robo "$@" ;;
 	robo-test) shift; cmd_robo_test "$@" ;;
 	capturas) cmd_capturas ;;
-	*)      sed -n '3,24p' "$0" | sed 's/^#//' ;;
+	save-test) cmd_save_test ;;
+	*)      sed -n '3,25p' "$0" | sed 's/^#//' ;;
 esac

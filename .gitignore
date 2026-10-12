@@ -21,3 +21,5 @@ build-robo-config.log
 build-robo-test/
 build-shots/
 build-shots.log
+build-save/
+build-save.log
