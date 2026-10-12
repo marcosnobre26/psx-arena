@@ -131,6 +131,10 @@ static struct {
 	int      stucks, no_heal, no_ranged_t, flees;
 } rb;
 
+#ifdef ROBOT_MENU
+static int menu_step, menu_last = -1;   /* sessão de menu (robo-test -D ROBOT_MENU=1) */
+#endif
+
 static int rb_rand(int n) {                    /* gerador PRÓPRIO (nunca g.rng) */
 	rb.rng = rb.rng * 1103515245u + 12345u;
 	return (int)((rb.rng >> 16) % (uint32_t)n);
@@ -556,11 +560,36 @@ void robot_begin(uint32_t salt) {
 	memset(known_pick, 0, sizeof(known_pick));
 	memset(notice, 0, sizeof(notice));
 	memset(memory, 0, sizeof(memory));
+#ifdef ROBOT_MENU
+	menu_step = 0;
+	menu_last = -1;
+#endif
 }
+
+#ifdef ROBOT_MENU
+/* ./dev robo-test -D ROBOT_MENU=1 (etapa 08): a cada 10 s de jogo abre o
+ * menu e passeia pelas abas sem usar nada. O tempo do jogo não anda no menu,
+ * então o hash no fim de cada partida tem que dar IGUAL ao sem menu. */
+static const uint16_t menu_session[] = {
+	PAD_START, 0, PAD_R1, 0, PAD_R1, PAD_DOWN, PAD_R1, PAD_DOWN, PAD_R1, PAD_UP, PAD_R1, 0,
+	PAD_LEFT, 0, PAD_RIGHT, 0, PAD_START };
+#endif
 
 void robot_input(INPUT *in) {
 	memset(in, 0, sizeof(*in));
 	in->connected = 1;
+#ifdef ROBOT_MENU
+	if (menu_step == 0 && g.state == STATE_PLAY && g.play_frames > 0 &&
+	    g.play_frames % 600 == 0 && g.play_frames != menu_last) {
+		menu_step = 1;
+		menu_last = g.play_frames;
+	}
+	if (menu_step > 0) {
+		in->pressed = in->held = menu_session[menu_step - 1];
+		if (++menu_step > (int)(sizeof(menu_session) / sizeof(menu_session[0]))) menu_step = 0;
+		return;
+	}
+#endif
 	const PLAYER *p = &g.players[0];
 	if (g.state != STATE_PLAY || !player_alive(p)) return;
 

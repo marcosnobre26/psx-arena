@@ -449,7 +449,7 @@ typedef struct {
 	 * só mostra estas) e o menu do START. O menu é LÓGICA (usar um item muda
 	 * g), por isso fica em g: a última aba fica; o cursor zera ao fechar. */
 	uint8_t seen[MAP_MAX_H][MAP_MAX_W / 8];
-	int     menu_tab, menu_cursor, menu_player;
+	int     menu_tab, menu_cursor, menu_player, menu_owner;
 
 	/* eventos da fase (events.c). Tudo aqui é LÓGICA: só g.in, passos e g.rng */
 	struct {
@@ -653,6 +653,12 @@ int  inv_drop(PLAYER *p, int slot);             /* 1 = largou no chão */
 void inv_quick_heal(PLAYER *p);                 /* CÍRCULO: bandagem, depois kit */
 void explore_update(void);                      /* névoa de exploração (todo passo) */
 int  explore_seen(int cx, int cz);
+
+/* menu.c (etapa 08): menu do START */
+void menu_open(int who);                        /* who = controle que apertou START */
+void menu_update(void);                         /* um passo com o menu aberto (lógica) */
+void menu_draw(void);                           /* por cima do mundo (só lê g) */
+void menu_draw_map(void);
 void pickups_update(void);
 void pickups_draw(void);
 void crate_spawn(int cx, int cz);

@@ -638,12 +638,19 @@ PY
 #   ./dev robo-test           compara com a referência
 #   ./dev robo-test --save    grava a referência (mudança de lógica INTENCIONAL)
 cmd_robo_test() {
-	local save=0
-	[[ "${1:-}" == "--save" ]] && save=1
+	local save=0 extra=()
+	while [[ $# -gt 0 ]]; do
+		case "$1" in
+			--save) save=1; shift ;;
+			-D) extra+=(-D "$2"); shift 2 ;;
+			-D*) extra+=(-D "${1#-D}"); shift ;;
+			*) c_err "Uso: ./dev robo-test [--save] [-D NOME=VALOR]"; return 1 ;;
+		esac
+	done
 	local out="$ROOT/build-robo-test/robo-test.txt" ref="$ROOT/tools/robo_ref.txt"
 	mkdir -p "$ROOT/build-robo-test"
 	ROBO_BDIR=build-robo-test ROBO_LOG="$out" ROBO_QUIET=1 ROBO_FATIAS=4 \
-		cmd_robo 2 -D ROBOT_HASH=1 -D ROBOT_SKILL=50 > "$ROOT/build-robo-test/run.log" 2>&1 ||
+		cmd_robo 2 -D ROBOT_HASH=1 -D ROBOT_SKILL=50 "${extra[@]}" > "$ROOT/build-robo-test/run.log" 2>&1 ||
 		{ cat "$ROOT/build-robo-test/run.log"; c_err "O robo-test não rodou."; return 1; }
 	local got; got="$(grep '^ROBO HASH' "$out" | sed 's/^ROBO HASH k=//' | sort -n | sed 's/^/k=/')"
 	if [[ "$(printf '%s\n' "$got" | grep -c hash=)" != "24" ]]; then

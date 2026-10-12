@@ -553,7 +553,7 @@ static void draw_world(int with_players) {
 
 /* Lógica de UM passo (1/60 de segundo). Não desenha nada. */
 static void game_tick(void) {
-	int who;
+	int who, state_before = g.state;
 	collide_tick_begin();
 	switch (g.state) {
 	case STATE_TITLE:
@@ -571,8 +571,9 @@ static void game_tick(void) {
 		break;
 
 	case STATE_PLAY:
-		if (any_pressed(PAD_START) >= 0) {
-			g.state = STATE_MENU;
+		who = any_pressed(PAD_START);
+		if (who >= 0) {                    /* menu do START (etapa 08): o jogo para */
+			menu_open(who);
 			break;
 		}
 #ifdef DEBUG_BENCHMARK
@@ -609,8 +610,7 @@ static void game_tick(void) {
 		break;
 
 	case STATE_MENU:
-		if (any_pressed(PAD_START) >= 0)
-			g.state = STATE_PLAY;
+		menu_update();
 		break;
 
 	case STATE_INTRO:                             /* nome da fase e objetivo */
@@ -647,6 +647,11 @@ static void game_tick(void) {
 		break;
 	}
 
+	/* Menu aberto (ou abrindo/fechando neste passo): o tempo do jogo NÃO
+	 * anda, nem g.frame (os inimigos escalonam a visão por ele). Assim abrir
+	 * o menu não muda a partida (prova: replay-test/robo-test com menu). */
+	if (state_before == STATE_MENU || g.state == STATE_MENU)
+		return;
 	if (g.message_timer > 0)
 		g.message_timer--;
 	g.frame++;
@@ -680,15 +685,10 @@ static void game_draw(void) {
 		draw_hud();
 		break;
 
-	case STATE_MENU:
+	case STATE_MENU:                     /* o mundo parado ao fundo, escurecido */
 		camera_apply();
 		draw_world(1);
-		draw_hud();
-		draw_center(70,  "PAUSA");
-		draw_center(96,  "X pular   QUADRADO atirar");
-		draw_center(108, "TRIANGULO arma  CIRCULO poder");
-		draw_center(120, "R2 troca poder  L1/R1 camera");
-		draw_center(132, "SELECT lanterna  L2 debug");
+		menu_draw();
 		break;
 
 	case STATE_INTRO: {
@@ -1211,7 +1211,20 @@ static void bench_survive_fill(void) {
 /* ------------------------------------------------------------------ */
 #define REPLAY_TICKS   3600                /* 60 s por fase */
 #define REPLAY_HASH_AT 600                 /* hash a cada 10 s */
-static struct { int level, t, done; } rp;
+static struct { int level, t, done, menu, menu_t; } rp;
+
+#ifdef REPLAY_MENU
+/* ./dev replay-test -D REPLAY_MENU=1 (etapa 08): abre o menu nestes passos e
+ * passeia por todas as abas e linhas SEM usar nada. Os passos de menu não
+ * contam (rp.t para): o hash tem que dar IGUAL ao da partida sem menu. */
+static const int replay_menu_at[] = { 450, 1300, 2650 };
+#endif
+/* Sessão de menu (também usada pelo robô em ROBOT_MENU): um botão por
+ * passo; as 5 abas dão a volta e voltam à mesma (a última aba fica em g) */
+static const uint16_t menu_session[] = {
+	PAD_START, 0, PAD_R1, 0, PAD_R1, PAD_DOWN, PAD_R1, PAD_DOWN, PAD_R1, PAD_UP, PAD_R1, 0,
+	PAD_LEFT, 0, PAD_RIGHT, 0, PAD_START };
+#define MENU_SESSION_LEN ((int)(sizeof(menu_session) / sizeof(menu_session[0])))
 static const int replay_levels[] = { 0, 1, 2, 3, 4 };
 #define REPLAY_NLEVELS ((int)(sizeof(replay_levels) / sizeof(replay_levels[0])))
 
@@ -1231,6 +1244,15 @@ static void replay_input(void) {
 	INPUT *in = &g.in[0];
 	memset(&g.in[0], 0, sizeof(g.in));
 	in->connected = 1;
+#ifdef REPLAY_MENU
+	if (rp.menu == 0)
+		for (int k = 0; k < (int)(sizeof(replay_menu_at) / sizeof(replay_menu_at[0])); k++)
+			if (t == replay_menu_at[k] && rp.menu_t != t) { rp.menu = 1; rp.menu_t = t; }
+	if (rp.menu > 0) {                              /* sessão de menu em andamento */
+		in->pressed = in->held = menu_session[rp.menu - 1];
+		return;
+	}
+#endif
 	const int8_t *d = dirs[(t / 240) % 8];          /* direção muda a cada 4 s */
 	in->lx = d[0];
 	in->ly = d[1];
@@ -1254,6 +1276,10 @@ static void replay_input(void) {
 /* Depois de CADA game_tick */
 static void replay_after_tick(void) {
 	if (rp.done) return;
+	if (rp.menu > 0) {                              /* passo de menu: o tempo do jogo não anda */
+		if (++rp.menu > MENU_SESSION_LEN) rp.menu = 0;
+		return;
+	}
 	rp.t++;
 	if (rp.t % REPLAY_HASH_AT == 0)
 		printf("BENCH REPLAY fase=%d t=%d estado=%d hash=%08x\n", replay_levels[rp.level] + 1,
