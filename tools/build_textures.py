@@ -114,6 +114,12 @@ def main():
         mult = {16: 1, 8: 2, 4: 4}[bpp]
         if w % mult:
             sys.exit("%s: para %d bits a largura precisa ser múltipla de %d." % (path, bpp, mult))
+        if (w // mult) * h % 2:
+            # o LoadImage manda palavras de 32 bits: um número ímpar de pixels
+            # de 16 bits trava o DrawSync no boot (etapa 10: logotipo 204x39)
+            sys.exit("%s: %dx%d dá um número ÍMPAR de unidades de 16 bits na VRAM (%d); "
+                     "aumente a largura para múltipla de %d ou a altura para par."
+                     % (path, w, h, (w // mult) * h, mult * 2))
         items.append((path, c_name(stem), img, bpp, mult))
 
     # maiores primeiro = empacotamento melhor; nome desempata (resultado estável)

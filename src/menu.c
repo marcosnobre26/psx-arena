@@ -148,8 +148,7 @@ static void draw_options(void) {
 	static const char *const names[NUM_OPTS] = { "EFEITOS", "SALVAR JOGO" };
 	int vol = (sound_sfx_volume() * 10 + 64) / 128;
 	for (int i = 0; i < NUM_OPTS; i++, y += 18) {
-		if (i == g.menu_cursor)
-			render_rect(PX + 4, y - 4, PW - 8, 14, 70, 60, 30, 0);
+		/* barra e texto ANTES do destaque: o último colocado fica por baixo */
 		hud_print(PX + 16, y, "%s", names[i]);
 		if (i == OPT_SFX) {
 			hud_print(PX + 120, y, "<");
@@ -157,6 +156,8 @@ static void draw_options(void) {
 				render_rect(PX + 132 + k * 9, y, 7, 7, k < vol ? 230 : 60, k < vol ? 200 : 60, k < vol ? 90 : 70, 0);
 			hud_print(PX + 226, y, "> %d%%", vol * 10);
 		}
+		if (i == g.menu_cursor)
+			render_rect(PX + 4, y - 4, PW - 8, 14, 70, 60, 30, 0);
 	}
 	y += 8;
 	hud_print(PX + 16, y, "SALVA O COMECO DESTA FASE");          y += 10;
@@ -200,7 +201,7 @@ static void draw_stats(void) {
 	const PSTATS *s = &p->st;
 	int y = PY + 8, t = g.play_frames / 60, tt = (g.time_total + g.play_frames) / 60;
 	const int cf = PX + 132, ct = PX + 204;        /* colunas FASE e TOTAL */
-	hud_print(PX + 8, y, "SEMENTE %08X", (unsigned)g.seed);
+	hud_print(PX + 8, y, "SEMENTE DO MAPA %08X", (unsigned)g.seed);                   y += 12;
 	hud_print(cf, y, "FASE"); hud_print(ct, y, "TOTAL");                              y += 12;
 	hud_print(PX + 8, y, "TEMPO");
 	hud_print(cf, y, "%d:%02d", t / 60, t % 60); hud_print(ct, y, "%d:%02d", tt / 60, tt % 60); y += 12;

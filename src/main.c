@@ -137,6 +137,7 @@ typedef struct {
 	CARRY p[MAX_PLAYERS];
 } PROGRESS;
 static PROGRESS progress;
+static int save_status;          /* memory card: 1 há save; 0 não há; -1 inválido (fora de g) */
 
 /* Guarda o estado atual (chamado ao vencer uma fase) */
 static void progress_save(void) {
@@ -234,7 +235,9 @@ int game_save_checkpoint(void) {
 #else
 	static SAVE_DATA s;
 	save_build(&s);
-	return card_save(&s, sizeof(s));
+	int r = card_save(&s, sizeof(s));
+	if (r == 0) save_status = 1;             /* o título passa a oferecer CONTINUAR */
+	return r;
 #endif
 }
 
@@ -638,18 +641,100 @@ static void draw_world(int with_players) {
 /* ------------------------------------------------------------------ */
 
 /* Lógica de UM passo (1/60 de segundo). Não desenha nada. */
+/* ------------------------------------------------------------------ */
+/* Tela de título e créditos (etapa 10)                                 */
+/* ------------------------------------------------------------------ */
+/* O cursor do título e a situação do save ficam FORA de g: não são partida
+ * (o save depende do cartão que está no console, não da lógica). */
+enum { TM_NEW, TM_CONTINUE, TM_CREDITS, TM_COUNT };
+static int title_sel;
+static int credits_t;                         /* passos desde que os créditos abriram */
+
+static void title_enter(void) {
+	if (g.state != STATE_TITLE) { game_reset(0, 12345); }   /* fundo do título, sempre igual */
+	g.state = STATE_TITLE;
+	title_sel = 0;
+	music_title_start();                      /* etapa 01b: a música entra aqui */
+}
+
+static void title_tick(void) {
+	if (any_pressed(PAD_UP) >= 0)   title_sel = (title_sel + TM_COUNT - 1) % TM_COUNT;
+	if (any_pressed(PAD_DOWN) >= 0) title_sel = (title_sel + 1) % TM_COUNT;
+	int who = any_pressed(PAD_START | PAD_CROSS);
+	if (who < 0) return;
+	switch (title_sel) {
+	case TM_NEW:
+		sel[0].joined = 1;
+		if (who == 1) sel[1].joined = 1;      /* apertou no controle 2: entra também */
+		music_stop();
+		select_enter();
+		break;
+	case TM_CONTINUE: {
+		int r = game_load_and_start();
+		if (r == 1) { music_stop(); save_status = 1; }
+		else show_message(r < 0 ? "SAVE INVALIDO" : "NENHUM SAVE NO MEMORY CARD", 100);
+		if (r < 0) save_status = -1;
+		break;
+	}
+	case TM_CREDITS:
+		g.state = STATE_CREDITS;
+		credits_t = 0;
+		break;
+	}
+}
+
+static void title_draw(void) {
+	render_rect(0, 36, SCREEN_W, 150, 0, 0, 0, 1);    /* faixa escura atrás de tudo */
+	render_sprite(&tex_titulo_t, 0, 0, tex_titulo_t.w, tex_titulo_t.h,
+	              (SCREEN_W - tex_titulo_t.w) / 2, 50, tex_titulo_t.w, tex_titulo_t.h);
+	draw_center(98, "SOBREVIVA A NOITE NA FLORESTA");
+	static const char *const items[TM_COUNT] = { "NOVO JOGO", "CONTINUAR", "CREDITOS" };
+	for (int i = 0; i < TM_COUNT; i++) {
+		int y = 126 + i * 16;
+		char buf[32];
+		if (i == TM_CONTINUE && save_status != 1)
+			snprintf(buf, sizeof(buf), "%s (%s)", items[i], save_status < 0 ? "SAVE INVALIDO" : "SEM SAVE");
+		else
+			snprintf(buf, sizeof(buf), "%s", items[i]);
+		if (i == title_sel) {
+			int w = (int)strlen(buf) * 8 + 16;
+			render_rect(160 - w / 2, y - 3, w, 13, 90, 20, 22, 0);   /* item escolhido */
+		}
+		draw_center(y, buf);
+	}
+	if (g.message_timer > 0)
+		draw_center(182, g.message);
+	draw_center(206, "2 JOGADORES: START NO CONTROLE 2");
+	hud_print(SCREEN_W - 8 - 7 * 8, 224, "V%s", GAME_VERSION);
+}
+
+static void credits_draw(void) {
+	render_rect(0, 0, SCREEN_W, SCREEN_H, 0, 0, 0, 1);   /* escurece o fundo */
+	int y0 = SCREEN_H - credits_t / 2;                    /* sobe meio pixel por passo */
+	int total = credits_count * 12;
+	if (y0 + total < 20) credits_t = 0;                   /* acabou: recomeça */
+	for (int i = 0; i < credits_count; i++) {
+		int y = y0 + i * 12;
+		if (y < 8 || y > 200) continue;                   /* acima do rodapé */
+		draw_center(y, credits_lines[i]);
+	}
+	draw_center(222, "X OU O: VOLTAR");
+	render_rect(0, 212, SCREEN_W, 28, 0, 0, 0, 0);      /* faixa do rodapé */
+}
+
 static void game_tick(void) {
 	int who, state_before = g.state;
 	collide_tick_begin();
 	switch (g.state) {
 	case STATE_TITLE:
 		effects_update();
-		who = any_pressed(PAD_START | PAD_CROSS);
-		if (who >= 0) {
-			sel[0].joined = 1;
-			if (who == 1) sel[1].joined = 1;   /* apertou no controle 2: entra também */
-			select_enter();
-		}
+		title_tick();
+		break;
+
+	case STATE_CREDITS:                           /* rola sozinho; qualquer botão volta */
+		credits_t++;
+		if (any_pressed(PAD_START | PAD_CROSS | PAD_CIRCLE) >= 0)
+			title_enter();
 		break;
 
 	case STATE_SELECT:
@@ -730,10 +815,8 @@ static void game_tick(void) {
 
 	case STATE_END:
 		effects_update();
-		if (any_pressed(PAD_START | PAD_CROSS) >= 0) {
-			game_reset(0, 12345);                 /* fundo do título, como no boot */
-			g.state = STATE_TITLE;
-		}
+		if (any_pressed(PAD_START | PAD_CROSS) >= 0)
+			title_enter();                        /* fundo do título, como no boot */
 		break;
 	}
 
@@ -758,11 +841,13 @@ static void game_draw(void) {
 	case STATE_TITLE:
 		camera_title();
 		draw_world(0);
-		draw_center(60,  "P S 1   A R E N A");
-		draw_center(76,  "projeto base PSn00bSDK");
-		if ((g.frame >> 5) & 1)
-			draw_center(150, "APERTE START");
-		draw_center(200, "1 OU 2 JOGADORES");
+		title_draw();
+		break;
+
+	case STATE_CREDITS:
+		camera_title();
+		draw_world(0);
+		credits_draw();
 		break;
 
 	case STATE_SELECT:
@@ -1982,6 +2067,17 @@ static void robot_shots(void) {
 	debug_page = 1;
 	shot("09-overlay-ambiente", 3);
 	show_debug = debug_page = 0;
+	/* etapa 10: abas novas/mudadas, título e créditos */
+	menu_open(0);
+	g.menu_tab = 5;                          /* OPCOES */
+	shot("10-opcoes", 3);
+	g.menu_tab = 2;                          /* ESTATISTICAS: fase e total */
+	shot("10-estatisticas", 3);
+	title_enter();                           /* volta ao fundo do título */
+	shot("10-titulo", 60);
+	g.state = STATE_CREDITS;
+	credits_t = 330;                         /* com a lista no meio da tela */
+	shot("10-creditos", 3);
 	printf("SHOT TUDO\nROBO FIM\n");
 	robot_over = 1;
 }
@@ -2126,6 +2222,7 @@ int main(void) {
 
 	game_reset(0, 12345);       /* fundo da tela de título: sempre igual */
 	g.state = STATE_TITLE;
+	title_enter();
 #ifdef DEBUG_BENCHMARK
 	bench_start();
 #endif
@@ -2151,6 +2248,16 @@ int main(void) {
 
 		input_update(g.in);
 		debug_input(&g.in[0]);         /* L2: overlay e atalhos (controle 1) */
+		{                              /* há save no cartão? (só para o título) */
+			/* NÃO logo no boot: com um cartão recém-ligado o BIOS ainda está
+			 * cuidando dele (precisa dos quadros/interrupções), e um open()
+			 * imediato ficava esperando para sempre. Depois de ~1 s, sim. */
+			static int boot_frames;
+			if (boot_frames <= 60 && ++boot_frames == 60) {
+				static SAVE_DATA probe;
+				save_status = card_load(&probe, sizeof(probe));
+			}
+		}
 
 #ifdef DEBUG_BENCHMARK
 		uint16_t t_logic = TIMER_VALUE(1);     /* perfil: tempo da lógica do quadro */

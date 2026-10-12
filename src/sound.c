@@ -190,6 +190,11 @@ void sound_loop_stop(int voice) {
 	loop_sound[voice] = NULL;
 }
 
+/* Etapa 01b: tocar a faixa de CD-DA do título aqui (CdControl/CdlPlay) e
+ * parar em music_stop. Hoje: nada (a release v0.9 sai sem música). */
+void music_title_start(void) {}
+void music_stop(void) {}
+
 int sound_sfx_volume(void)   { return sfx_master; }
 int sound_music_volume(void) { return music_master; }
 

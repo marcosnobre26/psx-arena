@@ -46,7 +46,17 @@ if(PSN00BSDK_TARGET MATCHES "linux")
 	set(ELF2X ${Python3_EXECUTABLE} ${PROJECT_SOURCE_DIR}/tools/fix_gnu_stack.py --elf2x ${ELF2X})
 endif()
 
-psn00bsdk_add_executable(arena GPREL ${_sources} ${GEN_DIR}/assets_gen.c)
+# Créditos (etapa 10): o CREDITS.md vira texto embutido (o jogo ainda não
+# lê arquivos do CD). Regera sozinho quando o CREDITS.md muda.
+add_custom_command(
+	OUTPUT  ${GEN_DIR}/credits_gen.c
+	COMMAND ${Python3_EXECUTABLE} ${PROJECT_SOURCE_DIR}/tools/credits_gen.py
+	        ${PROJECT_SOURCE_DIR}/CREDITS.md ${GEN_DIR}/credits_gen.c
+	DEPENDS ${PROJECT_SOURCE_DIR}/CREDITS.md ${PROJECT_SOURCE_DIR}/tools/credits_gen.py
+	COMMENT "Gerando os créditos a partir do CREDITS.md"
+)
+
+psn00bsdk_add_executable(arena GPREL ${_sources} ${GEN_DIR}/assets_gen.c ${GEN_DIR}/credits_gen.c)
 
 target_include_directories(arena PRIVATE
 	${PROJECT_SOURCE_DIR}/src

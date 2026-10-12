@@ -39,7 +39,11 @@ void sound_loop_start(int voice, const SOUND *s, int vol); /* voice 0..1 */
 void sound_loop_stop(int voice);
 
 void sound_set_volume(int sfx, int music);      /* volumes mestre 0..128 */
-int  sound_sfx_volume(void);                    /* volume mestre dos efeitos (0..128) */
+int  sound_sfx_volume(void);
+/* Música da tela de título: PONTO DE ENTRADA para a etapa 01b (CD-DA). Hoje
+ * não toca nada; o título já chama no lugar certo. */
+void music_title_start(void);
+void music_stop(void);                    /* volume mestre dos efeitos (0..128) */
 int  sound_music_volume(void);
 int  sound_spu_used(void);                      /* bytes ocupados na RAM do SPU */
 
