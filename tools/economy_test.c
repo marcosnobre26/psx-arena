@@ -109,8 +109,9 @@ static RESULT economy(int lv, const COUNT *c, int character) {
 	if (!(owned & ((1u << W_PISTOL) | (1u << W_SHOTGUN)))) bullets = 0;
 
 	/* mana: inicial + poções + gemas + soltos (inimigos 8%, caixas 35%) + volta lenta */
-	double mana = PLAYER_MAX_ENERGY / 2 + c->n['N'] * 40 + c->n['G'] * 15
-	            + kills * 0.08 * 40 + c->n['C'] * 0.35 * 40
+	const int pot = item_defs[IT_POTION].amount;           /* N = poção de mana (etapa 08) */
+	double mana = PLAYER_MAX_ENERGY / 2 + c->n['N'] * pot + c->n['G'] * 15
+	            + kills * 0.08 * pot + c->n['C'] * 0.35 * pot
 	            + (double)secs * 60 / ENERGY_REGEN_DELAY * 0.5;   /* metade do tempo abaixo de 25% */
 
 	/* dano à distância */
@@ -132,7 +133,9 @@ static RESULT economy(int lv, const COUNT *c, int character) {
 	r.ranged_ratio = hp > 0 ? ranged / hp : 99;
 
 	/* cura: itens de vida + soltos (inimigos 12%, caixas 35%) contra o dano esperado */
-	double heal = c->n['H'] * 30 + kills * 0.12 * 30 + c->n['C'] * 0.35 * 30;
+	/* etapa 08: H = bandagem, J = kit médico; os soltos de inimigo/caixa são bandagens */
+	const int band = item_defs[IT_BANDAGE].amount, kit = item_defs[IT_MEDKIT].amount;
+	double heal = c->n['H'] * band + c->n['J'] * kit + kills * 0.12 * band + c->n['C'] * 0.35 * band;
 	double life = cd->max_hp + heal;
 	r.heal_margin1 = life - dmg1;          /* cuidadoso: cada inimigo acerta 1 vez */
 	r.heal_margin2 = life - 2 * dmg1;      /* médio: 2 vezes */

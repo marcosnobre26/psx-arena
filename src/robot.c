@@ -8,7 +8,8 @@
  * Nada daqui usa g.rng (o sorteio do robô é um gerador próprio).
  *
  * O que ele faz, em ordem de prioridade:
- *   1. vida < 35% e mana para CURA: cura;
+ *   1. vida < 35%: bandagem/kit pelo CÍRCULO; sem item, a magia CURA; sem
+ *      mana, poção pelo menu (etapa 08). Pilha < 10%: troca pelo menu;
  *   2. vida baixa com o GRANDE perto: CLARAO (se ele está em cima) e foge;
  *   3. inimigo ameaçando (perseguindo ou muito perto): luta com a melhor
  *      arma (de longe: espingarda, pistola, arco, bola de fogo; de perto:
@@ -127,6 +128,8 @@ static struct {
 	int      wander_x, wander_z, wander_t;
 	int      low_hp_prev, fleeing;
 	int      kite;                    /* recuando do GRANDE */
+	int      menu_slot, menu_done;    /* item a usar pelo menu (-1 = nenhum) */
+	int      heal_wait, item_heals;
 	int      greedy;                  /* passos "ganancioso": não recua (erro humano) */
 	int      aim_err, aim_t;          /* erro de mira atual (sorteado a cada ~0,7 s) */
 	int      exit_known, exploring;
@@ -552,6 +555,19 @@ static int crate_target(const PLAYER *p, int *w, int *x, int *z) {
 	return 0;
 }
 
+/* Abre o menu para usar o item 'type' (se tiver): START agora; os passos de
+ * menu (robot_input, g.state == STATE_MENU) fazem o resto. */
+static int use_from_menu(INPUT *in, const PLAYER *p, int type) {
+	for (int i = 0; i < INV_SLOTS; i++)
+		if (p->inv[i].type == type) {
+			rb.menu_slot = i;
+			rb.menu_done = 0;
+			in->pressed = in->held = PAD_START;
+			return 1;
+		}
+	return 0;
+}
+
 /* ------------------------------------------------------------------ */
 /* Um passo                                                             */
 /* ------------------------------------------------------------------ */
@@ -561,6 +577,7 @@ void robot_begin(uint32_t salt) {
 	rb.last_x = g.players[0].pos.vx;
 	rb.last_z = g.players[0].pos.vz;
 	rb.lpcx = -1000;
+	rb.menu_slot = -1;
 	memset(visited, 0, sizeof(visited));
 	memset(known_pick, 0, sizeof(known_pick));
 	memset(notice, 0, sizeof(notice));
@@ -596,6 +613,16 @@ void robot_input(INPUT *in) {
 	}
 #endif
 	const PLAYER *p = &g.players[0];
+	/* usando um item pelo menu (etapa 08): o jogo está parado; vai até a aba
+	 * Itens, desce até o espaço, X e sai. Não conta como tempo de jogo. */
+	if (g.state == STATE_MENU) {
+		if (rb.menu_slot < 0 || rb.menu_done) { in->pressed = in->held = PAD_START; rb.menu_slot = -1; return; }
+		if (g.menu_tab != 4)                       in->pressed = PAD_R1;
+		else if (g.menu_cursor != rb.menu_slot)    in->pressed = PAD_DOWN;
+		else { in->pressed = PAD_CROSS; rb.menu_done = 1; }
+		in->held = in->pressed;
+		return;
+	}
 	if (g.state != STATE_PLAY || !player_alive(p)) return;
 
 	int pcx = CELL(p->pos.vx), pcz = CELL(p->pos.vz);
@@ -661,14 +688,27 @@ void robot_input(INPUT *in) {
 	}
 
 	int low = p->hp * 100 < p->max_hp * 35;
-	if (low && !rb.low_hp_prev && p->energy < weapon_defs[W_HEAL].cost)
-		rb.no_heal++;                             /* precisou de cura e não tinha mana */
+	if (low && !rb.low_hp_prev && p->energy < weapon_defs[W_HEAL].cost &&
+	    !inv_count(p, IT_BANDAGE) && !inv_count(p, IT_MEDKIT) && !inv_count(p, IT_POTION))
+		rb.no_heal++;                             /* precisou de cura e não tinha nada */
 	rb.low_hp_prev = low;
 
 	int nx, nz, ix = 0, iz = 0, w, r;
 	if (rb.fleeing > 0) rb.fleeing--;
 	rb.nav = 0;
-	/* 1. cura */
+	/* 1. cura: item pelo CÍRCULO (bandagem, depois kit); sem item, a magia;
+	 * sem mana, abre o menu e bebe uma poção. Pilha no fim: troca pelo menu. */
+	if (rb.heal_wait > 0) rb.heal_wait--;
+	if (low && (inv_count(p, IT_BANDAGE) || inv_count(p, IT_MEDKIT)) && rb.heal_wait == 0) {
+		in->pressed |= PAD_CIRCLE;
+		rb.heal_wait = 20;                        /* um uso, depois reavalia a vida */
+		rb.item_heals++;
+		if (e && ed < 3 * TILE_SIZE) flee(in, p, e);
+		goto done;
+	}
+	if ((low && p->energy < weapon_defs[W_HEAL].cost && use_from_menu(in, p, IT_POTION)) ||
+	    (p->battery < BATTERY_MAX / 10 && use_from_menu(in, p, IT_BATTERY)))
+		return;
 	if (low && p->energy >= weapon_defs[W_HEAL].cost) {
 		if (select_weapon(in, p, W_HEAL) && p->cooldown == 0) in->held |= PAD_SQUARE;
 		if (e && ed < 3 * TILE_SIZE) flee(in, p, e);
@@ -769,5 +809,9 @@ void robot_report(const char *reason) {
 	       "sem_cura=%d sem_distancia_s=%d fugas=%d\n",
 	       g.level + 1, (unsigned)g.seed, g.players[0].character, reason, g.play_frames / 60,
 	       rb.stucks, rb.no_heal, rb.no_ranged_t / 60, rb.flees);
+	const PLAYER *p = &g.players[0];
+	printf("ROBO MAIS curas_atalho=%d inv_bandagem=%d inv_kit=%d inv_pocao=%d inv_pilha=%d\n",
+	       rb.item_heals, inv_count(p, IT_BANDAGE), inv_count(p, IT_MEDKIT), inv_count(p, IT_POTION),
+	       inv_count(p, IT_BATTERY));
 }
 #endif

@@ -53,6 +53,13 @@ def read_matches(path):
     matches, cur, last = [], None, None
     with open(path, encoding="utf-8", errors="replace") as f:
         for line in f:
+            j = line.find("ROBO MAIS")
+            if j >= 0:                              # continuação do relatório do robô
+                for m in reversed(matches):
+                    if m["robo"] is not None:
+                        m["robo"].update(parse(line[j:])[1])
+                        break
+                continue
             j = line.find("ROBO FIM_PARTIDA")
             if j >= 0:
                 _, kv = parse(line[j:])
@@ -243,6 +250,10 @@ def robot_summary(matches, detail):
             robos = [m["robo"] or {} for m in ms]
             print("  f%d %-10s mortos: %s" % (f, c, ", ".join("%s %d" % kv for kv in
                                                               sorted(kills.items(), key=lambda x: -x[1])) or "-"))
+            print("  %-13s inventário no fim: bandagem %.1f kit %.1f poção %.1f pilha %.1f | curas pelo atalho %.1f" %
+                  ("", avg([num(r, "inv_bandagem") for r in robos]), avg([num(r, "inv_kit") for r in robos]),
+                   avg([num(r, "inv_pocao") for r in robos]), avg([num(r, "inv_pilha") for r in robos]),
+                   avg([num(r, "curas_atalho") for r in robos])))
             print("  %-13s sobrou: %s | inimigos vivos %.1f | robô preso %.1f | fugas do grande %.1f" %
                   ("", ", ".join("%s %.1f" % (k, v / len(ends)) for k, v in sorted(left.items())) or "-",
                    avg([num(e, "inimigos_vivos") for e in ends]), avg([num(r, "presos") for r in robos]),
