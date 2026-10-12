@@ -124,6 +124,16 @@ void inv_quick_heal(PLAYER *p) {
 	show_message("SEM CURA", 40);
 }
 
+/* Totais da campanha (etapa 10): soma campo a campo */
+void stats_add(PSTATS *dst, const PSTATS *src) {
+	for (int k = 0; k < STAT_ENEMY_TYPES; k++) dst->kills[k] += src->kills[k];
+	dst->shots += src->shots;
+	dst->hits += src->hits;
+	dst->dmg_taken += src->dmg_taken;
+	dst->items_used += src->items_used;
+	dst->dist += src->dist;
+}
+
 /* ------------------------------------------------------------------ */
 /* Névoa de exploração                                                  */
 /* ------------------------------------------------------------------ */

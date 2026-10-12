@@ -128,10 +128,12 @@ typedef struct {
 	uint32_t weapons_owned;
 	int      battery, lantern_on;
 	INV_SLOT inv[INV_SLOTS];          /* o inventário passa de fase (etapa 08) */
+	PSTATS   total;                   /* estatísticas das fases vencidas (etapa 10) */
 } CARRY;
 
 static struct {
 	int   score;
+	int   time_total;                 /* passos das fases vencidas (etapa 10) */
 	CARRY p[MAX_PLAYERS];
 } progress;
 
@@ -152,7 +154,10 @@ static void progress_save(void) {
 		c->battery       = p->battery;
 		c->lantern_on    = p->lantern_on && p->battery > 0;
 		memcpy(c->inv, p->inv, sizeof(c->inv));
+		c->total = p->total;              /* campanha: o que já tinha + esta fase */
+		stats_add(&c->total, &p->st);
 	}
+	progress.time_total = g.time_total + g.play_frames;
 }
 
 static void draw_center(int y, const char *text);
@@ -186,7 +191,9 @@ static void start_level(int level, uint32_t seed) {
 		p->battery       = c->battery;
 		p->lantern_on    = c->lantern_on;
 		memcpy(p->inv, c->inv, sizeof(p->inv));
+		p->total = c->total;
 	}
+	g.time_total = progress.time_total;
 	g.state = STATE_INTRO;
 	g.state_timer = INTRO_TIME;
 	PL(pl_begin());

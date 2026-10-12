@@ -317,7 +317,8 @@ typedef struct PLAYER_S {
 	int      battery_tick;  /* passos até gastar mais 1 de bateria */
 	int      lantern_dying; /* bateria acabou: passos piscando até apagar */
 	INV_SLOT inv[INV_SLOTS];  /* inventário (etapa 08) */
-	PSTATS   st;            /* estatísticas (menu) */
+	PSTATS   st;            /* estatísticas da fase atual (menu) */
+	PSTATS   total;         /* soma das fases JÁ VENCIDAS (campanha; etapa 10) */
 	int      seen_cx, seen_cz;  /* última célula marcada na névoa de exploração */
 } PLAYER;
 
@@ -450,6 +451,7 @@ typedef struct {
 	 * g), por isso fica em g: a última aba fica; o cursor zera ao fechar. */
 	uint8_t seen[MAP_MAX_H][MAP_MAX_W / 8];
 	int     menu_tab, menu_cursor, menu_player, menu_owner;
+	int     time_total;           /* passos das fases já vencidas (campanha; etapa 10) */
 
 	/* eventos da fase (events.c). Tudo aqui é LÓGICA: só g.in, passos e g.rng */
 	struct {
@@ -651,6 +653,7 @@ int  inv_count(const PLAYER *p, int type);
 int  inv_use(PLAYER *p, int slot);              /* 1 = usou (aplica o efeito) */
 int  inv_drop(PLAYER *p, int slot);             /* 1 = largou no chão */
 void inv_quick_heal(PLAYER *p);                 /* CÍRCULO: bandagem, depois kit */
+void stats_add(PSTATS *dst, const PSTATS *src); /* dst += src (totais da campanha) */
 void explore_update(void);                      /* névoa de exploração (todo passo) */
 int  explore_seen(int cx, int cz);
 

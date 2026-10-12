@@ -150,24 +150,33 @@ static void draw_goal(void) {
 	hud_print(PX + 8, y, "GEMAS %d/%d   CHAVES %d", g.gems, g.gems_total, g.ev.keys);
 }
 
+/* Estatísticas: a FASE atual e o TOTAL da campanha (fases vencidas + esta) */
 static void draw_stats(void) {
 	const PLAYER *p = shown();
+	PSTATS tot = p->total;
+	stats_add(&tot, &p->st);
 	const PSTATS *s = &p->st;
-	int y = PY + 10, t = g.play_frames / 60;
-	hud_print(PX + 8, y, "TEMPO %d:%02d   SEMENTE %08X", t / 60, t % 60, (unsigned)g.seed); y += 16;
-	hud_print(PX + 8, y, "INIMIGOS DERROTADOS");                                         y += 12;
+	int y = PY + 8, t = g.play_frames / 60, tt = (g.time_total + g.play_frames) / 60;
+	const int cf = PX + 132, ct = PX + 204;        /* colunas FASE e TOTAL */
+	hud_print(PX + 8, y, "SEMENTE %08X", (unsigned)g.seed);
+	hud_print(cf, y, "FASE"); hud_print(ct, y, "TOTAL");                              y += 12;
+	hud_print(PX + 8, y, "TEMPO");
+	hud_print(cf, y, "%d:%02d", t / 60, t % 60); hud_print(ct, y, "%d:%02d", tt / 60, tt % 60); y += 12;
 	for (int k = 0; k < num_enemy_types && k < STAT_ENEMY_TYPES; k++) {
-		hud_print(PX + 16, y, "%-12s %d", enemy_defs[k].name, s->kills[k]);              y += 10;
+		hud_print(PX + 8, y, "%s", enemy_defs[k].name);
+		hud_print(cf, y, "%d", s->kills[k]); hud_print(ct, y, "%d", tot.kills[k]);   y += 10;
 	}
-	y += 6;
-	if (s->shots)
-		hud_print(PX + 8, y, "PRECISAO %d%%  (%d DE %d)", s->hits * 100 / s->shots, s->hits, s->shots);
-	else
-		hud_print(PX + 8, y, "PRECISAO -");
+	y += 4;
+	hud_print(PX + 8, y, "PRECISAO");
+	if (s->shots) hud_print(cf, y, "%d%%", s->hits * 100 / s->shots); else hud_print(cf, y, "-");
+	if (tot.shots) hud_print(ct, y, "%d%%", tot.hits * 100 / tot.shots); else hud_print(ct, y, "-");
 	y += 12;
-	hud_print(PX + 8, y, "DANO RECEBIDO %d", s->dmg_taken);                                y += 12;
-	hud_print(PX + 8, y, "ITENS USADOS  %d", s->items_used);                               y += 12;
-	hud_print(PX + 8, y, "DISTANCIA     %d M", s->dist / TILE_SIZE);                       y += 12;
+	hud_print(PX + 8, y, "DANO RECEBIDO");
+	hud_print(cf, y, "%d", s->dmg_taken); hud_print(ct, y, "%d", tot.dmg_taken);       y += 12;
+	hud_print(PX + 8, y, "ITENS USADOS");
+	hud_print(cf, y, "%d", s->items_used); hud_print(ct, y, "%d", tot.items_used);     y += 12;
+	hud_print(PX + 8, y, "DISTANCIA");
+	hud_print(cf, y, "%dM", s->dist / TILE_SIZE); hud_print(ct, y, "%dM", tot.dist / TILE_SIZE); y += 12;
 	hud_print(PX + 8, y, "PONTOS        %d", g.score);
 }
 

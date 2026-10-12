@@ -90,6 +90,7 @@ void player_spawn(PLAYER *p, int x, int z) {
 	p->lantern_dying = 0;
 	memset(p->inv, 0, sizeof(p->inv));    /* inventário e estatísticas (etapa 08) */
 	memset(&p->st, 0, sizeof(p->st));
+	memset(&p->total, 0, sizeof(p->total));
 	p->seen_cx = p->seen_cz = -1;         /* marca a névoa de exploração no 1o passo */
 	collide_track(p);                     /* posição definida direto: entra na grade */
 }
@@ -140,11 +141,12 @@ static void respawn(PLAYER *p) {
 	}
 	int skin = p->skin, battery = p->battery;
 	INV_SLOT inv[INV_SLOTS];                 /* cair não perde o inventário nem as estatísticas */
-	PSTATS st = p->st;
+	PSTATS st = p->st, total = p->total;
 	memcpy(inv, p->inv, sizeof(inv));
 	player_spawn(p, x, z);
 	memcpy(p->inv, inv, sizeof(inv));
 	p->st = st;
+	p->total = total;
 	p->skin = skin;
 	p->battery = battery;               /* a pilha não se recarrega por cair */
 	p->lantern_on = battery > 0;
