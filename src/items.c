@@ -26,6 +26,8 @@ static const int pickup_scale[NUM_PICKUP_TYPES] = { ONE, ONE * 3 / 4, ONE * 3 / 
 /* Itens                                                               */
 /* ------------------------------------------------------------------ */
 
+int pool_full[POOL_KINDS];
+
 int pickup_spawn(int type, int x, int z) {
 	for (int i = 0; i < MAX_PICKUPS; i++) {
 		PICKUP *p = &g.pickups[i];
@@ -38,6 +40,7 @@ int pickup_spawn(int type, int x, int z) {
 		if (type == PICK_QUEST) g.quest_total++;
 		return i + 1;
 	}
+	pool_full[POOL_PICKUP]++;
 	return 0;
 }
 
@@ -228,6 +231,7 @@ void effect_spawn(int type, int x, int z, int radius, int duration, int r, int g
 		if (g.effects[i].timer > g.effects[slot].timer) slot = i;  /* substitui o mais velho */
 	}
 	EFFECT *e = &g.effects[slot];
+	if (e->active) pool_full[POOL_EFFECT]++;   /* cheio: troca o mais velho */
 	e->active = 1;
 	e->type = type;
 	e->pos.vx = x; e->pos.vy = -8; e->pos.vz = z;

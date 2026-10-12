@@ -12,6 +12,7 @@
 #   ./dev robo-test       24 partidas do robô: a lógica mudou? (hash de g no fim)
 #   ./dev capturas        telas do menu em docs/capturas/ (o robô joga e fotografa)
 #   ./dev save-test       memory card: salva, carrega e compara o hash de g
+#   ./dev maratona [MIN]  robô joga MIN minutos (120) desenhando: travou? pools? memória?
 #   ./dev models         exporta os .blend de assets/blender/ para models/ (Blender do Windows)
 #   ./dev watch          recompila sozinho sempre que você salvar um arquivo
 #   ./dev clean          apaga a pasta build/
@@ -676,6 +677,42 @@ cmd_robo_test() {
 	fi
 }
 
+# Maratona (etapa 10, robustez): o robô joga campanhas por SOAK_MINUTES de
+# jogo (padrão 120) DESENHANDO, morrendo e recomeçando, abrindo o menu,
+# salvando e carregando. A cada minuto: pools, primitivas, pilha, pior
+# quadro, grade, cartão. Travou = o log parou de crescer (o vigia daqui).
+cmd_maratona() {
+	local min="${1:-120}" bdir="build-soak" log="$ROOT/build-soak/fatia-0.log"
+	mkdir -p "$ROOT/$bdir"
+	c_info "Maratona: $min minutos de jogo (robô desenhando; uns minutos de relógio)..."
+	( ROBO_BDIR=$bdir ROBO_LOG="$ROOT/$bdir/maratona.txt" ROBO_QUIET=1 ROBO_FATIAS=1 ROBO_TIMEOUT=7200 \
+		cmd_robo 1 -D ROBOT_SOAK=1 -D ROBOT_MENU=1 -D ROBOT_HASH=1 -D SOAK_MINUTES=$min \
+		> "$ROOT/$bdir/run.log" 2>&1 ) &
+	local job=$! last=0 still=0 waited=0
+	while kill -0 "$job" 2>/dev/null; do
+		sleep 10; waited=$((waited + 10))
+		local size; size="$(stat -c %s "$log" 2>/dev/null || echo 0)"
+		if (( size == last && size > 0 )); then still=$((still + 10)); else still=0; fi
+		last=$size
+		if (( still >= 180 )); then
+			c_err "TRAVOU? o log não cresce há 3 min (veja $bdir/fatia-0.log)"
+			pkill -9 -f "$bdir/ds-0/AppRun" 2>/dev/null || true
+			break
+		fi
+		local m; m="$(sed 's/\x1b\[[0-9;]*m//g' "$log" 2>/dev/null | grep -o "MARATONA min=[0-9]*" | tail -1)"
+		(( waited % 60 == 0 )) && printf '  %4ds de relógio: %s\n' "$waited" "${m:-iniciando}"
+	done
+	wait "$job" 2>/dev/null || true
+	local out; out="$(sed 's/\x1b\[[0-9;]*m//g' "$log" | grep -o "MARATONA .*" | tr -d '\r')"
+	printf '%s\n' "$out" > "$ROOT/$bdir/maratona-resumo.txt"
+	printf '%s\n' "$out" | tail -4
+	if printf '%s\n' "$out" | grep -q "MARATONA FIM"; then
+		c_ok "MARATONA OK: $min minutos de jogo sem travar (resumo: $bdir/maratona-resumo.txt)"
+	else
+		c_err "A maratona não chegou ao fim (log: $bdir/fatia-0.log)"; return 1
+	fi
+}
+
 # Teste do memory card (etapa 10): o robô vence a f1, começa a f2, salva,
 # bagunça, carrega e compara o hash de g; save estragado, de outra versão e
 # cartão vazio têm que ser recusados sem mudar nada. Cartão da cópia
@@ -729,5 +766,6 @@ case "${1:-build}" in
 	robo-test) shift; cmd_robo_test "$@" ;;
 	capturas) cmd_capturas ;;
 	save-test) cmd_save_test ;;
-	*)      sed -n '3,25p' "$0" | sed 's/^#//' ;;
+	maratona) shift; cmd_maratona "$@" ;;
+	*)      sed -n '3,26p' "$0" | sed 's/^#//' ;;
 esac

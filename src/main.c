@@ -2144,9 +2144,168 @@ static void save_test(void) {
 }
 #endif
 
+#ifdef ROBOT_SOAK
+/* ------------------------------------------------------------------ */
+/* ./dev maratona (etapa 10): robustez numa sessão longa. O robô joga    */
+/* CAMPANHAS (f1 -> f4 levando o progresso, personagens alternados),    */
+/* recomeça a fase ao morrer, abre o menu (ROBOT_MENU), salva no cartão */
+/* a cada fase e, a cada 3 fases, carrega e confere o hash. DESENHA     */
+/* todo quadro (cobre a parte gráfica). A cada minuto de jogo: uso dos  */
+/* pools, pools cheios, primitivas, pilha, pior quadro, grade, cartão.  */
+/* ------------------------------------------------------------------ */
+#ifndef SOAK_MINUTES
+#define SOAK_MINUTES 120
+#endif
+static struct {
+	int ticks, minute, campaign, phases, wins, deaths, timeouts, saves, save_err, loads, load_bad;
+	int max_en, max_bu, max_pk, max_fx, max_ga, prim_max, cpu_max, tpf_max, grid_err, frames_heavy;
+	int last_logic_t, load_frames, print_frames;
+} sk;
+static int soak_robot_lines;                   /* linhas gastas pelo robô no quadro */
+extern int pl_printed;                         /* playlog.c: imprimiu no TTY neste quadro */
+static int soak_loading;                       /* houve start_level neste quadro (carga de fase) */
+static uint32_t *stack_lo, *stack_hi;          /* região pintada da pilha */
+#define STACK_PAINT 0x5AFE57ACu
+
+/* Pinta 64 KB abaixo da pilha atual; depois, o primeiro valor mudado
+ * (de baixo para cima) mostra até onde a pilha desceu */
+static void stack_paint(void) {
+	volatile uint32_t here;
+	stack_hi = (uint32_t *)((uintptr_t)&here & ~3u) - 64;            /* abaixo do quadro do main */
+	stack_lo = stack_hi - 16 * 1024;                                   /* 64 KB */
+	for (uint32_t *p = stack_lo; p < stack_hi; p++) *p = STACK_PAINT;
+}
+static int stack_used(void) {
+	uint32_t *p = stack_lo;
+	while (p < stack_hi && *p == STACK_PAINT) p++;
+	return (int)((stack_hi - p) * 4) + 256;                            /* + o quadro do main */
+}
+
+static void soak_campaign(void) {
+	sk.campaign++;
+	int character = (sk.campaign - 1) % num_characters;
+	sel[0].joined = 1; sel[0].ready = 1; sel[0].character = character; sel[0].skin = 0;
+	sel[1].joined = 0;
+	memset(&progress, 0, sizeof(progress));
+	memset(g.in, 0, sizeof(g.in));
+	soak_loading = 1;
+	start_level(0, 0x50AC0000u + (uint32_t)sk.campaign * 7919u);
+	g.state = STATE_PLAY;
+	robot_begin((uint32_t)sk.campaign);
+}
+
+static void soak_phase(int level, uint32_t seed) {
+	soak_loading = 1;
+	memset(g.in, 0, sizeof(g.in));
+	start_level(level, seed);
+	g.state = STATE_PLAY;
+	robot_begin((uint32_t)(sk.phases * 31 + level));
+}
+
+/* Começo de fase nova: salva; a cada 3, carrega e confere o hash */
+static void soak_card(void) {
+	uint32_t h1 = replay_hash();
+	if (game_save_checkpoint() == 0) sk.saves++; else sk.save_err++;
+	if (sk.phases % 3 == 0) {
+		memset(g.in, 0, sizeof(g.in));
+		int r = game_load_and_start();
+		g.state = STATE_PLAY;                    /* (carregar começa na introdução; a maratona pula) */
+		sk.loads++;
+		if (r != 1 || replay_hash() != h1) sk.load_bad++;
+	}
+}
+
+static void soak_tick(void) {
+	if (g.state == STATE_PLAY) {
+		sk.ticks++;
+		int n;
+#define PEAK(field, arr, cnt) n = 0; for (int i = 0; i < cnt; i++) n += arr[i].active; if (n > sk.field) sk.field = n
+		PEAK(max_en, g.enemies, MAX_ENEMIES);
+		PEAK(max_bu, g.bullets, MAX_BULLETS);
+		PEAK(max_pk, g.pickups, MAX_PICKUPS);
+		PEAK(max_fx, g.effects, MAX_EFFECTS);
+		PEAK(max_ga, g.garrow, MAX_GROUND_ARROWS);
+#undef PEAK
+	}
+	if (sk.ticks > 0 && sk.ticks % 3600 == 0 && sk.ticks / 3600 != sk.minute) {
+		sk.minute = sk.ticks / 3600;
+		pl_printed = 1;                          /* este quadro tem printf: não conta */
+		int ge = collide_check_grid();
+		if (ge > sk.grid_err) sk.grid_err = ge;
+		printf("MARATONA min=%d campanha=%d fase=%d fases=%d vitorias=%d mortes=%d tempo=%d\n",
+		       sk.minute, sk.campaign, g.level + 1, sk.phases, sk.wins, sk.deaths, sk.timeouts);
+		printf("MARATONA MAIS pools inimigos=%d/%d tiros=%d/%d itens=%d/%d efeitos=%d/%d flechas=%d/%d\n",
+		       sk.max_en, MAX_ENEMIES, sk.max_bu, MAX_BULLETS, sk.max_pk, MAX_PICKUPS, sk.max_fx, MAX_EFFECTS,
+		       sk.max_ga, MAX_GROUND_ARROWS);
+		printf("MARATONA MAIS cheios inimigos=%d tiros=%d itens=%d efeitos=%d flechas=%d\n",
+		       pool_full[POOL_ENEMY], pool_full[POOL_BULLET], pool_full[POOL_PICKUP], pool_full[POOL_EFFECT],
+		       pool_full[POOL_GARROW]);
+		printf("MARATONA MAIS prim_max=%d/%d cpu_max=%d quadros_pesados=%d passos_por_quadro_max=%d "
+		       "pilha=%d grade_erros=%d saves=%d save_erros=%d loads=%d load_diferente=%d cargas=%d quadros_printf=%d\n",
+		       sk.prim_max, PACKET_LEN, sk.cpu_max, sk.frames_heavy, sk.tpf_max, stack_used(), sk.grid_err,
+		       sk.saves, sk.save_err, sk.loads, sk.load_bad, sk.load_frames, sk.print_frames);
+		if (sk.minute >= SOAK_MINUTES) {
+			printf("MARATONA FIM minutos=%d\nROBO FIM\n", sk.minute);
+			robot_over = 1;
+		}
+	}
+}
+
+/* Depois de cada quadro desenhado */
+static void soak_frame(int ticks) {
+	int pc, pg, pv;
+	render_stats_time(&pc, &pg, &pv);              /* o quadro que acabou de terminar */
+	int game = pc - soak_robot_lines;               /* desconta o robô (não é o jogo) */
+	if (soak_loading) sk.load_frames++;             /* carga de fase: não conta como quadro de jogo */
+	else if (pl_printed) sk.print_frames++;         /* printf no TTY (lento): é da medição, não do jogo */
+	else {
+		if (game > sk.cpu_max) sk.cpu_max = game;
+		if (game > 525) {                           /* passou de 30 FPS: o que era? */
+			sk.frames_heavy++;
+			printf("MARATONA PESADO linhas=%d robo=%d estado=%d aba=%d fase=%d t=%d passos=%d\n", game,
+			       soak_robot_lines, g.state, g.menu_tab, g.level + 1, g.play_frames, ticks);
+		}
+	}
+	soak_robot_lines = 0;
+	soak_loading = 0;
+	pl_printed = 0;
+	if (render_stats_bytes() > sk.prim_max) sk.prim_max = render_stats_bytes();
+	if (ticks > sk.tpf_max) sk.tpf_max = ticks;
+}
+#endif
+
 /* Depois de CADA game_tick (o pl_tick já fechou vitória/morte) */
 static void robot_after_tick(void) {
 	if (robot_over) return;
+#ifdef ROBOT_SOAK
+	soak_tick();
+	if (robot_over) return;
+	if (g.state == STATE_WIN) {
+		robot_report("vitoria");
+		sk.wins++; sk.phases++;
+		if (g.level + 1 >= num_levels) { soak_campaign(); return; }   /* campanha vencida */
+		progress_save();
+		soak_phase(g.level + 1, (uint32_t)g.frame * 2654435761u);
+		soak_card();
+		return;
+	}
+	if (g.state == STATE_DEAD) {                 /* game over: a mesma fase de novo */
+		robot_report("morte");
+		sk.deaths++;
+		soak_phase(g.level, g.seed);
+		return;
+	}
+	if (g.state == STATE_PLAY && g.play_frames >= robot_limit_ticks(g.level)) {   /* emperrou: segue */
+		pl_end("tempo");
+		robot_report("tempo");
+		sk.timeouts++; sk.phases++;
+		if (g.level + 1 >= num_levels) { soak_campaign(); return; }
+		progress_save();
+		soak_phase(g.level + 1, (uint32_t)g.frame * 2654435761u);
+		return;
+	}
+	return;
+#endif
 #ifdef ROBOT_SAVETEST
 	if (g.state == STATE_WIN) { save_test(); return; }
 	if (g.state == STATE_DEAD || g.play_frames >= robot_limit_ticks(g.level)) {   /* de novo */
@@ -2228,7 +2387,12 @@ int main(void) {
 #endif
 #ifdef DEBUG_ROBOT
 	printf("ROBO INICIO\n");
+#ifdef ROBOT_SOAK
+	stack_paint();
+	soak_campaign();
+#else
 	robot_next();
+#endif
 #endif
 
 	int last_vsync = VSync(-1);
@@ -2256,6 +2420,9 @@ int main(void) {
 			if (boot_frames <= 60 && ++boot_frames == 60) {
 				static SAVE_DATA probe;
 				save_status = card_load(&probe, sizeof(probe));
+#ifdef ROBOT_SOAK
+				soak_loading = 1;            /* leitura do cartão (bloqueia): não é quadro de jogo */
+#endif
 			}
 		}
 
@@ -2267,7 +2434,13 @@ int main(void) {
 			replay_input();
 #endif
 #ifdef DEBUG_ROBOT
+#ifdef ROBOT_SOAK
+			uint16_t rt0 = TIMER_VALUE(1);
 			robot_input(&g.in[0]);
+			soak_robot_lines += (uint16_t)(TIMER_VALUE(1) - rt0);   /* o robô não é o jogo */
+#else
+			robot_input(&g.in[0]);
+#endif
 #endif
 #ifdef DEBUG_BENCHMARK
 			bench_input();
@@ -2290,7 +2463,7 @@ int main(void) {
 #ifdef DEBUG_BENCHMARK
 		bench.logic_last = (uint16_t)(TIMER_VALUE(1) - t_logic);
 #endif
-#ifdef DEBUG_ROBOT
+#if defined(DEBUG_ROBOT) && !defined(ROBOT_SOAK)
 		continue;                      /* robô: ninguém olha; só a lógica (bem mais rápido) */
 #endif
 		/* câmera visual: segue o grupo depois da lógica (fora de g) */
@@ -2301,6 +2474,9 @@ int main(void) {
 		ambience_update();
 		game_draw();
 		render_end_frame();
+#ifdef ROBOT_SOAK
+		soak_frame(ticks);
+#endif
 #ifdef DEBUG_BENCHMARK
 		bench_frame(frame_vs);
 #endif

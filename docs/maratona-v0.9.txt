@@ -1,0 +1,481 @@
+MARATONA min=1 campanha=1 fase=1 fases=0 vitorias=0 mortes=0 tempo=0
+MARATONA MAIS pools inimigos=12/24 tiros=1/48 itens=16/24 efeitos=3/16 flechas=1/6
+MARATONA MAIS cheios inimigos=0 tiros=0 itens=0 efeitos=0 flechas=0
+MARATONA MAIS prim_max=26800/98304 cpu_max=360 quadros_pesados=0 passos_por_quadro_max=2 pilha=1280 grade_erros=0 saves=0 save_erros=0 loads=0 load_diferente=0 cargas=2 quadros_printf=1
+MARATONA min=2 campanha=1 fase=1 fases=0 vitorias=0 mortes=0 tempo=0
+MARATONA MAIS pools inimigos=12/24 tiros=1/48 itens=16/24 efeitos=3/16 flechas=1/6
+MARATONA MAIS cheios inimigos=0 tiros=0 itens=0 efeitos=0 flechas=0
+MARATONA MAIS prim_max=26800/98304 cpu_max=360 quadros_pesados=0 passos_por_quadro_max=2 pilha=1280 grade_erros=0 saves=0 save_erros=0 loads=0 load_diferente=0 cargas=2 quadros_printf=4
+MARATONA min=3 campanha=1 fase=1 fases=0 vitorias=0 mortes=0 tempo=0
+MARATONA MAIS pools inimigos=12/24 tiros=1/48 itens=16/24 efeitos=3/16 flechas=2/6
+MARATONA MAIS cheios inimigos=0 tiros=0 itens=0 efeitos=0 flechas=0
+MARATONA MAIS prim_max=26800/98304 cpu_max=360 quadros_pesados=0 passos_por_quadro_max=2 pilha=1280 grade_erros=0 saves=0 save_erros=0 loads=0 load_diferente=0 cargas=2 quadros_printf=7
+MARATONA min=4 campanha=1 fase=1 fases=0 vitorias=0 mortes=0 tempo=0
+MARATONA MAIS pools inimigos=12/24 tiros=2/48 itens=16/24 efeitos=3/16 flechas=2/6
+MARATONA MAIS cheios inimigos=0 tiros=0 itens=0 efeitos=0 flechas=0
+MARATONA MAIS prim_max=26800/98304 cpu_max=360 quadros_pesados=0 passos_por_quadro_max=2 pilha=1280 grade_erros=0 saves=0 save_erros=0 loads=0 load_diferente=0 cargas=2 quadros_printf=10
+MARATONA min=5 campanha=1 fase=1 fases=0 vitorias=0 mortes=0 tempo=0
+MARATONA MAIS pools inimigos=12/24 tiros=2/48 itens=16/24 efeitos=3/16 flechas=2/6
+MARATONA MAIS cheios inimigos=0 tiros=0 itens=0 efeitos=0 flechas=0
+MARATONA MAIS prim_max=27940/98304 cpu_max=360 quadros_pesados=0 passos_por_quadro_max=2 pilha=1280 grade_erros=0 saves=0 save_erros=0 loads=0 load_diferente=0 cargas=2 quadros_printf=13
+MARATONA min=6 campanha=1 fase=1 fases=0 vitorias=0 mortes=0 tempo=0
+MARATONA MAIS pools inimigos=12/24 tiros=2/48 itens=16/24 efeitos=3/16 flechas=2/6
+MARATONA MAIS cheios inimigos=0 tiros=0 itens=0 efeitos=0 flechas=0
+MARATONA MAIS prim_max=27940/98304 cpu_max=360 quadros_pesados=0 passos_por_quadro_max=2 pilha=1280 grade_erros=0 saves=0 save_erros=0 loads=0 load_diferente=0 cargas=2 quadros_printf=16
+MARATONA min=7 campanha=1 fase=2 fases=1 vitorias=1 mortes=0 tempo=0
+MARATONA MAIS pools inimigos=14/24 tiros=2/48 itens=19/24 efeitos=4/16 flechas=2/6
+MARATONA MAIS cheios inimigos=0 tiros=0 itens=0 efeitos=0 flechas=0
+MARATONA MAIS prim_max=27940/98304 cpu_max=360 quadros_pesados=0 passos_por_quadro_max=2 pilha=1280 grade_erros=0 saves=1 save_erros=0 loads=0 load_diferente=0 cargas=3 quadros_printf=19
+MARATONA min=8 campanha=1 fase=3 fases=2 vitorias=2 mortes=0 tempo=0
+MARATONA MAIS pools inimigos=14/24 tiros=2/48 itens=19/24 efeitos=4/16 flechas=2/6
+MARATONA MAIS cheios inimigos=0 tiros=0 itens=0 efeitos=0 flechas=0
+MARATONA MAIS prim_max=27940/98304 cpu_max=360 quadros_pesados=0 passos_por_quadro_max=2 pilha=1280 grade_erros=0 saves=2 save_erros=0 loads=0 load_diferente=0 cargas=4 quadros_printf=21
+MARATONA min=9 campanha=1 fase=3 fases=2 vitorias=2 mortes=0 tempo=0
+MARATONA MAIS pools inimigos=14/24 tiros=2/48 itens=19/24 efeitos=4/16 flechas=2/6
+MARATONA MAIS cheios inimigos=0 tiros=0 itens=0 efeitos=0 flechas=0
+MARATONA MAIS prim_max=27940/98304 cpu_max=360 quadros_pesados=0 passos_por_quadro_max=2 pilha=1280 grade_erros=0 saves=2 save_erros=0 loads=0 load_diferente=0 cargas=4 quadros_printf=24
+MARATONA min=10 campanha=1 fase=3 fases=2 vitorias=2 mortes=0 tempo=0
+MARATONA MAIS pools inimigos=14/24 tiros=2/48 itens=19/24 efeitos=4/16 flechas=2/6
+MARATONA MAIS cheios inimigos=0 tiros=0 itens=0 efeitos=0 flechas=0
+MARATONA MAIS prim_max=27940/98304 cpu_max=360 quadros_pesados=0 passos_por_quadro_max=2 pilha=1280 grade_erros=0 saves=2 save_erros=0 loads=0 load_diferente=0 cargas=4 quadros_printf=27
+MARATONA min=11 campanha=1 fase=4 fases=3 vitorias=3 mortes=0 tempo=0
+MARATONA MAIS pools inimigos=14/24 tiros=2/48 itens=19/24 efeitos=4/16 flechas=2/6
+MARATONA MAIS cheios inimigos=0 tiros=0 itens=0 efeitos=0 flechas=0
+MARATONA MAIS prim_max=27940/98304 cpu_max=360 quadros_pesados=0 passos_por_quadro_max=2 pilha=1280 grade_erros=0 saves=3 save_erros=0 loads=1 load_diferente=0 cargas=5 quadros_printf=30
+MARATONA min=12 campanha=2 fase=1 fases=4 vitorias=4 mortes=0 tempo=0
+MARATONA MAIS pools inimigos=14/24 tiros=2/48 itens=19/24 efeitos=4/16 flechas=2/6
+MARATONA MAIS cheios inimigos=0 tiros=0 itens=0 efeitos=0 flechas=0
+MARATONA MAIS prim_max=27940/98304 cpu_max=362 quadros_pesados=0 passos_por_quadro_max=2 pilha=1280 grade_erros=0 saves=3 save_erros=0 loads=1 load_diferente=0 cargas=6 quadros_printf=32
+MARATONA min=13 campanha=2 fase=1 fases=4 vitorias=4 mortes=0 tempo=0
+MARATONA MAIS pools inimigos=14/24 tiros=2/48 itens=19/24 efeitos=4/16 flechas=2/6
+MARATONA MAIS cheios inimigos=0 tiros=0 itens=0 efeitos=0 flechas=0
+MARATONA MAIS prim_max=30940/98304 cpu_max=362 quadros_pesados=0 passos_por_quadro_max=2 pilha=1280 grade_erros=0 saves=3 save_erros=0 loads=1 load_diferente=0 cargas=6 quadros_printf=35
+MARATONA min=14 campanha=2 fase=1 fases=4 vitorias=4 mortes=0 tempo=0
+MARATONA MAIS pools inimigos=14/24 tiros=2/48 itens=19/24 efeitos=4/16 flechas=2/6
+MARATONA MAIS cheios inimigos=0 tiros=0 itens=0 efeitos=0 flechas=0
+MARATONA MAIS prim_max=30940/98304 cpu_max=362 quadros_pesados=0 passos_por_quadro_max=2 pilha=1280 grade_erros=0 saves=3 save_erros=0 loads=1 load_diferente=0 cargas=6 quadros_printf=38
+MARATONA min=15 campanha=2 fase=2 fases=5 vitorias=5 mortes=0 tempo=0
+MARATONA MAIS pools inimigos=14/24 tiros=2/48 itens=19/24 efeitos=4/16 flechas=2/6
+MARATONA MAIS cheios inimigos=0 tiros=0 itens=0 efeitos=0 flechas=0
+MARATONA MAIS prim_max=30940/98304 cpu_max=362 quadros_pesados=0 passos_por_quadro_max=2 pilha=1280 grade_erros=0 saves=4 save_erros=0 loads=1 load_diferente=0 cargas=7 quadros_printf=40
+MARATONA min=16 campanha=2 fase=2 fases=5 vitorias=5 mortes=0 tempo=0
+MARATONA MAIS pools inimigos=14/24 tiros=2/48 itens=19/24 efeitos=4/16 flechas=2/6
+MARATONA MAIS cheios inimigos=0 tiros=0 itens=0 efeitos=0 flechas=0
+MARATONA MAIS prim_max=30940/98304 cpu_max=362 quadros_pesados=0 passos_por_quadro_max=2 pilha=1280 grade_erros=0 saves=4 save_erros=0 loads=1 load_diferente=0 cargas=7 quadros_printf=43
+MARATONA min=17 campanha=2 fase=3 fases=6 vitorias=6 mortes=0 tempo=0
+MARATONA MAIS pools inimigos=14/24 tiros=2/48 itens=19/24 efeitos=4/16 flechas=4/6
+MARATONA MAIS cheios inimigos=0 tiros=0 itens=0 efeitos=0 flechas=0
+MARATONA MAIS prim_max=30940/98304 cpu_max=362 quadros_pesados=0 passos_por_quadro_max=2 pilha=1280 grade_erros=0 saves=5 save_erros=0 loads=2 load_diferente=0 cargas=8 quadros_printf=46
+MARATONA min=18 campanha=2 fase=3 fases=6 vitorias=6 mortes=0 tempo=0
+MARATONA MAIS pools inimigos=14/24 tiros=2/48 itens=19/24 efeitos=4/16 flechas=6/6
+MARATONA MAIS cheios inimigos=0 tiros=0 itens=0 efeitos=0 flechas=1
+MARATONA MAIS prim_max=30940/98304 cpu_max=362 quadros_pesados=0 passos_por_quadro_max=2 pilha=1280 grade_erros=0 saves=5 save_erros=0 loads=2 load_diferente=0 cargas=8 quadros_printf=49
+MARATONA min=19 campanha=2 fase=3 fases=6 vitorias=6 mortes=0 tempo=0
+MARATONA MAIS pools inimigos=14/24 tiros=2/48 itens=19/24 efeitos=4/16 flechas=6/6
+MARATONA MAIS cheios inimigos=0 tiros=0 itens=0 efeitos=0 flechas=1
+MARATONA MAIS prim_max=30940/98304 cpu_max=362 quadros_pesados=0 passos_por_quadro_max=2 pilha=1280 grade_erros=0 saves=5 save_erros=0 loads=2 load_diferente=0 cargas=8 quadros_printf=52
+MARATONA min=20 campanha=2 fase=4 fases=7 vitorias=7 mortes=0 tempo=0
+MARATONA MAIS pools inimigos=14/24 tiros=2/48 itens=19/24 efeitos=4/16 flechas=6/6
+MARATONA MAIS cheios inimigos=0 tiros=0 itens=0 efeitos=0 flechas=1
+MARATONA MAIS prim_max=30940/98304 cpu_max=362 quadros_pesados=0 passos_por_quadro_max=2 pilha=1280 grade_erros=0 saves=6 save_erros=0 loads=2 load_diferente=0 cargas=9 quadros_printf=55
+MARATONA min=21 campanha=3 fase=1 fases=8 vitorias=8 mortes=0 tempo=0
+MARATONA MAIS pools inimigos=14/24 tiros=2/48 itens=19/24 efeitos=4/16 flechas=6/6
+MARATONA MAIS cheios inimigos=0 tiros=0 itens=0 efeitos=0 flechas=1
+MARATONA MAIS prim_max=30940/98304 cpu_max=362 quadros_pesados=0 passos_por_quadro_max=2 pilha=1280 grade_erros=0 saves=6 save_erros=0 loads=2 load_diferente=0 cargas=10 quadros_printf=57
+MARATONA min=22 campanha=3 fase=1 fases=8 vitorias=8 mortes=0 tempo=0
+MARATONA MAIS pools inimigos=14/24 tiros=2/48 itens=19/24 efeitos=4/16 flechas=6/6
+MARATONA MAIS cheios inimigos=0 tiros=0 itens=0 efeitos=0 flechas=1
+MARATONA MAIS prim_max=30984/98304 cpu_max=362 quadros_pesados=0 passos_por_quadro_max=2 pilha=1280 grade_erros=0 saves=6 save_erros=0 loads=2 load_diferente=0 cargas=10 quadros_printf=60
+MARATONA min=23 campanha=3 fase=1 fases=8 vitorias=8 mortes=0 tempo=0
+MARATONA MAIS pools inimigos=14/24 tiros=2/48 itens=19/24 efeitos=4/16 flechas=6/6
+MARATONA MAIS cheios inimigos=0 tiros=0 itens=0 efeitos=0 flechas=1
+MARATONA MAIS prim_max=30984/98304 cpu_max=362 quadros_pesados=0 passos_por_quadro_max=2 pilha=1280 grade_erros=0 saves=6 save_erros=0 loads=2 load_diferente=0 cargas=10 quadros_printf=63
+MARATONA min=24 campanha=3 fase=1 fases=8 vitorias=8 mortes=0 tempo=0
+MARATONA MAIS pools inimigos=14/24 tiros=2/48 itens=19/24 efeitos=4/16 flechas=6/6
+MARATONA MAIS cheios inimigos=0 tiros=0 itens=0 efeitos=0 flechas=1
+MARATONA MAIS prim_max=30984/98304 cpu_max=362 quadros_pesados=0 passos_por_quadro_max=2 pilha=1280 grade_erros=0 saves=6 save_erros=0 loads=2 load_diferente=0 cargas=10 quadros_printf=66
+MARATONA min=25 campanha=3 fase=1 fases=8 vitorias=8 mortes=0 tempo=0
+MARATONA MAIS pools inimigos=14/24 tiros=2/48 itens=19/24 efeitos=4/16 flechas=6/6
+MARATONA MAIS cheios inimigos=0 tiros=0 itens=0 efeitos=0 flechas=1
+MARATONA MAIS prim_max=30984/98304 cpu_max=362 quadros_pesados=0 passos_por_quadro_max=2 pilha=1280 grade_erros=0 saves=6 save_erros=0 loads=2 load_diferente=0 cargas=10 quadros_printf=69
+MARATONA min=26 campanha=3 fase=1 fases=8 vitorias=8 mortes=0 tempo=0
+MARATONA MAIS pools inimigos=14/24 tiros=2/48 itens=19/24 efeitos=4/16 flechas=6/6
+MARATONA MAIS cheios inimigos=0 tiros=0 itens=0 efeitos=0 flechas=1
+MARATONA MAIS prim_max=32052/98304 cpu_max=362 quadros_pesados=0 passos_por_quadro_max=2 pilha=1280 grade_erros=0 saves=6 save_erros=0 loads=2 load_diferente=0 cargas=10 quadros_printf=72
+MARATONA min=27 campanha=3 fase=1 fases=8 vitorias=8 mortes=0 tempo=0
+MARATONA MAIS pools inimigos=14/24 tiros=2/48 itens=19/24 efeitos=4/16 flechas=6/6
+MARATONA MAIS cheios inimigos=0 tiros=0 itens=0 efeitos=0 flechas=1
+MARATONA MAIS prim_max=32052/98304 cpu_max=362 quadros_pesados=0 passos_por_quadro_max=2 pilha=1280 grade_erros=0 saves=6 save_erros=0 loads=2 load_diferente=0 cargas=10 quadros_printf=75
+MARATONA min=28 campanha=3 fase=1 fases=8 vitorias=8 mortes=0 tempo=0
+MARATONA MAIS pools inimigos=14/24 tiros=2/48 itens=19/24 efeitos=4/16 flechas=6/6
+MARATONA MAIS cheios inimigos=0 tiros=0 itens=0 efeitos=0 flechas=1
+MARATONA MAIS prim_max=32052/98304 cpu_max=362 quadros_pesados=0 passos_por_quadro_max=2 pilha=1280 grade_erros=0 saves=6 save_erros=0 loads=2 load_diferente=0 cargas=10 quadros_printf=78
+MARATONA min=29 campanha=3 fase=1 fases=8 vitorias=8 mortes=0 tempo=0
+MARATONA MAIS pools inimigos=14/24 tiros=2/48 itens=19/24 efeitos=4/16 flechas=6/6
+MARATONA MAIS cheios inimigos=0 tiros=0 itens=0 efeitos=0 flechas=1
+MARATONA MAIS prim_max=32052/98304 cpu_max=362 quadros_pesados=0 passos_por_quadro_max=2 pilha=1280 grade_erros=0 saves=6 save_erros=0 loads=2 load_diferente=0 cargas=10 quadros_printf=81
+MARATONA min=30 campanha=3 fase=1 fases=8 vitorias=8 mortes=0 tempo=0
+MARATONA MAIS pools inimigos=14/24 tiros=2/48 itens=19/24 efeitos=4/16 flechas=6/6
+MARATONA MAIS cheios inimigos=0 tiros=0 itens=0 efeitos=0 flechas=1
+MARATONA MAIS prim_max=32052/98304 cpu_max=362 quadros_pesados=0 passos_por_quadro_max=2 pilha=1280 grade_erros=0 saves=6 save_erros=0 loads=2 load_diferente=0 cargas=10 quadros_printf=84
+MARATONA min=31 campanha=3 fase=2 fases=9 vitorias=9 mortes=0 tempo=0
+MARATONA MAIS pools inimigos=14/24 tiros=2/48 itens=19/24 efeitos=4/16 flechas=6/6
+MARATONA MAIS cheios inimigos=0 tiros=0 itens=0 efeitos=0 flechas=1
+MARATONA MAIS prim_max=32052/98304 cpu_max=362 quadros_pesados=0 passos_por_quadro_max=2 pilha=1280 grade_erros=0 saves=7 save_erros=0 loads=3 load_diferente=0 cargas=11 quadros_printf=86
+MARATONA min=32 campanha=3 fase=2 fases=9 vitorias=9 mortes=0 tempo=0
+MARATONA MAIS pools inimigos=14/24 tiros=2/48 itens=19/24 efeitos=4/16 flechas=6/6
+MARATONA MAIS cheios inimigos=0 tiros=0 itens=0 efeitos=0 flechas=1
+MARATONA MAIS prim_max=32052/98304 cpu_max=362 quadros_pesados=0 passos_por_quadro_max=2 pilha=1280 grade_erros=0 saves=7 save_erros=0 loads=3 load_diferente=0 cargas=11 quadros_printf=89
+MARATONA min=33 campanha=3 fase=3 fases=10 vitorias=10 mortes=0 tempo=0
+MARATONA MAIS pools inimigos=14/24 tiros=2/48 itens=19/24 efeitos=4/16 flechas=6/6
+MARATONA MAIS cheios inimigos=0 tiros=0 itens=0 efeitos=0 flechas=1
+MARATONA MAIS prim_max=32052/98304 cpu_max=362 quadros_pesados=0 passos_por_quadro_max=2 pilha=1280 grade_erros=0 saves=8 save_erros=0 loads=3 load_diferente=0 cargas=12 quadros_printf=91
+MARATONA min=34 campanha=3 fase=4 fases=11 vitorias=11 mortes=0 tempo=0
+MARATONA MAIS pools inimigos=14/24 tiros=2/48 itens=19/24 efeitos=4/16 flechas=6/6
+MARATONA MAIS cheios inimigos=0 tiros=0 itens=0 efeitos=0 flechas=1
+MARATONA MAIS prim_max=32052/98304 cpu_max=362 quadros_pesados=0 passos_por_quadro_max=2 pilha=1280 grade_erros=0 saves=9 save_erros=0 loads=3 load_diferente=0 cargas=13 quadros_printf=94
+MARATONA min=35 campanha=4 fase=1 fases=12 vitorias=12 mortes=0 tempo=0
+MARATONA MAIS pools inimigos=14/24 tiros=2/48 itens=19/24 efeitos=4/16 flechas=6/6
+MARATONA MAIS cheios inimigos=0 tiros=0 itens=0 efeitos=0 flechas=1
+MARATONA MAIS prim_max=32052/98304 cpu_max=362 quadros_pesados=0 passos_por_quadro_max=2 pilha=1280 grade_erros=0 saves=9 save_erros=0 loads=3 load_diferente=0 cargas=14 quadros_printf=96
+MARATONA min=36 campanha=4 fase=1 fases=12 vitorias=12 mortes=0 tempo=0
+MARATONA MAIS pools inimigos=14/24 tiros=2/48 itens=19/24 efeitos=4/16 flechas=6/6
+MARATONA MAIS cheios inimigos=0 tiros=0 itens=0 efeitos=0 flechas=1
+MARATONA MAIS prim_max=32052/98304 cpu_max=376 quadros_pesados=0 passos_por_quadro_max=2 pilha=1280 grade_erros=0 saves=9 save_erros=0 loads=3 load_diferente=0 cargas=14 quadros_printf=99
+MARATONA min=37 campanha=4 fase=2 fases=13 vitorias=13 mortes=0 tempo=0
+MARATONA MAIS pools inimigos=14/24 tiros=2/48 itens=20/24 efeitos=4/16 flechas=6/6
+MARATONA MAIS cheios inimigos=0 tiros=0 itens=0 efeitos=0 flechas=1
+MARATONA MAIS prim_max=32052/98304 cpu_max=376 quadros_pesados=0 passos_por_quadro_max=2 pilha=1280 grade_erros=0 saves=10 save_erros=0 loads=3 load_diferente=0 cargas=15 quadros_printf=101
+MARATONA min=38 campanha=4 fase=2 fases=13 vitorias=13 mortes=0 tempo=0
+MARATONA MAIS pools inimigos=14/24 tiros=2/48 itens=20/24 efeitos=4/16 flechas=6/6
+MARATONA MAIS cheios inimigos=0 tiros=0 itens=0 efeitos=0 flechas=1
+MARATONA MAIS prim_max=32052/98304 cpu_max=376 quadros_pesados=0 passos_por_quadro_max=2 pilha=1280 grade_erros=0 saves=10 save_erros=0 loads=3 load_diferente=0 cargas=15 quadros_printf=104
+MARATONA min=39 campanha=4 fase=2 fases=13 vitorias=13 mortes=0 tempo=0
+MARATONA MAIS pools inimigos=14/24 tiros=2/48 itens=20/24 efeitos=4/16 flechas=6/6
+MARATONA MAIS cheios inimigos=0 tiros=0 itens=0 efeitos=0 flechas=1
+MARATONA MAIS prim_max=32052/98304 cpu_max=376 quadros_pesados=0 passos_por_quadro_max=2 pilha=1280 grade_erros=0 saves=10 save_erros=0 loads=3 load_diferente=0 cargas=15 quadros_printf=107
+MARATONA min=40 campanha=4 fase=2 fases=13 vitorias=13 mortes=0 tempo=0
+MARATONA MAIS pools inimigos=14/24 tiros=2/48 itens=20/24 efeitos=4/16 flechas=6/6
+MARATONA MAIS cheios inimigos=0 tiros=0 itens=0 efeitos=0 flechas=1
+MARATONA MAIS prim_max=32052/98304 cpu_max=376 quadros_pesados=0 passos_por_quadro_max=2 pilha=1280 grade_erros=0 saves=10 save_erros=0 loads=3 load_diferente=0 cargas=15 quadros_printf=110
+MARATONA min=41 campanha=4 fase=3 fases=14 vitorias=14 mortes=0 tempo=0
+MARATONA MAIS pools inimigos=14/24 tiros=2/48 itens=20/24 efeitos=4/16 flechas=6/6
+MARATONA MAIS cheios inimigos=0 tiros=0 itens=0 efeitos=0 flechas=1
+MARATONA MAIS prim_max=32052/98304 cpu_max=376 quadros_pesados=0 passos_por_quadro_max=2 pilha=1280 grade_erros=0 saves=11 save_erros=0 loads=3 load_diferente=0 cargas=16 quadros_printf=113
+MARATONA min=42 campanha=4 fase=3 fases=14 vitorias=14 mortes=0 tempo=0
+MARATONA MAIS pools inimigos=14/24 tiros=2/48 itens=20/24 efeitos=4/16 flechas=6/6
+MARATONA MAIS cheios inimigos=0 tiros=0 itens=0 efeitos=0 flechas=1
+MARATONA MAIS prim_max=32052/98304 cpu_max=376 quadros_pesados=0 passos_por_quadro_max=2 pilha=1280 grade_erros=0 saves=11 save_erros=0 loads=3 load_diferente=0 cargas=16 quadros_printf=116
+MARATONA min=43 campanha=4 fase=3 fases=14 vitorias=14 mortes=0 tempo=0
+MARATONA MAIS pools inimigos=14/24 tiros=2/48 itens=20/24 efeitos=4/16 flechas=6/6
+MARATONA MAIS cheios inimigos=0 tiros=0 itens=0 efeitos=0 flechas=1
+MARATONA MAIS prim_max=32052/98304 cpu_max=376 quadros_pesados=0 passos_por_quadro_max=2 pilha=1280 grade_erros=0 saves=11 save_erros=0 loads=3 load_diferente=0 cargas=16 quadros_printf=119
+MARATONA min=44 campanha=4 fase=4 fases=15 vitorias=15 mortes=0 tempo=0
+MARATONA MAIS pools inimigos=14/24 tiros=2/48 itens=20/24 efeitos=4/16 flechas=6/6
+MARATONA MAIS cheios inimigos=0 tiros=0 itens=0 efeitos=0 flechas=1
+MARATONA MAIS prim_max=32052/98304 cpu_max=376 quadros_pesados=0 passos_por_quadro_max=2 pilha=1280 grade_erros=0 saves=12 save_erros=0 loads=4 load_diferente=0 cargas=17 quadros_printf=121
+MARATONA min=45 campanha=5 fase=1 fases=16 vitorias=16 mortes=0 tempo=0
+MARATONA MAIS pools inimigos=14/24 tiros=2/48 itens=20/24 efeitos=4/16 flechas=6/6
+MARATONA MAIS cheios inimigos=0 tiros=0 itens=0 efeitos=0 flechas=1
+MARATONA MAIS prim_max=32052/98304 cpu_max=378 quadros_pesados=0 passos_por_quadro_max=2 pilha=1280 grade_erros=0 saves=12 save_erros=0 loads=4 load_diferente=0 cargas=18 quadros_printf=123
+MARATONA min=46 campanha=5 fase=1 fases=16 vitorias=16 mortes=0 tempo=0
+MARATONA MAIS pools inimigos=14/24 tiros=3/48 itens=20/24 efeitos=4/16 flechas=6/6
+MARATONA MAIS cheios inimigos=0 tiros=0 itens=0 efeitos=0 flechas=1
+MARATONA MAIS prim_max=32052/98304 cpu_max=378 quadros_pesados=0 passos_por_quadro_max=2 pilha=1280 grade_erros=0 saves=12 save_erros=0 loads=4 load_diferente=0 cargas=18 quadros_printf=126
+MARATONA min=47 campanha=5 fase=1 fases=16 vitorias=16 mortes=0 tempo=0
+MARATONA MAIS pools inimigos=14/24 tiros=3/48 itens=20/24 efeitos=4/16 flechas=6/6
+MARATONA MAIS cheios inimigos=0 tiros=0 itens=0 efeitos=0 flechas=1
+MARATONA MAIS prim_max=32052/98304 cpu_max=378 quadros_pesados=0 passos_por_quadro_max=2 pilha=1280 grade_erros=0 saves=12 save_erros=0 loads=4 load_diferente=0 cargas=18 quadros_printf=129
+MARATONA min=48 campanha=5 fase=1 fases=16 vitorias=16 mortes=0 tempo=0
+MARATONA MAIS pools inimigos=14/24 tiros=3/48 itens=20/24 efeitos=4/16 flechas=6/6
+MARATONA MAIS cheios inimigos=0 tiros=0 itens=0 efeitos=0 flechas=1
+MARATONA MAIS prim_max=32052/98304 cpu_max=378 quadros_pesados=0 passos_por_quadro_max=2 pilha=1280 grade_erros=0 saves=12 save_erros=0 loads=4 load_diferente=0 cargas=18 quadros_printf=132
+MARATONA min=49 campanha=5 fase=1 fases=16 vitorias=16 mortes=0 tempo=0
+MARATONA MAIS pools inimigos=14/24 tiros=3/48 itens=20/24 efeitos=4/16 flechas=6/6
+MARATONA MAIS cheios inimigos=0 tiros=0 itens=0 efeitos=0 flechas=1
+MARATONA MAIS prim_max=32052/98304 cpu_max=378 quadros_pesados=0 passos_por_quadro_max=2 pilha=1280 grade_erros=0 saves=12 save_erros=0 loads=4 load_diferente=0 cargas=18 quadros_printf=135
+MARATONA min=50 campanha=5 fase=2 fases=17 vitorias=17 mortes=0 tempo=0
+MARATONA MAIS pools inimigos=14/24 tiros=3/48 itens=20/24 efeitos=4/16 flechas=6/6
+MARATONA MAIS cheios inimigos=0 tiros=0 itens=0 efeitos=0 flechas=1
+MARATONA MAIS prim_max=32052/98304 cpu_max=378 quadros_pesados=0 passos_por_quadro_max=2 pilha=1280 grade_erros=0 saves=13 save_erros=0 loads=4 load_diferente=0 cargas=19 quadros_printf=137
+MARATONA min=51 campanha=5 fase=2 fases=17 vitorias=17 mortes=0 tempo=0
+MARATONA MAIS pools inimigos=14/24 tiros=3/48 itens=20/24 efeitos=4/16 flechas=6/6
+MARATONA MAIS cheios inimigos=0 tiros=0 itens=0 efeitos=0 flechas=1
+MARATONA MAIS prim_max=32052/98304 cpu_max=378 quadros_pesados=0 passos_por_quadro_max=2 pilha=1280 grade_erros=0 saves=13 save_erros=0 loads=4 load_diferente=0 cargas=19 quadros_printf=140
+MARATONA min=52 campanha=5 fase=3 fases=18 vitorias=18 mortes=0 tempo=0
+MARATONA MAIS pools inimigos=14/24 tiros=3/48 itens=20/24 efeitos=4/16 flechas=6/6
+MARATONA MAIS cheios inimigos=0 tiros=0 itens=0 efeitos=0 flechas=1
+MARATONA MAIS prim_max=32052/98304 cpu_max=378 quadros_pesados=0 passos_por_quadro_max=2 pilha=1280 grade_erros=0 saves=14 save_erros=0 loads=5 load_diferente=0 cargas=20 quadros_printf=142
+MARATONA min=53 campanha=5 fase=3 fases=18 vitorias=18 mortes=0 tempo=0
+MARATONA MAIS pools inimigos=14/24 tiros=6/48 itens=20/24 efeitos=4/16 flechas=6/6
+MARATONA MAIS cheios inimigos=0 tiros=0 itens=0 efeitos=0 flechas=1
+MARATONA MAIS prim_max=32052/98304 cpu_max=378 quadros_pesados=0 passos_por_quadro_max=2 pilha=1280 grade_erros=0 saves=14 save_erros=0 loads=5 load_diferente=0 cargas=20 quadros_printf=145
+MARATONA min=54 campanha=5 fase=3 fases=18 vitorias=18 mortes=0 tempo=0
+MARATONA MAIS pools inimigos=14/24 tiros=6/48 itens=20/24 efeitos=4/16 flechas=6/6
+MARATONA MAIS cheios inimigos=0 tiros=0 itens=0 efeitos=0 flechas=1
+MARATONA MAIS prim_max=32052/98304 cpu_max=378 quadros_pesados=0 passos_por_quadro_max=2 pilha=1280 grade_erros=0 saves=14 save_erros=0 loads=5 load_diferente=0 cargas=20 quadros_printf=148
+MARATONA min=55 campanha=5 fase=4 fases=19 vitorias=19 mortes=0 tempo=0
+MARATONA MAIS pools inimigos=14/24 tiros=6/48 itens=20/24 efeitos=4/16 flechas=6/6
+MARATONA MAIS cheios inimigos=0 tiros=0 itens=0 efeitos=0 flechas=1
+MARATONA MAIS prim_max=32052/98304 cpu_max=378 quadros_pesados=0 passos_por_quadro_max=2 pilha=1280 grade_erros=0 saves=15 save_erros=0 loads=5 load_diferente=0 cargas=21 quadros_printf=151
+MARATONA min=56 campanha=6 fase=1 fases=20 vitorias=20 mortes=0 tempo=0
+MARATONA MAIS pools inimigos=14/24 tiros=6/48 itens=20/24 efeitos=4/16 flechas=6/6
+MARATONA MAIS cheios inimigos=0 tiros=0 itens=0 efeitos=0 flechas=1
+MARATONA MAIS prim_max=32052/98304 cpu_max=378 quadros_pesados=0 passos_por_quadro_max=2 pilha=1280 grade_erros=0 saves=15 save_erros=0 loads=5 load_diferente=0 cargas=22 quadros_printf=153
+MARATONA min=57 campanha=6 fase=1 fases=20 vitorias=20 mortes=0 tempo=0
+MARATONA MAIS pools inimigos=14/24 tiros=6/48 itens=20/24 efeitos=4/16 flechas=6/6
+MARATONA MAIS cheios inimigos=0 tiros=0 itens=0 efeitos=0 flechas=1
+MARATONA MAIS prim_max=32052/98304 cpu_max=378 quadros_pesados=0 passos_por_quadro_max=2 pilha=1280 grade_erros=0 saves=15 save_erros=0 loads=5 load_diferente=0 cargas=22 quadros_printf=156
+MARATONA min=58 campanha=6 fase=1 fases=20 vitorias=20 mortes=0 tempo=0
+MARATONA MAIS pools inimigos=14/24 tiros=6/48 itens=20/24 efeitos=4/16 flechas=6/6
+MARATONA MAIS cheios inimigos=0 tiros=0 itens=0 efeitos=0 flechas=1
+MARATONA MAIS prim_max=32052/98304 cpu_max=378 quadros_pesados=0 passos_por_quadro_max=2 pilha=1280 grade_erros=0 saves=15 save_erros=0 loads=5 load_diferente=0 cargas=22 quadros_printf=159
+MARATONA min=59 campanha=6 fase=1 fases=20 vitorias=20 mortes=0 tempo=0
+MARATONA MAIS pools inimigos=14/24 tiros=6/48 itens=20/24 efeitos=4/16 flechas=6/6
+MARATONA MAIS cheios inimigos=0 tiros=0 itens=0 efeitos=0 flechas=1
+MARATONA MAIS prim_max=32052/98304 cpu_max=378 quadros_pesados=0 passos_por_quadro_max=2 pilha=1280 grade_erros=0 saves=15 save_erros=0 loads=5 load_diferente=0 cargas=22 quadros_printf=162
+MARATONA min=60 campanha=6 fase=1 fases=20 vitorias=20 mortes=0 tempo=0
+MARATONA MAIS pools inimigos=14/24 tiros=6/48 itens=20/24 efeitos=4/16 flechas=6/6
+MARATONA MAIS cheios inimigos=0 tiros=0 itens=0 efeitos=0 flechas=1
+MARATONA MAIS prim_max=32052/98304 cpu_max=378 quadros_pesados=0 passos_por_quadro_max=2 pilha=1280 grade_erros=0 saves=15 save_erros=0 loads=5 load_diferente=0 cargas=22 quadros_printf=165
+MARATONA min=61 campanha=6 fase=1 fases=20 vitorias=20 mortes=0 tempo=0
+MARATONA MAIS pools inimigos=14/24 tiros=6/48 itens=20/24 efeitos=4/16 flechas=6/6
+MARATONA MAIS cheios inimigos=0 tiros=0 itens=0 efeitos=0 flechas=1
+MARATONA MAIS prim_max=32052/98304 cpu_max=378 quadros_pesados=0 passos_por_quadro_max=2 pilha=1280 grade_erros=0 saves=15 save_erros=0 loads=5 load_diferente=0 cargas=22 quadros_printf=168
+MARATONA min=62 campanha=6 fase=1 fases=20 vitorias=20 mortes=0 tempo=0
+MARATONA MAIS pools inimigos=14/24 tiros=6/48 itens=20/24 efeitos=4/16 flechas=6/6
+MARATONA MAIS cheios inimigos=0 tiros=0 itens=0 efeitos=0 flechas=1
+MARATONA MAIS prim_max=32052/98304 cpu_max=378 quadros_pesados=0 passos_por_quadro_max=2 pilha=1280 grade_erros=0 saves=15 save_erros=0 loads=5 load_diferente=0 cargas=22 quadros_printf=171
+MARATONA min=63 campanha=6 fase=2 fases=21 vitorias=21 mortes=0 tempo=0
+MARATONA MAIS pools inimigos=14/24 tiros=6/48 itens=20/24 efeitos=4/16 flechas=6/6
+MARATONA MAIS cheios inimigos=0 tiros=0 itens=0 efeitos=0 flechas=1
+MARATONA MAIS prim_max=32052/98304 cpu_max=378 quadros_pesados=0 passos_por_quadro_max=2 pilha=1280 grade_erros=0 saves=16 save_erros=0 loads=6 load_diferente=0 cargas=23 quadros_printf=173
+MARATONA min=64 campanha=6 fase=4 fases=23 vitorias=23 mortes=0 tempo=0
+MARATONA MAIS pools inimigos=14/24 tiros=6/48 itens=20/24 efeitos=4/16 flechas=6/6
+MARATONA MAIS cheios inimigos=0 tiros=0 itens=0 efeitos=0 flechas=1
+MARATONA MAIS prim_max=32052/98304 cpu_max=378 quadros_pesados=0 passos_por_quadro_max=2 pilha=1280 grade_erros=0 saves=18 save_erros=0 loads=6 load_diferente=0 cargas=25 quadros_printf=175
+MARATONA min=65 campanha=7 fase=1 fases=24 vitorias=24 mortes=0 tempo=0
+MARATONA MAIS pools inimigos=14/24 tiros=6/48 itens=20/24 efeitos=4/16 flechas=6/6
+MARATONA MAIS cheios inimigos=0 tiros=0 itens=0 efeitos=0 flechas=1
+MARATONA MAIS prim_max=32052/98304 cpu_max=378 quadros_pesados=0 passos_por_quadro_max=2 pilha=1280 grade_erros=0 saves=18 save_erros=0 loads=6 load_diferente=0 cargas=26 quadros_printf=177
+MARATONA min=66 campanha=7 fase=1 fases=24 vitorias=24 mortes=0 tempo=0
+MARATONA MAIS pools inimigos=14/24 tiros=6/48 itens=20/24 efeitos=4/16 flechas=6/6
+MARATONA MAIS cheios inimigos=0 tiros=0 itens=0 efeitos=0 flechas=1
+MARATONA MAIS prim_max=32052/98304 cpu_max=378 quadros_pesados=0 passos_por_quadro_max=2 pilha=1280 grade_erros=0 saves=18 save_erros=0 loads=6 load_diferente=0 cargas=26 quadros_printf=180
+MARATONA min=67 campanha=7 fase=1 fases=24 vitorias=24 mortes=0 tempo=0
+MARATONA MAIS pools inimigos=14/24 tiros=6/48 itens=20/24 efeitos=4/16 flechas=6/6
+MARATONA MAIS cheios inimigos=0 tiros=0 itens=0 efeitos=0 flechas=2
+MARATONA MAIS prim_max=32052/98304 cpu_max=378 quadros_pesados=0 passos_por_quadro_max=2 pilha=1280 grade_erros=0 saves=18 save_erros=0 loads=6 load_diferente=0 cargas=26 quadros_printf=183
+MARATONA min=68 campanha=7 fase=1 fases=24 vitorias=24 mortes=0 tempo=0
+MARATONA MAIS pools inimigos=14/24 tiros=6/48 itens=20/24 efeitos=4/16 flechas=6/6
+MARATONA MAIS cheios inimigos=0 tiros=0 itens=0 efeitos=0 flechas=2
+MARATONA MAIS prim_max=32052/98304 cpu_max=378 quadros_pesados=0 passos_por_quadro_max=2 pilha=1280 grade_erros=0 saves=18 save_erros=0 loads=6 load_diferente=0 cargas=26 quadros_printf=186
+MARATONA min=69 campanha=7 fase=2 fases=25 vitorias=25 mortes=0 tempo=0
+MARATONA MAIS pools inimigos=14/24 tiros=6/48 itens=20/24 efeitos=4/16 flechas=6/6
+MARATONA MAIS cheios inimigos=0 tiros=0 itens=0 efeitos=0 flechas=2
+MARATONA MAIS prim_max=32052/98304 cpu_max=378 quadros_pesados=0 passos_por_quadro_max=2 pilha=1280 grade_erros=0 saves=19 save_erros=0 loads=6 load_diferente=0 cargas=27 quadros_printf=188
+MARATONA min=70 campanha=7 fase=3 fases=26 vitorias=26 mortes=0 tempo=0
+MARATONA MAIS pools inimigos=14/24 tiros=6/48 itens=20/24 efeitos=4/16 flechas=6/6
+MARATONA MAIS cheios inimigos=0 tiros=0 itens=0 efeitos=0 flechas=2
+MARATONA MAIS prim_max=32052/98304 cpu_max=378 quadros_pesados=0 passos_por_quadro_max=2 pilha=1280 grade_erros=0 saves=20 save_erros=0 loads=6 load_diferente=0 cargas=28 quadros_printf=190
+MARATONA min=71 campanha=7 fase=3 fases=26 vitorias=26 mortes=0 tempo=0
+MARATONA MAIS pools inimigos=14/24 tiros=6/48 itens=20/24 efeitos=4/16 flechas=6/6
+MARATONA MAIS cheios inimigos=0 tiros=0 itens=0 efeitos=0 flechas=2
+MARATONA MAIS prim_max=32052/98304 cpu_max=378 quadros_pesados=0 passos_por_quadro_max=2 pilha=1280 grade_erros=0 saves=20 save_erros=0 loads=6 load_diferente=0 cargas=28 quadros_printf=193
+MARATONA min=72 campanha=7 fase=4 fases=27 vitorias=27 mortes=0 tempo=0
+MARATONA MAIS pools inimigos=14/24 tiros=6/48 itens=20/24 efeitos=4/16 flechas=6/6
+MARATONA MAIS cheios inimigos=0 tiros=0 itens=0 efeitos=0 flechas=2
+MARATONA MAIS prim_max=32052/98304 cpu_max=378 quadros_pesados=0 passos_por_quadro_max=2 pilha=1280 grade_erros=0 saves=21 save_erros=0 loads=7 load_diferente=0 cargas=29 quadros_printf=196
+MARATONA min=73 campanha=8 fase=1 fases=28 vitorias=28 mortes=0 tempo=0
+MARATONA MAIS pools inimigos=14/24 tiros=6/48 itens=20/24 efeitos=4/16 flechas=6/6
+MARATONA MAIS cheios inimigos=0 tiros=0 itens=0 efeitos=0 flechas=2
+MARATONA MAIS prim_max=32052/98304 cpu_max=378 quadros_pesados=0 passos_por_quadro_max=2 pilha=1280 grade_erros=0 saves=21 save_erros=0 loads=7 load_diferente=0 cargas=30 quadros_printf=198
+MARATONA min=74 campanha=8 fase=1 fases=28 vitorias=28 mortes=0 tempo=0
+MARATONA MAIS pools inimigos=14/24 tiros=6/48 itens=20/24 efeitos=4/16 flechas=6/6
+MARATONA MAIS cheios inimigos=0 tiros=0 itens=0 efeitos=0 flechas=2
+MARATONA MAIS prim_max=32052/98304 cpu_max=381 quadros_pesados=0 passos_por_quadro_max=2 pilha=1280 grade_erros=0 saves=21 save_erros=0 loads=7 load_diferente=0 cargas=30 quadros_printf=201
+MARATONA min=75 campanha=8 fase=1 fases=28 vitorias=28 mortes=0 tempo=0
+MARATONA MAIS pools inimigos=14/24 tiros=6/48 itens=20/24 efeitos=4/16 flechas=6/6
+MARATONA MAIS cheios inimigos=0 tiros=0 itens=0 efeitos=0 flechas=2
+MARATONA MAIS prim_max=32052/98304 cpu_max=381 quadros_pesados=0 passos_por_quadro_max=2 pilha=1280 grade_erros=0 saves=21 save_erros=0 loads=7 load_diferente=0 cargas=30 quadros_printf=203
+MARATONA min=76 campanha=8 fase=1 fases=28 vitorias=28 mortes=1 tempo=0
+MARATONA MAIS pools inimigos=14/24 tiros=6/48 itens=20/24 efeitos=4/16 flechas=6/6
+MARATONA MAIS cheios inimigos=0 tiros=0 itens=0 efeitos=0 flechas=2
+MARATONA MAIS prim_max=32052/98304 cpu_max=385 quadros_pesados=0 passos_por_quadro_max=2 pilha=1280 grade_erros=0 saves=21 save_erros=0 loads=7 load_diferente=0 cargas=31 quadros_printf=205
+MARATONA min=77 campanha=8 fase=2 fases=29 vitorias=29 mortes=1 tempo=0
+MARATONA MAIS pools inimigos=14/24 tiros=6/48 itens=20/24 efeitos=4/16 flechas=6/6
+MARATONA MAIS cheios inimigos=0 tiros=0 itens=0 efeitos=0 flechas=2
+MARATONA MAIS prim_max=32052/98304 cpu_max=385 quadros_pesados=0 passos_por_quadro_max=2 pilha=1280 grade_erros=0 saves=22 save_erros=0 loads=7 load_diferente=0 cargas=32 quadros_printf=208
+MARATONA min=78 campanha=8 fase=2 fases=29 vitorias=29 mortes=1 tempo=0
+MARATONA MAIS pools inimigos=14/24 tiros=6/48 itens=20/24 efeitos=4/16 flechas=6/6
+MARATONA MAIS cheios inimigos=0 tiros=0 itens=0 efeitos=0 flechas=2
+MARATONA MAIS prim_max=32052/98304 cpu_max=385 quadros_pesados=0 passos_por_quadro_max=2 pilha=1280 grade_erros=0 saves=22 save_erros=0 loads=7 load_diferente=0 cargas=32 quadros_printf=211
+MARATONA min=79 campanha=8 fase=2 fases=29 vitorias=29 mortes=1 tempo=0
+MARATONA MAIS pools inimigos=14/24 tiros=6/48 itens=20/24 efeitos=4/16 flechas=6/6
+MARATONA MAIS cheios inimigos=0 tiros=0 itens=0 efeitos=0 flechas=2
+MARATONA MAIS prim_max=32052/98304 cpu_max=385 quadros_pesados=0 passos_por_quadro_max=2 pilha=1280 grade_erros=0 saves=22 save_erros=0 loads=7 load_diferente=0 cargas=32 quadros_printf=214
+MARATONA min=80 campanha=8 fase=2 fases=29 vitorias=29 mortes=1 tempo=0
+MARATONA MAIS pools inimigos=14/24 tiros=6/48 itens=20/24 efeitos=4/16 flechas=6/6
+MARATONA MAIS cheios inimigos=0 tiros=0 itens=0 efeitos=0 flechas=2
+MARATONA MAIS prim_max=32052/98304 cpu_max=385 quadros_pesados=0 passos_por_quadro_max=2 pilha=1280 grade_erros=0 saves=22 save_erros=0 loads=7 load_diferente=0 cargas=32 quadros_printf=217
+MARATONA min=81 campanha=8 fase=2 fases=29 vitorias=29 mortes=1 tempo=0
+MARATONA MAIS pools inimigos=14/24 tiros=6/48 itens=20/24 efeitos=4/16 flechas=6/6
+MARATONA MAIS cheios inimigos=0 tiros=0 itens=0 efeitos=0 flechas=2
+MARATONA MAIS prim_max=32052/98304 cpu_max=385 quadros_pesados=0 passos_por_quadro_max=2 pilha=1280 grade_erros=0 saves=22 save_erros=0 loads=7 load_diferente=0 cargas=32 quadros_printf=220
+MARATONA min=82 campanha=8 fase=3 fases=30 vitorias=30 mortes=1 tempo=0
+MARATONA MAIS pools inimigos=14/24 tiros=6/48 itens=20/24 efeitos=4/16 flechas=6/6
+MARATONA MAIS cheios inimigos=0 tiros=0 itens=0 efeitos=0 flechas=2
+MARATONA MAIS prim_max=32052/98304 cpu_max=385 quadros_pesados=0 passos_por_quadro_max=2 pilha=1280 grade_erros=0 saves=23 save_erros=0 loads=8 load_diferente=0 cargas=33 quadros_printf=222
+MARATONA min=83 campanha=8 fase=3 fases=30 vitorias=30 mortes=1 tempo=0
+MARATONA MAIS pools inimigos=14/24 tiros=6/48 itens=20/24 efeitos=4/16 flechas=6/6
+MARATONA MAIS cheios inimigos=0 tiros=0 itens=0 efeitos=0 flechas=2
+MARATONA MAIS prim_max=32052/98304 cpu_max=385 quadros_pesados=0 passos_por_quadro_max=2 pilha=1280 grade_erros=0 saves=23 save_erros=0 loads=8 load_diferente=0 cargas=33 quadros_printf=225
+MARATONA min=84 campanha=8 fase=3 fases=30 vitorias=30 mortes=1 tempo=0
+MARATONA MAIS pools inimigos=14/24 tiros=6/48 itens=20/24 efeitos=4/16 flechas=6/6
+MARATONA MAIS cheios inimigos=0 tiros=0 itens=0 efeitos=0 flechas=2
+MARATONA MAIS prim_max=32052/98304 cpu_max=385 quadros_pesados=0 passos_por_quadro_max=2 pilha=1280 grade_erros=0 saves=23 save_erros=0 loads=8 load_diferente=0 cargas=33 quadros_printf=228
+MARATONA min=85 campanha=8 fase=4 fases=31 vitorias=31 mortes=1 tempo=0
+MARATONA MAIS pools inimigos=14/24 tiros=6/48 itens=20/24 efeitos=4/16 flechas=6/6
+MARATONA MAIS cheios inimigos=0 tiros=0 itens=0 efeitos=0 flechas=2
+MARATONA MAIS prim_max=32052/98304 cpu_max=385 quadros_pesados=0 passos_por_quadro_max=2 pilha=1280 grade_erros=0 saves=24 save_erros=0 loads=8 load_diferente=0 cargas=34 quadros_printf=231
+MARATONA min=86 campanha=9 fase=1 fases=32 vitorias=32 mortes=1 tempo=0
+MARATONA MAIS pools inimigos=14/24 tiros=6/48 itens=20/24 efeitos=4/16 flechas=6/6
+MARATONA MAIS cheios inimigos=0 tiros=0 itens=0 efeitos=0 flechas=2
+MARATONA MAIS prim_max=32052/98304 cpu_max=385 quadros_pesados=0 passos_por_quadro_max=2 pilha=1280 grade_erros=0 saves=24 save_erros=0 loads=8 load_diferente=0 cargas=35 quadros_printf=233
+MARATONA min=87 campanha=9 fase=1 fases=32 vitorias=32 mortes=1 tempo=0
+MARATONA MAIS pools inimigos=14/24 tiros=6/48 itens=20/24 efeitos=4/16 flechas=6/6
+MARATONA MAIS cheios inimigos=0 tiros=0 itens=0 efeitos=0 flechas=3
+MARATONA MAIS prim_max=32052/98304 cpu_max=385 quadros_pesados=0 passos_por_quadro_max=2 pilha=1280 grade_erros=0 saves=24 save_erros=0 loads=8 load_diferente=0 cargas=35 quadros_printf=236
+MARATONA min=88 campanha=9 fase=1 fases=32 vitorias=32 mortes=1 tempo=0
+MARATONA MAIS pools inimigos=14/24 tiros=6/48 itens=20/24 efeitos=4/16 flechas=6/6
+MARATONA MAIS cheios inimigos=0 tiros=0 itens=0 efeitos=0 flechas=3
+MARATONA MAIS prim_max=32052/98304 cpu_max=385 quadros_pesados=0 passos_por_quadro_max=2 pilha=1280 grade_erros=0 saves=24 save_erros=0 loads=8 load_diferente=0 cargas=35 quadros_printf=239
+MARATONA min=89 campanha=9 fase=2 fases=33 vitorias=33 mortes=1 tempo=0
+MARATONA MAIS pools inimigos=14/24 tiros=6/48 itens=20/24 efeitos=4/16 flechas=6/6
+MARATONA MAIS cheios inimigos=0 tiros=0 itens=0 efeitos=0 flechas=3
+MARATONA MAIS prim_max=32052/98304 cpu_max=385 quadros_pesados=0 passos_por_quadro_max=2 pilha=1280 grade_erros=0 saves=25 save_erros=0 loads=9 load_diferente=0 cargas=36 quadros_printf=242
+MARATONA min=90 campanha=9 fase=2 fases=33 vitorias=33 mortes=1 tempo=0
+MARATONA MAIS pools inimigos=14/24 tiros=6/48 itens=20/24 efeitos=4/16 flechas=6/6
+MARATONA MAIS cheios inimigos=0 tiros=0 itens=0 efeitos=0 flechas=3
+MARATONA MAIS prim_max=32052/98304 cpu_max=385 quadros_pesados=0 passos_por_quadro_max=2 pilha=1280 grade_erros=0 saves=25 save_erros=0 loads=9 load_diferente=0 cargas=36 quadros_printf=245
+MARATONA min=91 campanha=9 fase=3 fases=34 vitorias=34 mortes=1 tempo=0
+MARATONA MAIS pools inimigos=14/24 tiros=6/48 itens=20/24 efeitos=4/16 flechas=6/6
+MARATONA MAIS cheios inimigos=0 tiros=0 itens=0 efeitos=0 flechas=3
+MARATONA MAIS prim_max=32052/98304 cpu_max=385 quadros_pesados=0 passos_por_quadro_max=2 pilha=1280 grade_erros=0 saves=26 save_erros=0 loads=9 load_diferente=0 cargas=37 quadros_printf=247
+MARATONA min=92 campanha=9 fase=3 fases=34 vitorias=34 mortes=1 tempo=0
+MARATONA MAIS pools inimigos=14/24 tiros=6/48 itens=20/24 efeitos=4/16 flechas=6/6
+MARATONA MAIS cheios inimigos=0 tiros=0 itens=0 efeitos=0 flechas=3
+MARATONA MAIS prim_max=32052/98304 cpu_max=385 quadros_pesados=0 passos_por_quadro_max=2 pilha=1280 grade_erros=0 saves=26 save_erros=0 loads=9 load_diferente=0 cargas=37 quadros_printf=250
+MARATONA min=93 campanha=9 fase=4 fases=35 vitorias=35 mortes=1 tempo=0
+MARATONA MAIS pools inimigos=14/24 tiros=6/48 itens=20/24 efeitos=4/16 flechas=6/6
+MARATONA MAIS cheios inimigos=0 tiros=0 itens=0 efeitos=0 flechas=3
+MARATONA MAIS prim_max=32052/98304 cpu_max=385 quadros_pesados=0 passos_por_quadro_max=2 pilha=1280 grade_erros=0 saves=27 save_erros=0 loads=9 load_diferente=0 cargas=38 quadros_printf=253
+MARATONA min=94 campanha=10 fase=1 fases=36 vitorias=36 mortes=1 tempo=0
+MARATONA MAIS pools inimigos=14/24 tiros=6/48 itens=20/24 efeitos=4/16 flechas=6/6
+MARATONA MAIS cheios inimigos=0 tiros=0 itens=0 efeitos=0 flechas=3
+MARATONA MAIS prim_max=32052/98304 cpu_max=385 quadros_pesados=0 passos_por_quadro_max=2 pilha=1280 grade_erros=0 saves=27 save_erros=0 loads=9 load_diferente=0 cargas=39 quadros_printf=255
+MARATONA min=95 campanha=10 fase=1 fases=36 vitorias=36 mortes=1 tempo=0
+MARATONA MAIS pools inimigos=14/24 tiros=6/48 itens=20/24 efeitos=4/16 flechas=6/6
+MARATONA MAIS cheios inimigos=0 tiros=0 itens=0 efeitos=0 flechas=3
+MARATONA MAIS prim_max=32052/98304 cpu_max=385 quadros_pesados=0 passos_por_quadro_max=2 pilha=1280 grade_erros=0 saves=27 save_erros=0 loads=9 load_diferente=0 cargas=39 quadros_printf=258
+MARATONA min=96 campanha=10 fase=1 fases=36 vitorias=36 mortes=1 tempo=0
+MARATONA MAIS pools inimigos=14/24 tiros=6/48 itens=20/24 efeitos=4/16 flechas=6/6
+MARATONA MAIS cheios inimigos=0 tiros=0 itens=0 efeitos=0 flechas=3
+MARATONA MAIS prim_max=32052/98304 cpu_max=385 quadros_pesados=0 passos_por_quadro_max=2 pilha=1280 grade_erros=0 saves=27 save_erros=0 loads=9 load_diferente=0 cargas=39 quadros_printf=261
+MARATONA min=97 campanha=10 fase=1 fases=36 vitorias=36 mortes=1 tempo=0
+MARATONA MAIS pools inimigos=14/24 tiros=6/48 itens=20/24 efeitos=4/16 flechas=6/6
+MARATONA MAIS cheios inimigos=0 tiros=0 itens=0 efeitos=0 flechas=3
+MARATONA MAIS prim_max=32052/98304 cpu_max=385 quadros_pesados=0 passos_por_quadro_max=2 pilha=1280 grade_erros=0 saves=27 save_erros=0 loads=9 load_diferente=0 cargas=39 quadros_printf=264
+MARATONA min=98 campanha=10 fase=2 fases=37 vitorias=37 mortes=1 tempo=0
+MARATONA MAIS pools inimigos=14/24 tiros=6/48 itens=20/24 efeitos=4/16 flechas=6/6
+MARATONA MAIS cheios inimigos=0 tiros=0 itens=0 efeitos=0 flechas=3
+MARATONA MAIS prim_max=32052/98304 cpu_max=385 quadros_pesados=0 passos_por_quadro_max=2 pilha=1280 grade_erros=0 saves=28 save_erros=0 loads=9 load_diferente=0 cargas=40 quadros_printf=266
+MARATONA min=99 campanha=10 fase=2 fases=37 vitorias=37 mortes=1 tempo=0
+MARATONA MAIS pools inimigos=14/24 tiros=6/48 itens=20/24 efeitos=4/16 flechas=6/6
+MARATONA MAIS cheios inimigos=0 tiros=0 itens=0 efeitos=0 flechas=3
+MARATONA MAIS prim_max=32052/98304 cpu_max=398 quadros_pesados=0 passos_por_quadro_max=2 pilha=1280 grade_erros=0 saves=28 save_erros=0 loads=9 load_diferente=0 cargas=40 quadros_printf=269
+MARATONA min=100 campanha=10 fase=2 fases=37 vitorias=37 mortes=1 tempo=0
+MARATONA MAIS pools inimigos=14/24 tiros=6/48 itens=20/24 efeitos=4/16 flechas=6/6
+MARATONA MAIS cheios inimigos=0 tiros=0 itens=0 efeitos=0 flechas=3
+MARATONA MAIS prim_max=32052/98304 cpu_max=398 quadros_pesados=0 passos_por_quadro_max=2 pilha=1280 grade_erros=0 saves=28 save_erros=0 loads=9 load_diferente=0 cargas=40 quadros_printf=272
+MARATONA min=101 campanha=10 fase=2 fases=37 vitorias=37 mortes=1 tempo=0
+MARATONA MAIS pools inimigos=14/24 tiros=6/48 itens=20/24 efeitos=4/16 flechas=6/6
+MARATONA MAIS cheios inimigos=0 tiros=0 itens=0 efeitos=0 flechas=3
+MARATONA MAIS prim_max=32052/98304 cpu_max=398 quadros_pesados=0 passos_por_quadro_max=2 pilha=1280 grade_erros=0 saves=28 save_erros=0 loads=9 load_diferente=0 cargas=40 quadros_printf=275
+MARATONA min=102 campanha=10 fase=2 fases=37 vitorias=37 mortes=1 tempo=0
+MARATONA MAIS pools inimigos=14/24 tiros=6/48 itens=20/24 efeitos=4/16 flechas=6/6
+MARATONA MAIS cheios inimigos=0 tiros=0 itens=0 efeitos=0 flechas=3
+MARATONA MAIS prim_max=32052/98304 cpu_max=398 quadros_pesados=0 passos_por_quadro_max=2 pilha=1280 grade_erros=0 saves=28 save_erros=0 loads=9 load_diferente=0 cargas=40 quadros_printf=278
+MARATONA min=103 campanha=10 fase=2 fases=37 vitorias=37 mortes=1 tempo=0
+MARATONA MAIS pools inimigos=14/24 tiros=6/48 itens=20/24 efeitos=4/16 flechas=6/6
+MARATONA MAIS cheios inimigos=0 tiros=0 itens=0 efeitos=0 flechas=3
+MARATONA MAIS prim_max=32052/98304 cpu_max=398 quadros_pesados=0 passos_por_quadro_max=2 pilha=1280 grade_erros=0 saves=28 save_erros=0 loads=9 load_diferente=0 cargas=40 quadros_printf=281
+MARATONA min=104 campanha=10 fase=2 fases=37 vitorias=37 mortes=1 tempo=0
+MARATONA MAIS pools inimigos=14/24 tiros=6/48 itens=20/24 efeitos=4/16 flechas=6/6
+MARATONA MAIS cheios inimigos=0 tiros=0 itens=0 efeitos=0 flechas=3
+MARATONA MAIS prim_max=32052/98304 cpu_max=398 quadros_pesados=0 passos_por_quadro_max=2 pilha=1280 grade_erros=0 saves=28 save_erros=0 loads=9 load_diferente=0 cargas=40 quadros_printf=284
+MARATONA min=105 campanha=10 fase=2 fases=37 vitorias=37 mortes=1 tempo=0
+MARATONA MAIS pools inimigos=14/24 tiros=6/48 itens=20/24 efeitos=4/16 flechas=6/6
+MARATONA MAIS cheios inimigos=0 tiros=0 itens=0 efeitos=0 flechas=3
+MARATONA MAIS prim_max=32052/98304 cpu_max=398 quadros_pesados=0 passos_por_quadro_max=2 pilha=1280 grade_erros=0 saves=28 save_erros=0 loads=9 load_diferente=0 cargas=40 quadros_printf=287
+MARATONA min=106 campanha=10 fase=2 fases=37 vitorias=37 mortes=1 tempo=0
+MARATONA MAIS pools inimigos=14/24 tiros=6/48 itens=20/24 efeitos=4/16 flechas=6/6
+MARATONA MAIS cheios inimigos=0 tiros=0 itens=0 efeitos=0 flechas=3
+MARATONA MAIS prim_max=32052/98304 cpu_max=398 quadros_pesados=0 passos_por_quadro_max=2 pilha=1280 grade_erros=0 saves=28 save_erros=0 loads=9 load_diferente=0 cargas=40 quadros_printf=290
+MARATONA min=107 campanha=10 fase=2 fases=37 vitorias=37 mortes=1 tempo=0
+MARATONA MAIS pools inimigos=14/24 tiros=6/48 itens=20/24 efeitos=4/16 flechas=6/6
+MARATONA MAIS cheios inimigos=0 tiros=0 itens=0 efeitos=0 flechas=3
+MARATONA MAIS prim_max=32052/98304 cpu_max=398 quadros_pesados=0 passos_por_quadro_max=2 pilha=1280 grade_erros=0 saves=28 save_erros=0 loads=9 load_diferente=0 cargas=40 quadros_printf=293
+MARATONA min=108 campanha=10 fase=2 fases=37 vitorias=37 mortes=1 tempo=0
+MARATONA MAIS pools inimigos=14/24 tiros=6/48 itens=20/24 efeitos=4/16 flechas=6/6
+MARATONA MAIS cheios inimigos=0 tiros=0 itens=0 efeitos=0 flechas=3
+MARATONA MAIS prim_max=32052/98304 cpu_max=398 quadros_pesados=0 passos_por_quadro_max=2 pilha=1280 grade_erros=0 saves=28 save_erros=0 loads=9 load_diferente=0 cargas=40 quadros_printf=296
+MARATONA min=109 campanha=10 fase=2 fases=37 vitorias=37 mortes=1 tempo=0
+MARATONA MAIS pools inimigos=14/24 tiros=6/48 itens=20/24 efeitos=4/16 flechas=6/6
+MARATONA MAIS cheios inimigos=0 tiros=0 itens=0 efeitos=0 flechas=3
+MARATONA MAIS prim_max=32052/98304 cpu_max=398 quadros_pesados=0 passos_por_quadro_max=2 pilha=1280 grade_erros=0 saves=28 save_erros=0 loads=9 load_diferente=0 cargas=40 quadros_printf=299
+MARATONA min=110 campanha=10 fase=3 fases=38 vitorias=38 mortes=1 tempo=0
+MARATONA MAIS pools inimigos=14/24 tiros=6/48 itens=20/24 efeitos=4/16 flechas=6/6
+MARATONA MAIS cheios inimigos=0 tiros=0 itens=0 efeitos=0 flechas=3
+MARATONA MAIS prim_max=32052/98304 cpu_max=398 quadros_pesados=0 passos_por_quadro_max=2 pilha=1280 grade_erros=0 saves=29 save_erros=0 loads=9 load_diferente=0 cargas=41 quadros_printf=301
+MARATONA min=111 campanha=10 fase=3 fases=38 vitorias=38 mortes=1 tempo=0
+MARATONA MAIS pools inimigos=14/24 tiros=6/48 itens=20/24 efeitos=4/16 flechas=6/6
+MARATONA MAIS cheios inimigos=0 tiros=0 itens=0 efeitos=0 flechas=3
+MARATONA MAIS prim_max=32052/98304 cpu_max=398 quadros_pesados=0 passos_por_quadro_max=2 pilha=1280 grade_erros=0 saves=29 save_erros=0 loads=9 load_diferente=0 cargas=41 quadros_printf=304
+MARATONA min=112 campanha=10 fase=3 fases=38 vitorias=38 mortes=1 tempo=0
+MARATONA MAIS pools inimigos=14/24 tiros=6/48 itens=20/24 efeitos=4/16 flechas=6/6
+MARATONA MAIS cheios inimigos=0 tiros=0 itens=0 efeitos=0 flechas=3
+MARATONA MAIS prim_max=32052/98304 cpu_max=398 quadros_pesados=0 passos_por_quadro_max=2 pilha=1280 grade_erros=0 saves=29 save_erros=0 loads=9 load_diferente=0 cargas=41 quadros_printf=307
+MARATONA min=113 campanha=10 fase=4 fases=39 vitorias=39 mortes=1 tempo=0
+MARATONA MAIS pools inimigos=14/24 tiros=6/48 itens=20/24 efeitos=4/16 flechas=6/6
+MARATONA MAIS cheios inimigos=0 tiros=0 itens=0 efeitos=0 flechas=3
+MARATONA MAIS prim_max=32052/98304 cpu_max=398 quadros_pesados=0 passos_por_quadro_max=2 pilha=1280 grade_erros=0 saves=30 save_erros=0 loads=10 load_diferente=0 cargas=42 quadros_printf=310
+MARATONA min=114 campanha=11 fase=1 fases=40 vitorias=40 mortes=1 tempo=0
+MARATONA MAIS pools inimigos=14/24 tiros=6/48 itens=20/24 efeitos=4/16 flechas=6/6
+MARATONA MAIS cheios inimigos=0 tiros=0 itens=0 efeitos=0 flechas=3
+MARATONA MAIS prim_max=32052/98304 cpu_max=398 quadros_pesados=0 passos_por_quadro_max=2 pilha=1280 grade_erros=0 saves=30 save_erros=0 loads=10 load_diferente=0 cargas=43 quadros_printf=312
+MARATONA min=115 campanha=11 fase=1 fases=40 vitorias=40 mortes=1 tempo=0
+MARATONA MAIS pools inimigos=14/24 tiros=6/48 itens=20/24 efeitos=4/16 flechas=6/6
+MARATONA MAIS cheios inimigos=0 tiros=0 itens=0 efeitos=0 flechas=3
+MARATONA MAIS prim_max=32052/98304 cpu_max=398 quadros_pesados=0 passos_por_quadro_max=2 pilha=1280 grade_erros=0 saves=30 save_erros=0 loads=10 load_diferente=0 cargas=43 quadros_printf=315
+MARATONA min=116 campanha=11 fase=1 fases=40 vitorias=40 mortes=1 tempo=0
+MARATONA MAIS pools inimigos=14/24 tiros=6/48 itens=20/24 efeitos=4/16 flechas=6/6
+MARATONA MAIS cheios inimigos=0 tiros=0 itens=0 efeitos=0 flechas=3
+MARATONA MAIS prim_max=32052/98304 cpu_max=398 quadros_pesados=0 passos_por_quadro_max=2 pilha=1280 grade_erros=0 saves=30 save_erros=0 loads=10 load_diferente=0 cargas=43 quadros_printf=318
+MARATONA min=117 campanha=11 fase=1 fases=40 vitorias=40 mortes=1 tempo=0
+MARATONA MAIS pools inimigos=14/24 tiros=6/48 itens=20/24 efeitos=4/16 flechas=6/6
+MARATONA MAIS cheios inimigos=0 tiros=0 itens=0 efeitos=0 flechas=3
+MARATONA MAIS prim_max=32052/98304 cpu_max=398 quadros_pesados=0 passos_por_quadro_max=2 pilha=1280 grade_erros=0 saves=30 save_erros=0 loads=10 load_diferente=0 cargas=43 quadros_printf=321
+MARATONA min=118 campanha=11 fase=1 fases=40 vitorias=40 mortes=1 tempo=0
+MARATONA MAIS pools inimigos=14/24 tiros=6/48 itens=20/24 efeitos=4/16 flechas=6/6
+MARATONA MAIS cheios inimigos=0 tiros=0 itens=0 efeitos=0 flechas=3
+MARATONA MAIS prim_max=32052/98304 cpu_max=398 quadros_pesados=0 passos_por_quadro_max=2 pilha=1280 grade_erros=0 saves=30 save_erros=0 loads=10 load_diferente=0 cargas=43 quadros_printf=324
+MARATONA min=119 campanha=11 fase=1 fases=40 vitorias=40 mortes=1 tempo=0
+MARATONA MAIS pools inimigos=14/24 tiros=6/48 itens=20/24 efeitos=4/16 flechas=6/6
+MARATONA MAIS cheios inimigos=0 tiros=0 itens=0 efeitos=0 flechas=3
+MARATONA MAIS prim_max=32052/98304 cpu_max=398 quadros_pesados=0 passos_por_quadro_max=2 pilha=1280 grade_erros=0 saves=30 save_erros=0 loads=10 load_diferente=0 cargas=43 quadros_printf=327
+MARATONA min=120 campanha=11 fase=2 fases=41 vitorias=41 mortes=1 tempo=0
+MARATONA MAIS pools inimigos=14/24 tiros=6/48 itens=20/24 efeitos=4/16 flechas=6/6
+MARATONA MAIS cheios inimigos=0 tiros=0 itens=0 efeitos=0 flechas=3
+MARATONA MAIS prim_max=32052/98304 cpu_max=398 quadros_pesados=0 passos_por_quadro_max=2 pilha=1280 grade_erros=0 saves=31 save_erros=0 loads=10 load_diferente=0 cargas=44 quadros_printf=330
+MARATONA FIM minutos=120

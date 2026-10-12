@@ -68,6 +68,7 @@ void enemy_spawn(int type, int x, int z) {
 		collide_track(e);                 /* posição definida direto: entra na grade */
 		return;
 	}
+	pool_full[POOL_ENEMY]++;
 }
 
 void enemy_damage(ENEMY *e, int amount, int push_x, int push_z, int attacker) {

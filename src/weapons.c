@@ -94,6 +94,7 @@ static void spawn_bullet(int x, int y, int z, int angle, int speed, int damage, 
 		b->owner = owner;
 		return;
 	}
+	pool_full[POOL_BULLET]++;
 }
 
 /* Sai um pouco à frente do jogador, na altura da arma */
@@ -108,6 +109,7 @@ static void muzzle(const PLAYER *p, int *x, int *y, int *z) {
 static void drop_arrow(int x, int z) {
 	if (rng_range(&g.rng, 0, 99) >= ARROW_DROP_CHANCE) return;
 	int i = g.garrow_next;
+	if (g.garrow[i].active) pool_full[POOL_GARROW]++;   /* cheio: some a mais velha */
 	g.garrow_next = (g.garrow_next + 1) % MAX_GROUND_ARROWS;
 	g.garrow[i].active = 1;
 	g.garrow[i].x = x;

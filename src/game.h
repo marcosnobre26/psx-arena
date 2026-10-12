@@ -646,6 +646,11 @@ void bullets_draw(void);
 
 /* items.c */
 int  pickup_spawn(int type, int x, int z);      /* vaga + 1 (0 = sem vaga no chão) */
+/* Pools cheios (etapa 10, robustez): quantas vezes um spawn não achou vaga
+ * (ou substituiu o mais velho). Contadores FORA de g: não mudam o jogo; a
+ * maratona do robô (./dev maratona) mostra. */
+enum { POOL_ENEMY, POOL_BULLET, POOL_PICKUP, POOL_EFFECT, POOL_GARROW, POOL_KINDS };
+extern int pool_full[POOL_KINDS];
 
 /* inventory.c (etapa 08) */
 int  inv_add(PLAYER *p, int type);              /* 1 = guardou uma unidade */

@@ -121,8 +121,11 @@ void pl_big_escape(void) { pl.big_escapes++; }
 /* Resumo ou fim de fase. O DuckStation corta linhas longas do TTY, então
  * sai em várias linhas curtas: a primeira com o tipo, as outras com
  * "PLAYLOG MAIS" (o ./dev analisar-partida junta tudo num registro só). */
+int pl_printed;                                 /* imprimiu neste quadro (printf é lento) */
+
 static void dump(const char *kind, const char *reason) {
 	const PLAYER *p = &g.players[0];
+	pl_printed = 1;
 	printf("PLAYLOG %s fase=%d t=%d%s%s vida=%d vida_min=%d dano=%d mortes=%d",
 	       kind, pl.level + 1, g.play_frames / 60, reason ? " motivo=" : "", reason ? reason : "",
 	       p->hp, pl.hp_min, pl.dmg_taken, pl.deaths);
