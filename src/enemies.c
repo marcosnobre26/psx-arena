@@ -70,7 +70,7 @@ void enemy_spawn(int type, int x, int z) {
 	}
 }
 
-void enemy_damage(ENEMY *e, int amount, int push_x, int push_z) {
+void enemy_damage(ENEMY *e, int amount, int push_x, int push_z, int attacker) {
 	e->hp -= amount;
 	e->flash = 6;
 	e->kx += push_x;
@@ -94,6 +94,8 @@ void enemy_damage(ENEMY *e, int amount, int push_x, int push_z) {
 		collide_track(e);                 /* morreu: sai da grade */
 		g.enemies_left--;
 		PL(pl_kill(e->type));
+		if (attacker >= 0 && e->type < STAT_ENEMY_TYPES)   /* estatística (menu) */
+			g.players[attacker].st.kills[e->type]++;
 		events_enemy_killed();
 		g.score += d->score;
 		effect_spawn(FX_BURST, e->pos.vx, e->pos.vz, (300 * d->scale) >> 12, 18,

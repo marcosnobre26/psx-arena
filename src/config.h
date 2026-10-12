@@ -169,6 +169,9 @@
 #define MAX_ENEMIES     24
 #define MAX_BULLETS     48
 #define MAX_PICKUPS     24
+#define INV_SLOTS        8      /* espaços do inventário (etapa 08: escassez) */
+#define EXPLORE_R_DARK   4      /* névoa de exploração: raio visto sem lanterna (células) */
+#define EXPLORE_R_LIGHT  6      /* ... com a lanterna ligada */
 #define MAX_CRATES      32
 #define MAX_EFFECTS     16
 #define MAX_PROPS       64

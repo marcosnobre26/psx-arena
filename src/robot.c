@@ -476,11 +476,21 @@ static void flee(INPUT *in, const PLAYER *p, const ENEMY *e) {
 /* ------------------------------------------------------------------ */
 /* Itens                                                                */
 /* ------------------------------------------------------------------ */
+/* Cabe mais uma unidade deste item no inventário? (etapa 08) */
+static int inv_room(const PLAYER *p, int item) {
+	for (int i = 0; i < INV_SLOTS; i++)
+		if (p->inv[i].type == IT_NONE ||
+		    (p->inv[i].type == item && p->inv[i].count < item_defs[item].stack))
+			return 1;
+	return 0;
+}
+
 static int wants_pickup(const PLAYER *p, int type) {
 	switch (type) {
-	case PICK_HEALTH:  return p->hp <= p->max_hp - 20;
-	case PICK_ENERGY:  return p->energy <= PLAYER_MAX_ENERGY - 20;
-	case PICK_BATTERY: return p->battery < BATTERY_MAX * 4 / 5;
+	case PICK_HEALTH:  return inv_room(p, IT_BANDAGE);   /* etapa 08: vão para o inventário */
+	case PICK_MEDKIT:  return inv_room(p, IT_MEDKIT);
+	case PICK_ENERGY:  return inv_room(p, IT_POTION);
+	case PICK_BATTERY: return inv_room(p, IT_BATTERY);
 	case PICK_ARROWS:  return p->arrows < MAX_ARROWS;
 	case PICK_AMMO:    return p->bullets < MAX_BULLETS_AMMO;
 	default:           return 1;                 /* gema, arma, relíquia, chave */

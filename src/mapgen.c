@@ -573,7 +573,7 @@ static void generate(const GEN_PARAMS *gp) {
 	}
 
 	/* 5d) itens pelo orçamento (perto de onde se anda: qualquer lugar livre) */
-	static const char item_ch[GEN_ITEM_TYPES] = { 'H', 'N', 'L', 'W', 'G', 'C', 'V', 'M' };
+	static const char item_ch[GEN_ITEM_TYPES] = { 'H', 'N', 'L', 'W', 'G', 'C', 'V', 'M', 'J' };
 	for (int t = 0; t < GEN_ITEM_TYPES; t++)
 		for (int k = 0; k < gp->items[t]; k++) {
 			int x, z;

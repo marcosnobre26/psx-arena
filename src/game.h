@@ -173,7 +173,7 @@ extern const TREE_DEF tree_defs[];
 /* Geração procedural (mapgen.c): parâmetros de uma fase gerada */
 enum { GEN_HUNT, GEN_CROSS, GEN_COLLECT, GEN_SURVIVE };   /* onde ficam início/saída/... */
 enum { GEN_HEALTH, GEN_ENERGY, GEN_BATTERY, GEN_WEAPON, GEN_GEM, GEN_CRATE,
-       GEN_ARROWS, GEN_AMMO, GEN_ITEM_TYPES };   /* (novos no fim: o gerador sorteia na ordem) */
+       GEN_ARROWS, GEN_AMMO, GEN_MEDKIT, GEN_ITEM_TYPES };   /* (novos no fim: o gerador sorteia na ordem) */
 typedef struct {
 	int w, h;                    /* tamanho em células (até 128) */
 	int layout;                  /* GEN_* */
@@ -189,7 +189,7 @@ typedef struct {
 	int logs;                    /* troncos caídos */
 	int enemies;                 /* orçamento de inimigos */
 	int enemy_min_dist;          /* distância mínima do início (células) */
-	int items[GEN_ITEM_TYPES];   /* vida, energia, pilha, arma, gema, caixa */
+	int items[GEN_ITEM_TYPES];   /* bandagem, poção, pilha, arma, gema, caixa, flechas, balas, kit */
 	int thicket;                 /* mata alta: ruído >= isto (0..255; 256 = nenhuma) */
 	int walls;                   /* paredes ao lado das trilhas: limiar mais baixo
 	                                (thicket - walls) colado na faixa da trilha */
@@ -264,6 +264,32 @@ extern const int        num_level_defs;   /* todas, inclusive a de teste */
 /* ------------------------------------------------------------------ */
 /* Entidades                                                           */
 /* ------------------------------------------------------------------ */
+/* ------------------------------------------------------------------ */
+/* Inventário (etapa 08): itens GUARDADOS, usados quando o jogador quer */
+/* ------------------------------------------------------------------ */
+/* Só estes ocupam espaço (INV_SLOTS). Relíquias, chaves, gemas, armas,
+ * flechas e balas NÃO ocupam: são contadores. A ordem é a de item_defs. */
+enum { IT_NONE, IT_BANDAGE, IT_MEDKIT, IT_POTION, IT_BATTERY, NUM_ITEM_TYPES };
+typedef struct {
+	const char *name;       /* ASCII sem acentos (menu) */
+	const char *desc;       /* uma linha curta */
+	int         stack;      /* quantos cabem num espaço */
+	int         amount;     /* efeito: vida, mana ou pilha */
+	int         pick;       /* PICK_* que vira este item (descartar = volta ao chão) */
+} ITEM_DEF;
+extern const ITEM_DEF item_defs[];
+typedef struct { uint8_t type, count; } INV_SLOT;
+
+/* Estatísticas de cada jogador (etapa 08): ficam em g porque o menu mostra
+ * no build normal; o registro de partida (playlog) conta o resto. */
+#define STAT_ENEMY_TYPES 4
+typedef struct {
+	uint16_t kills[STAT_ENEMY_TYPES];   /* inimigos derrotados por tipo */
+	uint16_t shots, hits;               /* ataques / ataques que acertaram (precisão) */
+	uint16_t dmg_taken, items_used;
+	int      dist;                      /* unidades andadas (256 = 1 m) */
+} PSTATS;
+
 typedef struct PLAYER_S {
 	int      index;         /* 0 = jogador 1, 1 = jogador 2 */
 	int      active;        /* está participando da partida */
@@ -290,6 +316,9 @@ typedef struct PLAYER_S {
 	int      battery;       /* 0..BATTERY_MAX */
 	int      battery_tick;  /* passos até gastar mais 1 de bateria */
 	int      lantern_dying; /* bateria acabou: passos piscando até apagar */
+	INV_SLOT inv[INV_SLOTS];  /* inventário (etapa 08) */
+	PSTATS   st;            /* estatísticas (menu) */
+	int      seen_cx, seen_cz;  /* última célula marcada na névoa de exploração */
 } PLAYER;
 
 typedef struct {
@@ -317,16 +346,20 @@ typedef struct {
 	int     life;
 	int     damage;
 	int     weapon;
+	int     owner;          /* índice do jogador que atirou (estatística) */
 } BULLET;
 
 enum { PICK_GEM, PICK_HEALTH, PICK_ENERGY, PICK_WEAPON, PICK_QUEST, PICK_BATTERY, PICK_KEY,
        PICK_ARROWS, PICK_AMMO,   /* etapa 07: feixe de flechas (V), balas (M) */
+       PICK_MEDKIT,              /* etapa 08: kit médico (J) */
        NUM_PICKUP_TYPES };
 
 typedef struct {
 	int     active;
 	int     type;
 	VECTOR  pos;
+	int     lock;           /* etapa 08: largado pelo jogador lock-1; ele só pega de
+	                           novo depois de se afastar (0 = qualquer um pega) */
 } PICKUP;
 
 typedef struct {
@@ -363,7 +396,7 @@ typedef struct {
 	uint32_t s;
 } RNG;
 
-enum { STATE_TITLE, STATE_SELECT, STATE_PLAY, STATE_PAUSE, STATE_WIN, STATE_DEAD,
+enum { STATE_TITLE, STATE_SELECT, STATE_PLAY, STATE_MENU, STATE_WIN, STATE_DEAD,
        STATE_INTRO, STATE_END };   /* novos no fim: não mudam os números antigos */
 
 typedef struct {
@@ -412,6 +445,11 @@ typedef struct {
 	int     nnoise;
 	struct { int active, x, z, age; } garrow[MAX_GROUND_ARROWS];
 	int     garrow_next;          /* a próxima vaga (a mais antiga some) */
+	/* etapa 08: névoa de exploração (1 bit por célula vista; o mapa do menu
+	 * só mostra estas) e o menu do START. O menu é LÓGICA (usar um item muda
+	 * g), por isso fica em g: a última aba fica; o cursor zera ao fechar. */
+	uint8_t seen[MAP_MAX_H][MAP_MAX_W / 8];
+	int     menu_tab, menu_cursor, menu_player;
 
 	/* eventos da fase (events.c). Tudo aqui é LÓGICA: só g.in, passos e g.rng */
 	struct {
@@ -592,7 +630,7 @@ int  enemy_radius(const ENEMY *e);
 void enemy_spawn(int type, int x, int z);
 void enemies_update(void);
 void enemies_draw(void);
-void enemy_damage(ENEMY *e, int amount, int push_x, int push_z);
+void enemy_damage(ENEMY *e, int amount, int push_x, int push_z, int attacker);   /* attacker = jogador ou -1 */
 ENEMY *enemy_nearest_in_cone(int x, int z, int angle, int cone, int max_dist);
 
 /* weapons.c */
@@ -605,7 +643,16 @@ void bullets_update(void);
 void bullets_draw(void);
 
 /* items.c */
-void pickup_spawn(int type, int x, int z);
+int  pickup_spawn(int type, int x, int z);      /* vaga + 1 (0 = sem vaga no chão) */
+
+/* inventory.c (etapa 08) */
+int  inv_add(PLAYER *p, int type);              /* 1 = guardou uma unidade */
+int  inv_count(const PLAYER *p, int type);
+int  inv_use(PLAYER *p, int slot);              /* 1 = usou (aplica o efeito) */
+int  inv_drop(PLAYER *p, int slot);             /* 1 = largou no chão */
+void inv_quick_heal(PLAYER *p);                 /* CÍRCULO: bandagem, depois kit */
+void explore_update(void);                      /* névoa de exploração (todo passo) */
+int  explore_seen(int cx, int cz);
 void pickups_update(void);
 void pickups_draw(void);
 void crate_spawn(int cx, int cz);

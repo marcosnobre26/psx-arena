@@ -126,6 +126,7 @@ typedef struct {
 	int      hp, energy, weapon, arrows, bullets;
 	uint32_t weapons_owned;
 	int      battery, lantern_on;
+	INV_SLOT inv[INV_SLOTS];          /* o inventário passa de fase (etapa 08) */
 } CARRY;
 
 static struct {
@@ -149,6 +150,7 @@ static void progress_save(void) {
 		c->weapons_owned = p->weapons_owned;
 		c->battery       = p->battery;
 		c->lantern_on    = p->lantern_on && p->battery > 0;
+		memcpy(c->inv, p->inv, sizeof(c->inv));
 	}
 }
 
@@ -182,6 +184,7 @@ static void start_level(int level, uint32_t seed) {
 		p->weapons_owned = c->weapons_owned;
 		p->battery       = c->battery;
 		p->lantern_on    = c->lantern_on;
+		memcpy(p->inv, c->inv, sizeof(p->inv));
 	}
 	g.state = STATE_INTRO;
 	g.state_timer = INTRO_TIME;
@@ -569,7 +572,7 @@ static void game_tick(void) {
 
 	case STATE_PLAY:
 		if (any_pressed(PAD_START) >= 0) {
-			g.state = STATE_PAUSE;
+			g.state = STATE_MENU;
 			break;
 		}
 #ifdef DEBUG_BENCHMARK
@@ -593,6 +596,7 @@ static void game_tick(void) {
 		ground_arrows_update();
 		effects_update();
 		events_update();                 /* a floresta muda (etapa 06) */
+		explore_update();                /* névoa de exploração (etapa 08) */
 		camera_turn();                   /* lógica: só o ângulo (g.cam_yaw) */
 		g.play_frames++;
 		if (objective_update() && g.state == STATE_PLAY) {
@@ -604,7 +608,7 @@ static void game_tick(void) {
 		}
 		break;
 
-	case STATE_PAUSE:
+	case STATE_MENU:
 		if (any_pressed(PAD_START) >= 0)
 			g.state = STATE_PLAY;
 		break;
@@ -676,7 +680,7 @@ static void game_draw(void) {
 		draw_hud();
 		break;
 
-	case STATE_PAUSE:
+	case STATE_MENU:
 		camera_apply();
 		draw_world(1);
 		draw_hud();
@@ -743,7 +747,7 @@ static void game_draw(void) {
 
 /* Pula para a próxima fase levando o progresso, como se tivesse vencido */
 static void debug_skip_level(void) {
-	if (g.state != STATE_PLAY && g.state != STATE_PAUSE && g.state != STATE_INTRO &&
+	if (g.state != STATE_PLAY && g.state != STATE_MENU && g.state != STATE_INTRO &&
 	    g.state != STATE_WIN && g.state != STATE_DEAD)
 		return;
 	progress_save();
@@ -778,7 +782,7 @@ static void teleport_to(const DEBUG_POINT *pt) {
 
 static void debug_teleport(int i) {
 	const DEBUG_POINT *pts = mapgen_points(g.level);   /* do mapa gerado ou fixos */
-	if (!pts || (g.state != STATE_PLAY && g.state != STATE_PAUSE))
+	if (!pts || (g.state != STATE_PLAY && g.state != STATE_MENU))
 		return;
 	teleport_to(&pts[i]);
 }
@@ -787,7 +791,7 @@ static void debug_teleport(int i) {
  * livre), para medir com muita gente perto. Respeita MAX_ENEMIES. */
 static void debug_spawn_enemies(void) {
 	const PLAYER *p = &g.players[0];
-	if (!player_alive(p) || (g.state != STATE_PLAY && g.state != STATE_PAUSE))
+	if (!player_alive(p) || (g.state != STATE_PLAY && g.state != STATE_MENU))
 		return;
 	for (int k = 0; k < DEBUG_SPAWN_COUNT; k++) {
 		int a = (p->angle + k * (4096 / DEBUG_SPAWN_COUNT)) & 4095;

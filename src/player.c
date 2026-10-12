@@ -6,8 +6,8 @@
  *   X                        pular (no ar você passa por cima dos inimigos)
  *   QUADRADO                 atirar (segure)
  *   TRIÂNGULO                trocar de arma
- *   CÍRCULO                  usar poder
- *   R2                       trocar de poder
+ *   CÍRCULO                  cura rápida (bandagem, depois kit médico)
+ *   R2                       andar devagar (silêncio)
  *   L1 / R1 / analóg. dir.   girar câmera
  *   SELECT                   trocar skin (personagens com use_skins)
  *   START                    pausar
@@ -17,6 +17,7 @@
  */
 #include <psxpad.h>
 #include <stdio.h>
+#include <string.h>
 #include "game.h"
 #include "models.h"
 
@@ -87,6 +88,9 @@ void player_spawn(PLAYER *p, int x, int z) {
 	p->battery = BATTERY_MAX;
 	p->battery_tick = 0;
 	p->lantern_dying = 0;
+	memset(p->inv, 0, sizeof(p->inv));    /* inventário e estatísticas (etapa 08) */
+	memset(&p->st, 0, sizeof(p->st));
+	p->seen_cx = p->seen_cz = -1;         /* marca a névoa de exploração no 1o passo */
 	collide_track(p);                     /* posição definida direto: entra na grade */
 }
 
@@ -114,7 +118,9 @@ static void keep_together(const PLAYER *p, int *dx, int *dz) {
 
 static void move(PLAYER *p, int dx, int dz) {
 	keep_together(p, &dx, &dz);
+	int ox = p->pos.vx, oz = p->pos.vz;
 	collide_move(&p->pos, dx, dz, PLAYER_RADIUS, p, COL_ALL);
+	p->st.dist += dist2d(p->pos.vx - ox, p->pos.vz - oz);   /* estatística: andado de fato */
 }
 
 /* Volta para o jogo ao lado de um parceiro vivo */
@@ -133,7 +139,12 @@ static void respawn(PLAYER *p) {
 		if (!collide_blocked(tx, tz, 0, PLAYER_RADIUS, p, COL_ALL, tx, tz)) { x = tx; z = tz; break; }
 	}
 	int skin = p->skin, battery = p->battery;
+	INV_SLOT inv[INV_SLOTS];                 /* cair não perde o inventário nem as estatísticas */
+	PSTATS st = p->st;
+	memcpy(inv, p->inv, sizeof(inv));
 	player_spawn(p, x, z);
+	memcpy(p->inv, inv, sizeof(inv));
+	p->st = st;
 	p->skin = skin;
 	p->battery = battery;               /* a pilha não se recarrega por cair */
 	p->lantern_on = battery > 0;
@@ -230,6 +241,10 @@ void player_update(PLAYER *p, INPUT *in) {
 	}
 
 	/* ---- lanterna (SELECT). A skin agora só muda na tela de seleção. ---- */
+	/* ---- CÍRCULO: cura rápida do inventário (bandagem, depois kit; etapa 08) ---- */
+	if (in->pressed & PAD_CIRCLE)
+		inv_quick_heal(p);
+
 	if (in->pressed & PAD_SELECT) {
 		if (p->lantern_on)
 			p->lantern_on = 0;
@@ -259,6 +274,7 @@ void player_damage(PLAYER *p, int amount, int from_x, int from_z) {
 	if (!player_alive(p) || p->invuln > 0 || g.state != STATE_PLAY)
 		return;
 	p->hp -= amount;
+	p->st.dmg_taken += amount;            /* estatística (menu) */
 	PL(pl_damage(p, amount));
 	p->invuln = PLAYER_INVULN;
 	sound_play_at(&sfx_dor, p->pos.vx, p->pos.vz, VOL_DOR);

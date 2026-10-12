@@ -1,6 +1,7 @@
 /*
  * items.c - Itens coletáveis, caixas destrutíveis, efeitos e sombras
  */
+#include <stdio.h>
 #include <stdlib.h>
 #include "game.h"
 #include "models.h"
@@ -16,28 +17,45 @@ static const CVECTOR pickup_colors[NUM_PICKUP_TYPES] = {
 	{ 255, 150,  20 },   /* PICK_KEY    (chave da barreira de raízes, letra K) */
 	{ 210, 180, 110 },   /* PICK_ARROWS (feixe de flechas, letra V) */
 	{ 200, 200, 210 },   /* PICK_AMMO   (balas, letra M) */
+	{ 255, 255, 255 },   /* PICK_MEDKIT (kit médico, letra J; etapa 08) */
 };
 static const int pickup_scale[NUM_PICKUP_TYPES] = { ONE, ONE * 3 / 4, ONE * 3 / 4, ONE * 3 / 2, ONE * 5 / 4, ONE * 2 / 3,
-                                                    ONE * 5 / 4, ONE * 3 / 4, ONE * 2 / 3 };
+                                                    ONE * 5 / 4, ONE * 3 / 4, ONE * 2 / 3, ONE };
 
 /* ------------------------------------------------------------------ */
 /* Itens                                                               */
 /* ------------------------------------------------------------------ */
 
-void pickup_spawn(int type, int x, int z) {
+int pickup_spawn(int type, int x, int z) {
 	for (int i = 0; i < MAX_PICKUPS; i++) {
 		PICKUP *p = &g.pickups[i];
 		if (p->active) continue;
 		p->active = 1;
 		p->type = type;
 		p->pos.vx = x; p->pos.vy = 0; p->pos.vz = z;
+		p->lock = 0;
 		if (type == PICK_GEM) g.gems_total++;
 		if (type == PICK_QUEST) g.quest_total++;
-		return;
+		return i + 1;
 	}
+	return 0;
 }
 
-static void collect(PICKUP *it, PLAYER *p) {
+/* Itens que vão para o INVENTÁRIO (etapa 08): guarda ou, cheio, deixa no chão */
+static int store(PLAYER *p, int item) {
+	if (inv_add(p, item)) {
+		char buf[32];
+		snprintf(buf, sizeof(buf), "+%s", item_defs[item].name);
+		show_message(buf, 40);
+		return 1;
+	}
+	if (g.message_timer == 0)
+		show_message("INVENTARIO CHEIO", 40);
+	return 0;
+}
+
+/* 1 = pegou (o item some do chão) */
+static int collect(PICKUP *it, PLAYER *p) {
 #ifdef DEBUG_PLAYLOG
 	int before_a = p->arrows, before_b = p->bullets, before_m = p->energy;
 #endif
@@ -48,14 +66,14 @@ static void collect(PICKUP *it, PLAYER *p) {
 		p->energy += 15;
 		show_message("GEMA!", 40);
 		break;
-	case PICK_HEALTH:
-		PL(pl_heal(0));
-		p->hp += 30;
-		show_message("+30 VIDA", 40);
+	case PICK_HEALTH:                         /* etapa 08: viram itens guardados */
+		if (!store(p, IT_BANDAGE)) return 0;
+		break;
+	case PICK_MEDKIT:
+		if (!store(p, IT_MEDKIT)) return 0;
 		break;
 	case PICK_ENERGY:
-		p->energy += 40;
-		show_message("+40 MANA", 40);
+		if (!store(p, IT_POTION)) return 0;
 		break;
 	case PICK_ARROWS:
 		p->arrows += ARROW_PICKUP;
@@ -68,11 +86,8 @@ static void collect(PICKUP *it, PLAYER *p) {
 		show_message("+BALAS", 40);
 		break;
 	case PICK_BATTERY:
+		if (!store(p, IT_BATTERY)) return 0;
 		PL(pl_battery(p));
-		p->battery += BATTERY_PICKUP;
-		if (p->battery > BATTERY_MAX) p->battery = BATTERY_MAX;
-		p->lantern_dying = 0;
-		show_message("+PILHA", 40);
 		break;
 	case PICK_KEY:
 		g.ev.keys++;                      /* do grupo, como os itens de missão */
@@ -113,6 +128,7 @@ static void collect(PICKUP *it, PLAYER *p) {
 	effect_spawn(FX_HEAL, it->pos.vx, it->pos.vz, 160, 14,
 	             pickup_colors[it->type].r, pickup_colors[it->type].g, pickup_colors[it->type].b);
 	it->active = 0;
+	return 1;
 }
 
 void pickups_update(void) {
@@ -123,10 +139,13 @@ void pickups_update(void) {
 			PLAYER *p = &g.players[k];
 			if (!player_alive(p)) continue;
 			int dx = p->pos.vx - it->pos.vx, dz = p->pos.vz - it->pos.vz;
-			if (abs(dx) < 140 && abs(dz) < 140) {
-				collect(it, p);
-				break;
+			int touch = abs(dx) < 140 && abs(dz) < 140;
+			if (it->lock == k + 1) {              /* quem largou: só depois de sair */
+				if (!touch) it->lock = 0;
+				continue;
 			}
+			if (touch && collect(it, p))
+				break;
 		}
 	}
 }

@@ -837,6 +837,7 @@ void level_place(char ch, int cx, int cz) {
 	case 'K': pickup_spawn(PICK_KEY, wx, wz);     break;  /* chave (barreira de raízes) */
 	case 'V': pickup_spawn(PICK_ARROWS, wx, wz);  break;  /* feixe de flechas (etapa 07) */
 	case 'M': pickup_spawn(PICK_AMMO, wx, wz);    break;  /* balas (etapa 07) */
+	case 'J': pickup_spawn(PICK_MEDKIT, wx, wz);  break;  /* kit médico (etapa 08) */
 	case 'X': g.has_exit = 1; g.exit_x = wx; g.exit_z = wz; break;  /* saída */
 	case 'S':                                         /* ponto de reforço */
 		if (g.num_spawn_pts < MAX_SPAWN_PTS) {

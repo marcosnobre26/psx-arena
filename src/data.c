@@ -46,6 +46,19 @@ const WEAPON_DEF weapon_defs[] = {
 const int num_weapons = sizeof(weapon_defs) / sizeof(weapon_defs[0]);
 
 /* ------------------------------------------------------------------ */
+/* ITENS DO INVENTÁRIO (etapa 08) — só estes ocupam espaço. A ordem é a */
+/* do enum IT_* (game.h). pilha = quantos cabem num espaço.             */
+/* ------------------------------------------------------------------ */
+const ITEM_DEF item_defs[NUM_ITEM_TYPES] = {
+	/* nome            descrição                pilha efeito  no chão */
+	{ "",              "",                      0,    0,      0 },
+	{ "BANDAGEM",      "+25 VIDA",              3,    25,     PICK_HEALTH },
+	{ "KIT MEDICO",    "+60 VIDA",              1,    60,     PICK_MEDKIT },
+	{ "POCAO DE MANA", "+40 MANA",              2,    40,     PICK_ENERGY },
+	{ "PILHA",         "RECARREGA A LANTERNA",  2,    BATTERY_PICKUP, PICK_BATTERY },
+};
+
+/* ------------------------------------------------------------------ */
 /* INIMIGOS — todos usam o modelo grunt com tamanho/cores diferentes. */
 /* Troque .mesh por um modelo seu exportado do Blender!                */
 /* Paleta: [0] corpo, [1] chifres, [2] olhos (materiais do modelo)    */

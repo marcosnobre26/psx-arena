@@ -336,11 +336,11 @@ static const DEBUG_POINT f4_pts[4] = { { 31, 31, 0 }, { 31, 31, 1024 }, { 31, 31
 #ifndef GEN_TREES_F4
 #define GEN_TREES_F4 10
 #endif
-/*                                 tam       layout       dens    tetos: bloco, janela, árvores/janela  clareiras   cerco troncos inim. dist  vida mana pilha arma gema caixa flechas balas   mata alta, paredes */
-static const GEN_PARAMS f1_gen = { 64, 64,   GEN_HUNT,    20, 90, GEN_CHUNK_CAP, GEN_WINDOW_CAP, GEN_TREES_F1, 3, 5, 3, 6, 0,    6,      12,   12, { 2, 1, 2, 1, 3, 3, 2, 1 }, GEN_THICKET_F1, GEN_WALLS };
-static const GEN_PARAMS f2_gen = { 128, 128, GEN_CROSS,   20, 90, GEN_CHUNK_CAP, GEN_WINDOW_CAP, GEN_TREES_F2, 5, 8, 4, 8, 0,    15,     14,   16, { 2, 1, 3, 1, 3, 2, 3, 1 }, GEN_THICKET_F2, GEN_WALLS };
-static const GEN_PARAMS f3_gen = { 64, 64,   GEN_COLLECT, 20, 90, GEN_CHUNK_CAP, GEN_WINDOW_CAP, GEN_TREES_F3, 2, 4, 3, 5, 0,    6,      8,    10, { 1, 1, 2, 0, 1, 2, 2, 0 }, GEN_THICKET_F3, GEN_WALLS };
-static const GEN_PARAMS f4_gen = { 64, 64,   GEN_SURVIVE, 20, 90, GEN_CHUNK_CAP, GEN_WINDOW_CAP, GEN_TREES_F4, 2, 3, 3, 5, 11,   6,      3,    6,  { 1, 1, 2, 0, 0, 2, 2, 1 }, GEN_THICKET_F4, GEN_WALLS };
+/*                                 tam       layout       dens    tetos: bloco, janela, árvores/janela  clareiras   cerco troncos inim. dist  vida mana pilha arma gema caixa flechas balas kit   mata alta, paredes */
+static const GEN_PARAMS f1_gen = { 64, 64,   GEN_HUNT,    20, 90, GEN_CHUNK_CAP, GEN_WINDOW_CAP, GEN_TREES_F1, 3, 5, 3, 6, 0,    6,      12,   12, { 2, 1, 2, 1, 3, 3, 2, 1, 0 }, GEN_THICKET_F1, GEN_WALLS };
+static const GEN_PARAMS f2_gen = { 128, 128, GEN_CROSS,   20, 90, GEN_CHUNK_CAP, GEN_WINDOW_CAP, GEN_TREES_F2, 5, 8, 4, 8, 0,    15,     14,   16, { 2, 1, 3, 1, 3, 2, 3, 1, 1 }, GEN_THICKET_F2, GEN_WALLS };
+static const GEN_PARAMS f3_gen = { 64, 64,   GEN_COLLECT, 20, 90, GEN_CHUNK_CAP, GEN_WINDOW_CAP, GEN_TREES_F3, 2, 4, 3, 5, 0,    6,      8,    10, { 1, 1, 2, 0, 1, 2, 2, 0, 1 }, GEN_THICKET_F3, GEN_WALLS };
+static const GEN_PARAMS f4_gen = { 64, 64,   GEN_SURVIVE, 20, 90, GEN_CHUNK_CAP, GEN_WINDOW_CAP, GEN_TREES_F4, 2, 3, 3, 5, 11,   6,      3,    6,  { 1, 1, 2, 0, 0, 2, 2, 1, 0 }, GEN_THICKET_F4, GEN_WALLS };
 
 /* Teleporte de depuração (L2 + direcional com o overlay aberto): sempre
  * os mesmos lugares e a mesma direção de câmera, para medir FPS/POLIS.

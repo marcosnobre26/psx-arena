@@ -156,7 +156,7 @@ static void dump(const char *kind, const char *reason) {
 	for (int i = 0; i < MAX_PICKUPS; i++)
 		if (g.pickups[i].active) left[g.pickups[i].type]++;
 	static const char *const pick_names[NUM_PICKUP_TYPES] = {
-		"gema", "vida", "mana", "arma", "missao", "pilha", "chave", "flechas", "balas" };
+		"gema", "bandagem", "pocao", "arma", "missao", "pilha", "chave", "flechas", "balas", "kit" };
 	for (int k = 0; k < NUM_PICKUP_TYPES; k++)
 		if (left[k]) printf(" nao_pegos_%s=%d", pick_names[k], left[k]);
 	printf("\n");

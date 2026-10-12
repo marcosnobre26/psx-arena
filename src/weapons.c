@@ -79,7 +79,7 @@ static void no_ammo_msg(const PLAYER *p, const WEAPON_DEF *w) {
 /* Projéteis (flecha, bola de fogo, bala)                               */
 /* ------------------------------------------------------------------ */
 
-static void spawn_bullet(int x, int y, int z, int angle, int speed, int damage, int life, int widx) {
+static void spawn_bullet(int x, int y, int z, int angle, int speed, int damage, int life, int widx, int owner) {
 	for (int i = 0; i < MAX_BULLETS; i++) {
 		BULLET *b = &g.bullets[i];
 		if (b->active) continue;
@@ -90,6 +90,7 @@ static void spawn_bullet(int x, int y, int z, int angle, int speed, int damage, 
 		b->life = life;
 		b->damage = damage;
 		b->weapon = widx;
+		b->owner = owner;
 		return;
 	}
 }
@@ -157,7 +158,8 @@ void bullets_update(void) {
 		ENEMY *e = collide_enemy_at(b->pos.vx, b->pos.vz, 30);
 		if (e) {
 			PL(pl_attack(b->weapon));
-			enemy_damage(e, b->damage, b->vx / 3, b->vz / 3);
+			g.players[b->owner].st.hits++;            /* precisão: este projétil acertou */
+			enemy_damage(e, b->damage, b->vx / 3, b->vz / 3, b->owner);
 			b->active = 0;
 			projectile_hit(b, e->pos.vx - b->vx, e->pos.vz - b->vz);
 		}
@@ -231,10 +233,11 @@ static void melee_hits(PLAYER *p, const WEAPON_DEF *w) {
 		int dx = e->pos.vx - p->pos.vx, dz = e->pos.vz - p->pos.vz;
 		if (dist2d(dx, dz) > w->reach + enemy_radius(e)) continue;
 		if (abs(angle_diff(p->angle, angle_of(dx, dz))) > w->arc) continue;
+		if (p->swing_hit == 0) p->st.hits++;      /* precisão: o golpe acertou alguém */
 		p->swing_hit |= 1u << i;
 		int a = angle_of(dx, dz);
 		PL(pl_attack(p->weapon));
-		enemy_damage(e, w->damage, (isin(a) * 40) >> 12, (icos(a) * 40) >> 12);
+		enemy_damage(e, w->damage, (isin(a) * 40) >> 12, (icos(a) * 40) >> 12, p->index);
 	}
 	(void)widx;
 }
@@ -244,7 +247,7 @@ static void magic_cast(PLAYER *p, const WEAPON_DEF *w) {
 	switch (w->magic) {
 	case MAGIC_FIRE:
 		muzzle(p, &x, &y, &z);
-		spawn_bullet(x, y, z, p->angle, w->speed, w->damage, w->reach, p->weapon);
+		spawn_bullet(x, y, z, p->angle, w->speed, w->damage, w->reach, p->weapon, p->index);
 		sound_play_at(&sfx_fogo, x, z, VOL_MAGIA);
 		break;
 	case MAGIC_FLASH: {
@@ -252,6 +255,7 @@ static void magic_cast(PLAYER *p, const WEAPON_DEF *w) {
 		effect_spawn(FX_SHOCKWAVE, p->pos.vx, p->pos.vz, w->reach, 22, w->color.r, w->color.g, w->color.b);
 		sound_play_at(&sfx_clarao, p->pos.vx, p->pos.vz, VOL_MAGIA);
 		uint32_t near = collide_enemies_near(p->pos.vx, p->pos.vz, w->reach);
+		int any = 0;
 		for (int i = 0; near; i++, near >>= 1) {
 			if (!(near & 1)) continue;
 			ENEMY *e = &g.enemies[i];
@@ -259,7 +263,8 @@ static void magic_cast(PLAYER *p, const WEAPON_DEF *w) {
 			if (dist2d(dx, dz) >= w->reach) continue;
 			int a = angle_of(dx, dz);
 			PL(pl_attack(p->weapon));
-			enemy_damage(e, w->damage, (isin(a) * 60) >> 12, (icos(a) * 60) >> 12);
+			if (!any++) p->st.hits++;                 /* precisão: o clarão pegou alguém */
+			enemy_damage(e, w->damage, (isin(a) * 60) >> 12, (icos(a) * 60) >> 12, p->index);
 			if (e->active) {
 				e->stun = FLASH_STUN;
 				e->flee = FLASH_FLEE;
@@ -293,7 +298,7 @@ static void gun_fire(PLAYER *p, const WEAPON_DEF *w) {
 		int a = aim;
 		if (w->pellets > 1)
 			a += ((2 * k - (w->pellets - 1)) * w->spread) / 2;  /* leque centralizado */
-		spawn_bullet(x, y, z, a & 4095, w->speed, w->damage, w->reach, p->weapon);
+		spawn_bullet(x, y, z, a & 4095, w->speed, w->damage, w->reach, p->weapon, p->index);
 	}
 	sound_play_at(&sfx_tiro, x, z, VOL_TIRO);
 }
@@ -331,6 +336,7 @@ void weapon_update(PLAYER *p, const INPUT *in) {
 			p->swing = 1;
 			p->swing_hit = 0;
 			p->cooldown = w->cooldown;
+			p->st.shots++;                            /* precisão: um golpe */
 			PL(pl_use(p, p->weapon));
 			sound_play_at(w->chops ? &sfx_machado : &sfx_espada, p->pos.vx, p->pos.vz, VOL_GOLPE);
 		}
@@ -350,8 +356,9 @@ void weapon_update(PLAYER *p, const INPUT *in) {
 			int x, y, z;
 			if (dmg < 1) dmg = 1;
 			muzzle(p, &x, &y, &z);
-			spawn_bullet(x, y, z, p->angle, spd, dmg, w->reach, p->weapon);
+			spawn_bullet(x, y, z, p->angle, spd, dmg, w->reach, p->weapon, p->index);
 			spend(p, w);
+			p->st.shots++;                            /* precisão: uma flecha */
 			PL(pl_use(p, p->weapon));
 			noise_emit(x, z, w->noise);
 			sound_play_at(&sfx_arco, x, z, VOL_GOLPE);
@@ -369,6 +376,8 @@ void weapon_update(PLAYER *p, const INPUT *in) {
 			}
 			spend(p, w);
 			PL(pl_use(p, p->weapon));
+			if (w->magic != MAGIC_HEAL)               /* precisão: cada projétil (o leque conta todos) */
+				p->st.shots += w->pellets > 1 ? w->pellets : 1;
 			p->cooldown = w->cooldown;
 			if (w->kind == WK_MAGIC) magic_cast(p, w);
 			else                     gun_fire(p, w);
