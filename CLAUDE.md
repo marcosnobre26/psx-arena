@@ -1,6 +1,7 @@
-# PS1 Arena — instruções para o agente
+# MATA ESCURA (repositório psx-arena) — instruções para o agente
 
-Jogo 3D de PlayStation 1 em C (PSn00bSDK 0.24), projeto de **estudo**. O dono
+Jogo 3D de PlayStation 1 em C (PSn00bSDK 0.24), projeto de **estudo**: terror
+de sobrevivência na floresta, versão 0.9.0 ("floresta"; v1.0 depois da música). O dono
 (Marcos) é dev back-end sênior (PHP/Go/Node), novo em PS1, C de console e
 Blender. Converse em **português do Brasil**, explique o "porquê" das
 mudanças e mantenha o código didático.
@@ -39,7 +40,10 @@ modificação: `docs/GUIA.md`.
 ./dev events-test 1000                       # eventos simulados no PC (alcance, ninguém preso, determinismo)
 ./dev replay-test                            # partida roteirizada: hash de g igual à referência?
 ./dev robo-test [--save]                     # 24 partidas do robô: hash de g no fim de cada uma
-./dev capturas                               # telas do menu em docs/capturas/08-*.png (robô + StoreImage)
+./dev capturas                               # telas em docs/capturas/08-*, 09-*, 10-*.png (robô + StoreImage)
+./dev save-test                              # memory card: salvar, carregar, hash de g IGUAL, save inválido recusado
+./dev maratona [MIN]                         # robô joga MIN min (120) DESENHANDO: travou? pools? pilha? pior quadro?
+./dev release                                # build do zero + dist/mata-escura-vX.Y.Z.{cue,bin,exe,zip}
 ./dev bench -D BENCH_MENU=1                  # cada aba do menu aberta no pior mapa da f2
 ./dev clean          # apaga build/
 VERBOSE=1 ./dev build
@@ -51,11 +55,15 @@ VERBOSE=1 ./dev build
   modo), roda uma cópia portátil do DuckStation Linux (a pasta do usuário não
   é tocada) e imprime a tabela. É determinístico: compare entre etapas e
   registre no HISTORICO. Valores de emulador, não de console real.
-- Você **não consegue ver o jogo rodando** (o emulador é do Windows). Depois
-  de mudanças visuais ou de jogabilidade, peça ao Marcos para testar com
-  `./dev run` e descreva exatamente o que conferir.
-- Não há testes automatizados; a verificação é build limpo + teste no emulador
-  (lista em README → "Lista de verificação de release").
+- Você não vê a janela do jogo, mas **vê o jogo pelas capturas**: `./dev
+  capturas` roda sem janela e grava PNGs em `docs/capturas/` (leia as
+  imagens). Mudou algo visual? Gere as capturas e confira antes de pedir ao
+  Marcos. O Marcos testa no fim (lista em `docs/TESTE-FINAL.md`).
+- **Testes automáticos** (todos sem janela, na cópia portátil do DuckStation):
+  `replay-test` e `robo-test` (a lógica mudou?), `save-test` (memory card),
+  `maratona` (sessão longa: travamento, pools, memória), `bench`
+  (desempenho), `mapgen-test` e `events-test` (no PC). Lista de release:
+  README → "Lista de verificação de release".
 
 ## Mapa do código (`src/`)
 
@@ -83,6 +91,7 @@ VERBOSE=1 ./dev build
 | `inventory.c` | inventário (8 espaços: bandagem, kit, poção, pilha), atalho de cura no CÍRCULO, névoa de exploração (`g.seen`) |
 | `menu.c` | menu do START (`STATE_MENU`): abas Mapa (textura 4 bits da névoa), Objetivo, Estatísticas, Armas, Itens |
 | `ambient.c` | **só visual** (etapa 09): céu em degradê, lua, bandos de pássaros, olhos, vulto, salto, galho; freio por CPU |
+| `savegame.c` | memory card (etapa 10): formato do bloco (cabeçalho do BIOS, marca, versão, checksum), `card_save/card_load`; o conteúdo (`SAVE_DATA`) é montado no `main.c` |
 | `playlog.c` / `robot.c` | só em builds de depuração: registro de partida (`DEBUG_PLAYLOG`) e jogador robô (`DEBUG_ROBOT`, `./dev robo`) |
 
 Gerados no build (não edite): `build/gen/assets_gen.{h,c}` (declara
@@ -259,6 +268,24 @@ uma branch. As regras do ROADMAP (determinismo, orçamentos de desempenho,
   passou de `AMB_CPU_LIMIT` (420). Custo medido: 14–17 linhas, ≤ 35
   polígonos (bench `fN_ambiente`, linha `BENCH ambiente`). Câmera vê só
   ~7° acima do horizonte (faixa de ~28 px): pássaros voam baixo.
+- **Memory card (etapa 10):** salva o COMEÇO da fase (fase, semente, `sel`,
+  `progress`, volume); carregar = `start_level` com a mesma semente. Mudou
+  algo que vai no save (`CARRY`, `PSTATS`, `PROGRESS`, `SAVE_DATA`)? **Some 1
+  em `SAVE_VERSION`** (o save antigo vira SAVE INVALIDO em vez de carregar
+  errado) e rode `./dev save-test`. Acesso ao cartão (BIOS `open/read/write`)
+  BLOQUEIA alguns quadros: só no título, no menu e na troca de fase. Nunca
+  acesse o cartão logo no boot: com o cartão recém-ligado o `open()` trava
+  (o título lê depois de ~1 s de quadros). `SAVE_ENABLED` some com
+  `LINK_MODE` (etapa 11: sem save no modo link).
+- **Texturas:** a área na VRAM (largura em unidades de 16 bits × altura)
+  precisa ser PAR, senão o `LoadImage` trava o `DrawSync` no boot (logotipo
+  204×39 em 4 bits, etapa 10); o `build_textures.py` recusa com mensagem.
+- **Título e créditos (etapa 10):** cursor do título e situação do save ficam
+  fora de `g`. Os créditos vêm do `CREDITS.md` (`tools/credits_gen.py` no
+  build). Música do título: `music_title_start` (vazio; etapa 01b).
+- **Maratona:** `pool_full[]` conta spawns sem vaga (fora de `g`); o pior
+  quadro desconta o tempo do robô e separa carga de fase, leitura do cartão
+  e `printf` (lentos e da medição). O build normal não tem nenhum `printf`.
 - Carga de fase: `start_level` desenha um quadro `CARREGANDO...` antes. Se a
   geração passar de ~1 s, divida-a entre quadros SEM rodar `game_tick` até
   o mapa ficar pronto (resultado idêntico ao de uma vez).

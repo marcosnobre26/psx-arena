@@ -44,7 +44,7 @@ Depois de qualquer mudança: `./dev run` (compila e abre no emulador) ou
 | **Círculo** | cura rápida: usa uma **bandagem** (ou, sem bandagem, o **kit médico**) do inventário. A magia CURA nunca entra no atalho |
 | **L1 / R1** ou analógico direito | girar a câmera |
 | **Select** | liga/desliga a **lanterna** (a skin muda só na tela de seleção) |
-| **Start** | abre o **menu** (o jogo para): Mapa, Objetivo, Estatísticas, Armas, Itens |
+| **Start** | abre o **menu** (o jogo para): Mapa, Objetivo, Estatísticas (fase e total), Armas, Itens, Opções |
 | **L2** (soltar) | depuração: névoa, memória do SPU, semente, polígonos, FPS, memória de primitivas, posição |
 | **L2 duas vezes** (rápido) | página **AMBIENTE** do overlay (etapa 09); outro toque fecha. Nela: **L2 + Quadrado** bando levanta voo, **+ Círculo** olhos no escuro, **+ X** vulto, **+ Triângulo** salto entre troncos, **+ R1** galho estalando, **+ L1** lua à frente da câmera, **+ R2** bando no céu (alterna: horizonte / rasante) |
 | **L2 + Start** | (com o overlay aberto) pula para a próxima fase |
@@ -57,6 +57,10 @@ Depois de qualquer mudança: `./dev run` (compila e abre no emulador) ou
 **X** confirma, **Círculo** desfaz (ou volta ao título). O **controle 2**
 entra apertando **Start**; com dois jogadores, a partida começa quando os
 dois confirmam.
+
+**Tela de título:** cima/baixo escolhe **NOVO JOGO**, **CONTINUAR** (o save
+do memory card) ou **CREDITOS**; **X** ou **Start** confirma. **Start no
+controle 2** em NOVO JOGO já entra com 2 jogadores.
 
 **Menu do START:** **L1/R1** (ou esquerda/direita) troca a aba, cima/baixo
 escolhe a linha, **X** usa o item (aba Itens) ou equipa a arma (aba Armas),
@@ -672,6 +676,37 @@ tabela de controles. Fotos: `docs/capturas/09-*.png` (`./dev capturas`).
 **Freio:** se o quadro anterior passou de 420 linhas (`AMB_CPU_LIMIT`), o
 evento que ia começar **espera** (até 5 s) e aparece quando aliviar. O céu
 sempre aparece.
+
+### Memory card, opções e título (etapa 10)
+
+**O que é salvo:** o **começo da fase atual** — fase, semente (o mesmo
+mapa), personagens e tudo o que você levou para ela (vida, mana, armas,
+munição, pilha, inventário, pontos, estatísticas da campanha) e o volume
+dos efeitos. Salva **sozinho ao vencer** cada fase e pela linha **SALVAR
+JOGO** da aba OPCOES. **CONTINUAR** no título recomeça essa fase igual.
+Save corrompido ou de outra versão: aparece **SAVE INVALIDO** e nada muda.
+
+**Mudar o que vai no save** (um campo novo em `CARRY`, `PSTATS`,
+`PROGRESS` ou `SAVE_DATA` no `main.c`): some 1 em `SAVE_VERSION`
+(`config.h`) e rode `./dev save-test`. Sem isso, um save antigo seria lido
+com os campos no lugar errado.
+
+**Opções:** aba OPCOES do menu. Setas mudam o volume dos efeitos (10
+passos; vai no save); X em SALVAR JOGO salva. Ali só L1/R1 trocam de aba.
+O volume da música entra com o CD-DA (etapa 01b).
+
+**Créditos:** a tela de créditos é gerada do `CREDITS.md` no build
+(`tools/credits_gen.py`). Asset de terceiros novo? Acrescente a linha na
+tabela do `CREDITS.md` e ele aparece no jogo. Nome e versão: `GAME_NAME` e
+`GAME_VERSION` em `game.h`; logotipo: `tools/make_title.py`.
+
+**Testes desta parte** (sem abrir janela):
+
+```bash
+./dev save-test      # salva, bagunça, carrega: hash de g IGUAL; save ruim recusado
+./dev maratona 120   # 2 h de jogo com o robô desenhando: travou? pools? memória?
+./dev release        # build do zero + dist/mata-escura-v0.9.0.{cue,bin,exe,zip}
+```
 
 ## 4. Modelar no Blender
 

@@ -854,3 +854,60 @@ automatizar testes visuais.
   Bench: pior quadro f1 420/432, f2 434/450, f3 384/402, f4 406/400
   (normal/evento), 30 FPS; ambiente 14–18 linhas, 27–39 polígonos.
   `replay-test` e `robo-test` IGUAL. Capturas novas: `09-ceu-rasante.png`.
+- 2026-10-12 — **Etapa 10 (polimento e release v0.9.0 "floresta")**, branch
+  `etapa-10-polimento`. Nome do jogo: **MATA ESCURA** (escolha do Marcos).
+  (1) **Totais da campanha** nas estatísticas (`PLAYER.total`,
+  `g.time_total`; menu mostra FASE e TOTAL) — mudança de lógica intencional,
+  referências regravadas. (2) **Memory card** (`savegame.c`): 1 bloco com
+  cabeçalho do BIOS (título "MATA ESCURA", ícone), marca, `SAVE_VERSION`,
+  tamanho e checksum FNV; salva o COMEÇO da fase (fase, semente, `sel`,
+  `progress` com inventário e totais, volume), sozinho ao passar de fase e
+  pela aba OPCOES; carregar = mesmo mapa pela semente. **`./dev save-test`:**
+  o robô vence a f1 com o Cavaleiro, salva o começo da f2, bagunça (outra
+  fase/personagem/progresso), carrega: **hash de g IGUAL** (`a024a099`);
+  corrompido, outra versão e cartão vazio recusados com o estado intacto;
+  controle da porta 1 ainda lido com o driver do cartão. (3) Aba **OPCOES**
+  (volume dos efeitos em 10 passos, salvar). (4) **Título** (logotipo 4 bits
+  por script, NOVO JOGO / CONTINUAR / CREDITOS, v0.9.0) e **créditos**
+  gerados do `CREDITS.md`; `music_title_start` vazio para a 01b. **Achados:**
+  `open()` do cartão logo no boot travava (cartão recém-ligado: o BIOS
+  precisa dos quadros) → o título lê depois de ~1 s; textura com número
+  ÍMPAR de unidades de 16 bits (logotipo 204×39 em 4 bits) travava o
+  `DrawSync` no boot → 208×39 e o `build_textures.py` recusa. (5)
+  **Maratona** (`./dev maratona`, `ROBOT_SOAK`): 120 min de jogo desenhando
+  (~5 min de relógio), 11 campanhas, 41 fases vencidas, 1 game over, 0 por
+  tempo; 31 saves sem erro, 10 loads com hash IGUAL; pico dos pools
+  inimigos 14/24, tiros 6/48, itens 20/24, efeitos 4/16, flechas no chão
+  6/6 (só elas giram, por projeto: 3 vezes); primitivas 32 KB de 96 KB;
+  pilha ~1,3 KB (pintada); grade 0 erros; pior quadro de JOGO 398 linhas, 0
+  quadros abaixo de 30 FPS (o tempo do robô é descontado; carga de fase,
+  leitura do cartão — 918 linhas, uma vez no boot — e `printf` pelo BIOS,
+  lento, contados à parte). Resumo: `docs/maratona-v0.9.txt`. O build
+  normal não tem nenhum `printf`. (6) **PCSX-Redux:** não testado — o
+  repositório no GitHub não publica releases; o AppImage oficial sai pelo
+  `distrib.app` (indicado pelo site do projeto), origem diferente da
+  autorizada; o Marcos decide. (7) **Medição final** (bench completo, os 3
+  piores lugares de cada fase; RAM total 1 000 170 bytes, SPU ~127 KB):
+
+  | Fase | Lugar (medida) | CPU máx. (linhas) | FPS mín. | Polígonos máx. | RAM GPU máx. |
+  |---|---|---|---|---|---|
+  | f1 | f1_pior4 (raízes abrem) | 431 | 30 | 580 | 24 320 |
+  | f1 | f1_arv2 (raízes abrem) | 424 | 30 | 631 | 26 856 |
+  | f1 | f1_arv3 (raízes abrem) | 423 | 30 | 597 | 24 040 |
+  | f2 | f2_fixo_arv (árvore cai) | 451 | 30 | 640 | 24 776 |
+  | f2 | f2_arv3 (raízes abrem) | 445 | 30 | 645 | 24 796 |
+  | f2 | f2_arv4 (mata fecha) | 445 | 30 | 662 | 25 484 |
+  | f3 | f3_arv1 (raízes abrem) | 402 | 30 | 603 | 26 556 |
+  | f3 | f3_arv2 (raízes abrem) | 391 | 30 | 577 | 26 220 |
+  | f3 | f3_ambiente (multidão) | 381 | 30 | 603 | 26 492 |
+  | f4 | f4_pior1_2j (remontagem) | 408 | 30 | 620 | 26 188 |
+  | f4 | f4_combate (combate) | 403 | 30 | 629 | 26 964 |
+  | f4 | f4_arv3 (remontagem) | 392 | 30 | 587 | 24 864 |
+
+  Pior normal por fase: 420 / 434 / 387 / 408; pior de evento: 431 / 451 /
+  402 / 400 (metas 450 / 480). Nenhuma otimização foi necessária. Robô (hab.
+  50, 240 partidas): 223 vitórias, 8 mortes. `./dev clean && ./dev build`
+  sem avisos. **Release:** `./dev release` gera
+  `dist/mata-escura-v0.9.0.{cue,bin,exe,zip}`; notas e comando `gh release
+  create` em `docs/NOTAS-v0.9.md`; teste final do Marcos em
+  `docs/TESTE-FINAL.md`; diferenças do manual em `docs/MANUAL-MUDANCAS.md`.

@@ -13,6 +13,7 @@
 #   ./dev capturas        telas do menu em docs/capturas/ (o robô joga e fotografa)
 #   ./dev save-test       memory card: salva, carrega e compara o hash de g
 #   ./dev maratona [MIN]  robô joga MIN minutos (120) desenhando: travou? pools? memória?
+#   ./dev release         build do zero + dist/mata-escura-vX.Y.Z.{cue,bin,exe,zip}
 #   ./dev models         exporta os .blend de assets/blender/ para models/ (Blender do Windows)
 #   ./dev watch          recompila sozinho sempre que você salvar um arquivo
 #   ./dev clean          apaga a pasta build/
@@ -713,6 +714,23 @@ cmd_maratona() {
 	fi
 }
 
+# Release (etapa 10): build do zero e os arquivos com o nome do jogo em
+# dist/ (o .cue aponta para o .bin novo), mais um .zip. A publicação no
+# GitHub é com o gh release create (o Marcos roda).
+cmd_release() {
+	local ver; ver="$(grep -o 'GAME_VERSION "[^"]*"' src/game.h | cut -d'"' -f2)"
+	local name="mata-escura-v$ver"
+	cmd_clean && cmd_build || return 1
+	rm -rf "$ROOT/dist" && mkdir -p "$ROOT/dist"
+	cp build/arena.bin "dist/$name.bin"
+	cp build/arena.exe "dist/$name.exe"
+	sed "s/arena\.bin/$name.bin/" build/arena.cue > "dist/$name.cue"
+	( cd dist && python3 -c "import zipfile,sys; z=zipfile.ZipFile(sys.argv[1],'w',zipfile.ZIP_DEFLATED); [z.write(f) for f in sys.argv[2:]]" \
+		"$name.zip" "$name.cue" "$name.bin" "$name.exe" )
+	ls -la dist/
+	c_ok "Release em dist/ ($name). Publique com o comando do docs/NOTAS-v0.9.md."
+}
+
 # Teste do memory card (etapa 10): o robô vence a f1, começa a f2, salva,
 # bagunça, carrega e compara o hash de g; save estragado, de outra versão e
 # cartão vazio têm que ser recusados sem mudar nada. Cartão da cópia
@@ -767,5 +785,6 @@ case "${1:-build}" in
 	capturas) cmd_capturas ;;
 	save-test) cmd_save_test ;;
 	maratona) shift; cmd_maratona "$@" ;;
-	*)      sed -n '3,26p' "$0" | sed 's/^#//' ;;
+	release) cmd_release ;;
+	*)      sed -n '3,27p' "$0" | sed 's/^#//' ;;
 esac

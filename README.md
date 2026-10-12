@@ -1,24 +1,26 @@
-# PS1 Arena
+# MATA ESCURA
 
-**Um jogo 3D completo para PlayStation 1, feito em C, para estudar e modificar.**
+**Terror de sobrevivência numa floresta escura, para PlayStation 1 — feito em C, para estudar e modificar.**
 
-Arena em terceira pessoa com seleção de personagem, até 2 jogadores, inimigos,
-armas, poderes, itens, colisão e uma floresta grande montada por código —
-com um pipeline que leva modelos do **Blender** e imagens **PNG** direto para o
-jogo. Roda em emuladores e em console real (CD-R).
+Você atravessa uma floresta **gerada a cada partida** e que **muda enquanto você joga**: a névoa
+avança, árvores caem, a mata fecha os caminhos. Munição, cura e pilha da lanterna são raras;
+os inimigos ouvem seus passos e veem sua luz. Até 2 jogadores, memory card, e um pipeline que
+leva modelos do **Blender** e imagens **PNG** direto para o jogo. Roda em emuladores e em
+console real (CD-R).
 
 ![Plataforma](https://img.shields.io/badge/plataforma-PlayStation%201-0050a0)
 ![Linguagem](https://img.shields.io/badge/linguagem-C-555)
 ![SDK](https://img.shields.io/badge/SDK-PSn00bSDK%200.24-6a4)
-![Build](https://img.shields.io/badge/build-Docker%20%7C%20WSL%20%7C%20Linux-2496ed)
+![Versão](https://img.shields.io/badge/vers%C3%A3o-0.9.0%20floresta-6a2)
 
-| Título | Seleção de personagem | 2 jogadores | Jogo |
+| Título | Jogo | Menu: mapa | Ambiente |
 |---|---|---|---|
-| ![Título](docs/titulo.png) | ![Seleção](docs/selecao.png) | ![2 jogadores](docs/dois-jogadores.png) | ![Jogo](docs/jogo.png) |
+| ![Título](docs/capturas/10-titulo.png) | ![Jogo](docs/capturas/08-jogo.png) | ![Mapa](docs/capturas/08-mapa.png) | ![Céu](docs/capturas/09-ceu-demo.png) |
 
 > 📘 **Quer só mudar o jogo?** O [Guia prático](docs/GUIA.md) tem receitas
-> passo a passo: personagem novo, mapa, texturas, armas, poderes, inimigos.
+> passo a passo: personagem, fase, texturas, armas, inimigos, itens, eventos.
 > Este README é a referência técnica: ambiente, build, arquitetura, rede e manutenção.
+> O que mudou em relação ao manual em PDF: [docs/MANUAL-MUDANCAS.md](docs/MANUAL-MUDANCAS.md).
 
 ---
 
@@ -41,30 +43,26 @@ jogo. Roda em emuladores e em console real (CD-R).
 
 ## Recursos
 
-**Jogo**
-- **4 fases** com objetivos diferentes (derrotar todos, chegar à saída, coletar itens, sobreviver),
-  tela de introdução e progressão; câmera em terceira pessoa que segue o grupo.
-- **Seleção de personagem** com modelo 3D girando e atributos (vida, velocidade, pulo, arma).
-  Três personagens incluídos: Robô (com 5 skins), Cavaleiro e Batedor.
-- **1 ou 2 jogadores** cooperativo (controles nas portas 1 e 2), com respawn ao lado do parceiro.
-- 4 armas (com mira automática), 3 poderes, 4 tipos de inimigo (um deles atira), gemas, itens, caixas destrutíveis
-  e objetos de cenário.
-- **Colisão entre tudo**: paredes, caixas, cenário, jogadores e inimigos. Pular passa por cima dos inimigos.
-- **Clima de terror:** névoa por profundidade da GTE, escuridão por fase e **lanterna** com bateria
-  (cone de luz aditivo; vê-se mais longe no cone).
-- **Som posicional** no SPU: passos, tiros, acertos, inimigos que rosnam fora da tela, vento e grilos em loop.
+**Jogo (v0.9.0 "floresta")**
+- **4 fases** com objetivos diferentes (caçada, travessia, relíquias, cerco), mapas **gerados pela
+  semente** a cada partida e **eventos** que mudam a floresta (névoa, árvore cai, mata fecha,
+  onda, silêncio, caminho abre com a chave).
+- **3 personagens** (Robô com 5 skins, Cavaleiro, Batedor); **1 ou 2 jogadores** cooperativo.
+- **Combate de sobrevivência:** espada, machado, arco (segurar carrega), pistola, espingarda e
+  magias (bola de fogo, clarão, cura). Inimigos com percepção (visão no escuro/lanterna, audição).
+- **Inventário de 8 espaços** (bandagem, kit médico, poção, pilha) e cura rápida no Círculo.
+- **Menu do START** (o jogo para de verdade): mapa com névoa de exploração, objetivo,
+  estatísticas da fase e da campanha, armas, itens e opções (volume dos efeitos, salvar).
+- **Memory card:** salva o começo da fase (sozinho ao vencer e pelo menu); carregar refaz o mesmo
+  mapa pela semente. Save inválido ou de outra versão é recusado sem travar.
+- **Floresta viva** (só visual): céu, lua, pássaros, olhos no escuro, vulto, bichos.
+- **Som posicional** no SPU. Música (CD-DA) chega na v1.0 (etapa 01b).
 
 **Motor e ferramentas**
-- Renderização 3D na GTE com iluminação, texturas (4/8/16 bits), ordenação por Ordering Table,
-  descarte por frustum e por face, geometria da fase agrupada em blocos.
-- Lógica em **passo fixo de 60 Hz**, independente da taxa de quadros.
-- Jogo **orientado a dados**: personagens, armas, poderes, inimigos, skins e cenário são linhas de tabela.
-- **Pipeline de assets automático**: PNG → TIM com alocação de VRAM; WAV → VAG; Blender → modelos C; tudo
-  descoberto pelo CMake sem editar arquivos de build.
-- Exportador do Blender (menu *File → Export* e linha de comando), `.blend` de exemplo com todos os modelos.
-- Ambiente reproduzível em **Docker**, script único `./dev`, integração com **VS Code**.
-
----
+- GTE, Ordering Table, blocos 8×8 montados sob demanda, descarte por esfera/sub-bloco, névoa,
+  lanterna aditiva; lógica em **passo fixo de 60 Hz**, determinística (preparada para o modo link).
+- Testes automáticos sem abrir janela: `replay-test`, `robo-test`, `save-test`, `maratona`,
+  `bench`, `capturas`, `mapgen-test`, `events-test` (veja [Comandos](#comandos-do-dev)).
 
 ## Início rápido
 
@@ -210,6 +208,9 @@ troque para `Debug` em [`CMakePresets.json`](CMakePresets.json) (`-Og`).
 | `replay-test [--save]` | partida roteirizada (60 s por fase, eventos forçados), hash de `g` + mapa a cada 10 s comparado com `tools/replay_ref.txt`: prova que a lógica não mudou |
 | `capturas` | o robô joga 75 s da f3 e grava telas do jogo, de cada aba do menu (`08-*`) e do ambiente (`09-ceu`, `09-ceu-rasante`, `09-ceu-demo`, `09-olhos`, `09-vulto`, `09-salto`, `09-overlay-ambiente`) em `docs/capturas/` (sem abrir janela) |
 | `robo-test [--save]` | 24 partidas do robô (2 sementes × 4 fases × 3 personagens), hash de `g` + mapa no fim de cada uma comparado com `tools/robo_ref.txt`: cobre dano, morte, itens, caixas e personagens, que o replay não cobre |
+| `save-test` | memory card: o robô vence a f1, salva o começo da f2, bagunça, carrega e compara o hash de `g`; save corrompido, de outra versão e cartão vazio têm que ser recusados |
+| `maratona [MIN]` | o robô joga campanhas por MIN minutos de jogo (padrão 120) **desenhando**: travamento, pools, primitivas, pilha, pior quadro, cartão (`build-soak/maratona-resumo.txt`) |
+| `release` | build do zero e `dist/mata-escura-vX.Y.Z.{cue,bin,exe,zip}` (o `.cue` aponta para o `.bin` novo) |
 | `bench [-D N=V ...]` | benchmark automático: compila com `DEBUG_BENCHMARK` em `build-bench/` (variantes com `-D` em `build-bench-var/`), roda no DuckStation Linux, mostra a tabela (detalhes no GUIA) |
 
 ---
@@ -581,15 +582,16 @@ tronco em pé bloqueiam; tronco caído e chão vazio não; pessoas não. A IA ai
   entradas reproduzem a partida — requisito do modo link. `DEBUG_FIXED_SEED` (`config.h`) força
   uma semente para testes. O overlay **L2** mostra `SEED`, `POLIS` (polígonos enviados à GPU) e `MAPA` (semente do gerador, tentativas, tempo de carga ou `PLANO B`).
 
-### Memória (build atual)
+### Memória (build atual, v0.9.0)
 
 | Seção | Tamanho | Conteúdo principal |
 |---|---|---|
-| `.text` | ~135 KB | código do jogo + bibliotecas do SDK usadas |
-| `.data` | ~118 KB | modelos, texturas e sons embutidos, tabelas |
-| `.bss` | ~602 KB | 2 × 96 KB de primitivas, 2 × OT, cache de 36 blocos (~277 KB; também é a memória do BFS do gerador) + 1 de reserva (remontagem em fatias), grade 128×128 (16 KB), alcance (2 KB) e janela da checagem (~5 KB), árvores, pools |
-| **Total** | **~894 KB** (915 066 bytes) de 2 MB | orçamento do roteiro: 1,2 MB |
+| `.text` | ~180 KB | código do jogo + bibliotecas do SDK usadas |
+| `.data` | ~173 KB | modelos, texturas e sons embutidos, tabelas, créditos |
+| `.bss` | ~623 KB | 2 × 96 KB de primitivas, 2 × OT, cache de 36 blocos (~277 KB) + 1 de reserva, grade 128×128, alcance, névoa de exploração (2 KB em `g`), imagem do mapa do menu (8 KB), bloco do memory card (8 KB), pools |
+| **Total** | **~977 KB** (1 000 170 bytes) de 2 MB | orçamento do roteiro: 1,2 MB (folga ~258 KB) |
 
+SPU: ~127 KB de 450 KB de amostras. Pilha: o pico medido na maratona foi ~1,3 KB.
 Medido com `mipsel-linux-gnu-size build/arena.elf` (dentro do `./dev shell`).
 
 ### Por que existe `fix_gnu_stack.py`
@@ -700,21 +702,27 @@ Só é necessário ao mudar os modelos padrão por código; o fluxo normal é ed
 ### Lista de verificação de release
 
 - [ ] `./dev clean && ./dev build` sem erros nem avisos novos
-- [ ] Título → seleção → partida com 1 jogador
-- [ ] Seleção com 2 controles, personagens diferentes, partida cooperativa e respawn
-- [ ] As 4 fases em sequência (cada objetivo vence); game over recomeça a fase; fim de jogo volta ao título
+- [ ] `./dev replay-test`, `./dev robo-test`, `./dev save-test` e `./dev maratona` OK
+- [ ] `./dev bench`: pior quadro ≤ 450 linhas (≤ 480 em evento) nas fases 1–4, sempre 30 FPS
+- [ ] Título → novo jogo → seleção → partida com 1 jogador; CONTINUAR com save; CREDITOS
+- [ ] Seleção com 2 controles, partida cooperativa e respawn
+- [ ] As 4 fases em sequência; game over recomeça a fase; fim de jogo volta ao título
+- [ ] Menu do START: as 6 abas; salvar pelo menu; volume dos efeitos
 - [ ] Overlay L2: FPS estável e memória de primitivas abaixo do limite
-- [ ] `arena.cue` inicia em DuckStation e PCSX-Redux
-- [ ] Atualizar `prebuilt/` ou anexar `arena.cue`/`arena.bin` à Release
+- [ ] `.cue` inicia no DuckStation (e no PCSX-Redux, se instalado)
+- [ ] `./dev release` e anexar `dist/` à Release do GitHub (comando em `docs/NOTAS-v0.9.md`)
 
 ### Limitações conhecidas
 
-- Sem música ainda (CD-DA chega na etapa 01b do `docs/ROADMAP.md`).
+- Sem música ainda (CD-DA chega na v1.0, etapa 01b); o título já tem o ponto de entrada.
+- O save guarda o **começo** da fase atual (não o meio): carregar recomeça a fase.
 - Sem recorte de polígonos no plano próximo: faces muito perto da câmera somem.
 - Ordenação por profundidade média: sobreposições erradas ocasionais em polígonos grandes
   (comportamento típico do PS1).
-- Inimigos perseguem em linha reta (sem pathfinding) e contornam obstáculos de forma simples.
+- A câmera vê só ~7° acima do horizonte: o céu é uma faixa estreita no alto da tela.
+- Inimigos sem pathfinding (contornam obstáculos de forma simples).
 - Fases embutidas no executável (sem carregamento do CD); mapas de até 128×128, sem relevo.
+- Modo link (2 consoles pela serial) ainda não existe (etapa 11); quando existir, o save fica desligado nele.
 
 ---
 
