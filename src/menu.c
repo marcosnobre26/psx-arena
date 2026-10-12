@@ -220,7 +220,8 @@ static void draw_stats(void) {
 	hud_print(cf, y, "%d", s->items_used); hud_print(ct, y, "%d", tot.items_used);     y += 12;
 	hud_print(PX + 8, y, "DISTANCIA");
 	hud_print(cf, y, "%dM", s->dist / TILE_SIZE); hud_print(ct, y, "%dM", tot.dist / TILE_SIZE); y += 12;
-	hud_print(PX + 8, y, "PONTOS        %d", g.score);
+	hud_print(PX + 8, y, "PONTOS");                 /* (os pontos são da campanha toda) */
+	hud_print(ct, y, "%d", g.score);
 }
 
 static void draw_weapons(void) {

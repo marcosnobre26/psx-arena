@@ -671,6 +671,7 @@ void ambient_note_noise(int x, int z, int r);   /* cópia visual de um barulho (
 void ambient_debug(int what);                   /* 0 bando da árvore, 1 olhos, 2 vulto, 3 salto,
                                                    4 galho, 5 lua à frente, 6 bando no céu */
 void ambient_stats(int *active, int *polys, int *delayed, int *cpu);
+void ambient_set_title_moon(int az, int dy);    /* lua da tela de título (etapa 10) */
 
 /* créditos gerados do CREDITS.md (build/gen/credits_gen.c, etapa 10) */
 extern const char *const credits_lines[];

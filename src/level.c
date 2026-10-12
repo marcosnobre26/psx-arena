@@ -331,7 +331,8 @@ static void stream_update(void) {
 	if (npl) {
 		fcx = (sx / npl) / CHUNK_SIZE;
 		fcz = (sz / npl) / CHUNK_SIZE;
-	} else {                          /* título: centra na câmera */
+	}
+	if (!npl || g.state == STATE_TITLE || g.state == STATE_CREDITS) {   /* título: centra na câmera */
 		const VECTOR *cp = render_camera_pos();
 		fcx = cp->vx / CHUNK_SIZE;
 		fcz = cp->vz / CHUNK_SIZE;

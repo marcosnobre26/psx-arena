@@ -344,6 +344,10 @@ void ambient_update(int ticks) {
 /* ------------------------------------------------------------------ */
 /* Desenho (só lê)                                                       */
 /* ------------------------------------------------------------------ */
+/* Título (etapa 10): a lua num lugar escolhido pela câmera do título */
+static int title_moon_az, title_moon_dy;
+void ambient_set_title_moon(int az, int dy) { title_moon_az = az; title_moon_dy = dy; }
+
 void ambient_draw_sky(void) {
 	prof_begin(PROF_AMBIENT);
 	const LEVEL_DEF *ld = &level_defs[g.level];
@@ -352,9 +356,13 @@ void ambient_draw_sky(void) {
 	render_sky(h, ld->sky_r / 2, ld->sky_g / 2, ld->sky_b / 2,
 	           ld->sky_r * 5 / 2 + 14, ld->sky_g * 5 / 2 + 14, ld->sky_b * 5 / 2 + 20);
 	/* lua: um pouco acima do horizonte, numa direção fixa por mapa */
-	int az = am.moon_front ? g.cam_yaw : am.moon_az;
+	int az = am.moon_front ? g.cam_yaw : am.moon_az, dy = -260;
+	if ((g.state == STATE_TITLE || g.state == STATE_CREDITS) && title_moon_dy) {
+		az = title_moon_az;                       /* título: no alto, ao lado do logotipo */
+		dy = title_moon_dy;
+	}
 	int sx, sy;
-	if (h > 0 && render_project_dir(isin(az), -260, icos(az), &sx, &sy)) {
+	if (h > 0 && render_project_dir(isin(az), dy, icos(az), &sx, &sy)) {
 		/* nunca por baixo do HUD (barras no alto: esquerda, e direita com 2 jogadores) */
 		int under_hud = sy < 64 && (sx < 150 || (g.num_players > 1 && sx > 170));
 		if (!under_hud)

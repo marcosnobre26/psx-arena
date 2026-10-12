@@ -9,6 +9,7 @@
  * (netplay do RetroArch: o jogador remoto vira o controle 2).
  */
 #include <stdio.h>
+#include <stdlib.h>
 #include <string.h>
 #include <psxapi.h>
 #include <psxpad.h>
@@ -286,14 +287,60 @@ static void start_new_game(void) {
 /* ------------------------------------------------------------------ */
 
 /* Na tela de título a câmera gira em volta da arena */
+/* Tela de título (etapa 10): câmera FIXA e baixa num trecho de trilha com o
+ * caminho livre à frente (sem caixa, mata ou tronco perto) e pinheiros a
+ * 6-14 m na direção do olhar, recortados contra a faixa clara do horizonte,
+ * com a lua no alto à direita. Escolhida uma vez por mapa (só visual). */
+static struct { uint32_t sig; int ok, x, z, yaw; } tcam;
+
+static void title_pick_view(void) {
+	tcam.sig = g.seed * 31u + (uint32_t)g.level;
+	tcam.ok = 0;
+	int best = -1, w = level_width(), h = level_height();
+	for (int cz = 3; cz < h - 3; cz++)
+		for (int cx = 3; cx < w - 3; cx++) {
+			if ((level_cell_raw(cx, cz) & CELL_TYPE_MASK) != CELL_DIRT || !reach_walkable(cx, cz)) continue;
+			for (int d8 = 0; d8 < 8; d8++) {
+				int yaw = d8 * 512, s = isin(yaw), c = icos(yaw), clear = 1;
+				for (int k = 1; k <= 6 && clear; k++) {          /* primeiro plano livre */
+					int x = (cx * TILE_SIZE + TILE_SIZE / 2 + ((s * k * TILE_SIZE) >> 12)) / TILE_SIZE;
+					int z = (cz * TILE_SIZE + TILE_SIZE / 2 + ((c * k * TILE_SIZE) >> 12)) / TILE_SIZE;
+					if ((level_cell_raw(x, z) & CELL_SOLID) || collide_cell_has_obstacle(x, z)) clear = 0;
+				}
+				if (!clear) continue;
+				int score = 0, ex = cx * TILE_SIZE + TILE_SIZE / 2, ez = cz * TILE_SIZE + TILE_SIZE / 2;
+				int tx, tz, t;
+				for (int i = 0; (t = level_tree_get(i, &tx, &tz)) >= 0; i++) {
+					if (t != TREE_PINE && t != TREE_DEAD) continue;
+					int dx = tx - ex, dz = tz - ez, dd = dist2d(dx, dz);
+					if (dd < 6 * TILE_SIZE || dd > 14 * TILE_SIZE) continue;
+					if (abs(angle_diff(yaw, angle_of(dx, dz))) < 380) score++;   /* no quadro */
+				}
+				if ((level_cell_raw((ex + s * 3 * TILE_SIZE / 4096) / TILE_SIZE,
+				                    (ez + c * 3 * TILE_SIZE / 4096) / TILE_SIZE) & CELL_TYPE_MASK) == CELL_DIRT)
+					score += 2;                                    /* a trilha segue à frente */
+				if (score > best) { best = score; tcam.x = ex; tcam.z = ez; tcam.yaw = yaw; tcam.ok = 1; }
+			}
+		}
+	/* lua: ~36 graus à direita do olhar, bem alta (canto de cima, longe do logotipo) */
+	ambient_set_title_moon((tcam.yaw + 400) & 4095, -2450);
+}
+
 static void camera_title(void) {
-	int cx = level_width() * TILE_SIZE / 2, cz = level_height() * TILE_SIZE / 2;
-	int a = (g.frame * 6) & 4095;
-	/* baixa e perto: alta (1900, raio 2600) virava vista de cima da floresta,
-	 * enxergando chão demais (lento) */
-	VECTOR eye  = { cx + ((isin(a) * TITLE_CAM_DIST) >> 12), -TITLE_CAM_HEIGHT,
-	                cz + ((icos(a) * TITLE_CAM_DIST) >> 12) };
-	VECTOR look = { cx, -120, cz };
+	if (tcam.sig != g.seed * 31u + (uint32_t)g.level) title_pick_view();
+	if (!tcam.ok) {                               /* (sem trilha boa: o giro antigo) */
+		int cx = level_width() * TILE_SIZE / 2, cz = level_height() * TILE_SIZE / 2;
+		int a = (g.frame * 6) & 4095;
+		VECTOR eye  = { cx + ((isin(a) * TITLE_CAM_DIST) >> 12), -TITLE_CAM_HEIGHT,
+		                cz + ((icos(a) * TITLE_CAM_DIST) >> 12) };
+		VECTOR look = { cx, -120, cz };
+		render_set_camera(&eye, &look);
+		return;
+	}
+	/* balanço lento (só visual), olhar 5 graus acima do horizonte */
+	int yaw = (tcam.yaw + (isin((g.frame * 4) & 4095) * 70 >> 12)) & 4095;
+	VECTOR eye  = { tcam.x, -420, tcam.z };
+	VECTOR look = { tcam.x + ((isin(yaw) * 3000) >> 12), -420 - 262, tcam.z + ((icos(yaw) * 3000) >> 12) };
 	render_set_camera(&eye, &look);
 }
 
@@ -684,7 +731,8 @@ static void title_tick(void) {
 }
 
 static void title_draw(void) {
-	render_rect(0, 36, SCREEN_W, 150, 0, 0, 0, 1);    /* faixa escura atrás de tudo */
+	render_rect(0, 44, SCREEN_W, 72, 0, 0, 0, 1);     /* faixas escuras só atrás do texto: */
+	render_rect(0, 120, SCREEN_W, 54, 0, 0, 0, 1);    /* o céu e a lua aparecem entre elas */
 	render_sprite(&tex_titulo_t, 0, 0, tex_titulo_t.w, tex_titulo_t.h,
 	              (SCREEN_W - tex_titulo_t.w) / 2, 50, tex_titulo_t.w, tex_titulo_t.h);
 	draw_center(98, "SOBREVIVA A NOITE NA FLORESTA");
